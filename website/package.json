@@ -4,7 +4,6 @@
 	"version": "0.0.1",
 	"scripts": {
 		"dev": "astro dev",
-		"start": "astro dev",
 		"build": "astro build",
 		"preview": "astro build && wrangler dev",
 		"astro": "astro",
@@ -13,11 +12,13 @@
 	},
 	"dependencies": {
 		"@astrojs/cloudflare": "^12.6.12",
-		"@astrojs/starlight": "^0.37.1",
+		"@tailwindcss/vite": "^4.1.18",
+		"@tailwindplus/elements": "^1.0.21",
 		"astro": "^5.16.6",
-		"sharp": "^0.34.5"
+		"tailwindcss": "^4.1.18"
 	},
 	"devDependencies": {
+		"@tailwindcss/typography": "^0.5.19",
 		"@types/node": "^25.0.3",
 		"wrangler": "^4.56.0"
 	}

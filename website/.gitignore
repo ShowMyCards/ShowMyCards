@@ -20,6 +20,9 @@ pnpm-debug.log*
 # macOS-specific files
 .DS_Store
 
+# jetbrains setting folder
+.idea/
+
 # wrangler files
 .wrangler
 .dev.vars*
