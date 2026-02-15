@@ -117,14 +117,14 @@ describe('getCardTreatmentName', () => {
 			expect(result).toBe('Extended Art');
 		});
 
-		it('should handle inverted', () => {
+		it('should handle inverted (informational, not a style effect)', () => {
 			const result = getCardTreatmentName(['nonfoil'], ['inverted'], 'nonfoil');
-			expect(result).toBe('Inverted');
+			expect(result).toBe('Nonfoil');
 		});
 
 		it('should handle shatteredglass', () => {
 			const result = getCardTreatmentName(['nonfoil'], ['shatteredglass'], 'nonfoil');
-			expect(result).toBe('Shatteredglass');
+			expect(result).toBe('Shattered Glass');
 		});
 
 		it('should handle showcase with foil finish', () => {
@@ -172,9 +172,9 @@ describe('getCardTreatmentName', () => {
 			expect(result).toBe('Showcase - Extended Art - Surge Foil');
 		});
 
-		it('should handle inverted + halofoil', () => {
+		it('should handle inverted + halofoil (inverted is informational, not a style effect)', () => {
 			const result = getCardTreatmentName(['nonfoil', 'foil'], ['inverted', 'halofoil'], 'foil');
-			expect(result).toBe('Inverted - Halo Foil');
+			expect(result).toBe('Halo Foil');
 		});
 	});
 
