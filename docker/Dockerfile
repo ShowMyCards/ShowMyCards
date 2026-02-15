@@ -21,11 +21,9 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-X backend/version.Version=${VER
 # ============================================
 # Stage 2: Build SvelteKit frontend
 # ============================================
-FROM node:25-alpine AS frontend-builder
+FROM oven/bun:1-alpine AS frontend-builder
 
 WORKDIR /app
-
-RUN npm install -g bun
 
 COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
