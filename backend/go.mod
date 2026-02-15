@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/BlueMonday/go-scryfall v0.9.1
 	github.com/TwiN/gocache/v2 v2.4.0
-	github.com/expr-lang/expr v1.17.6
+	github.com/expr-lang/expr v1.17.8
 	github.com/gofiber/fiber/v3 v3.0.0-rc.3
 	gorm.io/gorm v1.31.1
 )
