@@ -1,0 +1,28 @@
+# Docker Compose for ShowMyCards (default)
+# Runs a single container with both backend and frontend
+
+services:
+  showmycards:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: showmycards
+    ports:
+      - "3000:3000"  # Backend API
+      - "3001:3001"  # Frontend
+    volumes:
+      - showmycards-data:/app/data
+    environment:
+      - BACKEND_PORT=3000
+      - FRONTEND_PORT=3001
+      - ORIGIN=http://localhost:3001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  showmycards-data:
+    name: showmycards-data

@@ -1,1 +1,54 @@
+# ============================================
+# OS & Editor
+# ============================================
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ============================================
+# Backend (Go)
+# ============================================
+backend/data
+backend/bin/
+
+# ============================================
+# Frontend (SvelteKit)
+# ============================================
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/test-results/
+frontend/.output/
+frontend/.vercel/
+frontend/.netlify/
+frontend/vite.config.js.timestamp-*
+frontend/vite.config.ts.timestamp-*
+
+# ============================================
+# Website (Astro)
+# ============================================
+website/node_modules/
+website/dist/
+website/.astro/
+website/.wrangler/
+website/.dev.vars*
+!website/.dev.vars.example
+website/npm-debug.log*
+website/yarn-debug.log*
+website/pnpm-debug.log*
+
+# ============================================
+# Environment files
+# ============================================
+.env
+.env.*
+!.env.example
+!.env.test
+
+# ============================================
+# Claude Code
+# ============================================
+.claude/
