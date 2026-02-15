@@ -15,7 +15,7 @@
 	<div class="card-body">
 		<div class="flex items-start justify-between gap-4">
 			<!-- Icon -->
-			<div class="flex-shrink-0 mt-1">
+			<div class="shrink-0 mt-1">
 				<ListTodo class="w-6 h-6 text-primary" />
 			</div>
 
@@ -48,7 +48,7 @@
 			</div>
 
 			<!-- Browse Button -->
-			<div class="flex-shrink-0">
+			<div class="shrink-0">
 				<a href="/lists/{list.id}" class="btn btn-primary btn-sm"> Browse </a>
 			</div>
 		</div>

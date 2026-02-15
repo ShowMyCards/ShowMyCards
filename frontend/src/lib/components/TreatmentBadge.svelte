@@ -40,7 +40,7 @@
 	<!-- Foil treatments get rainbow gradient background -->
 	<span
 		class="inline-flex items-center font-medium rounded
-			bg-gradient-to-r from-yellow-200 via-amber-200 to-orange-200
+			bg-linear-to-r from-yellow-200 via-amber-200 to-orange-200
 			text-amber-900 border border-amber-300/50
 			{sizeClasses[size]} {className}">
 		{displayName}

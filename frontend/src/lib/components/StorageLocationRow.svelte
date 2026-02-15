@@ -59,7 +59,7 @@
 			<input type="hidden" name="id" value={location.id} />
 
 			<!-- Icon Preview -->
-			<div class="flex-shrink-0">
+			<div class="shrink-0">
 				{#if editType === 'Box'}
 					<Box class="w-6 h-6 text-primary" />
 				{:else}
@@ -112,7 +112,7 @@
 	{:else}
 		<!-- View Mode -->
 		<!-- Storage Type Icon -->
-		<div class="flex-shrink-0">
+		<div class="shrink-0">
 			{#if location.storage_type === 'Box'}
 				<Box class="w-6 h-6 text-primary" />
 			{:else}

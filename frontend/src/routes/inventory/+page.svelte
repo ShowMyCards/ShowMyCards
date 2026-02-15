@@ -58,7 +58,7 @@
 					{#if data.unassignedCount > 0}
 						<div class="flex items-center gap-4 p-4">
 							<!-- Icon -->
-							<div class="flex-shrink-0">
+							<div class="shrink-0">
 								<AlertCircle class="w-6 h-6 text-warning" />
 							</div>
 
@@ -84,7 +84,7 @@
 					{#each data.locations as location (location.id)}
 						<div class="flex items-center gap-4 p-4">
 							<!-- Storage Type Icon -->
-							<div class="flex-shrink-0">
+							<div class="shrink-0">
 								{#if location.storage_type === 'Box'}
 									<Box class="w-6 h-6 text-primary" />
 								{:else}
