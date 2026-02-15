@@ -19,7 +19,7 @@ benchmark:
 ## coverage: ☂️  Generate coverage report
 .PHONY: coverage
 coverage:
-	go run gotest.tools/gotestsum@v1.12.0 -f testname -- ./... -race -count=1 -coverprofile=coverage.out -covermode=atomic
+	go run gotest.tools/gotestsum@v1.13.0 -f testname -- ./... -race -count=1 -coverprofile=coverage.out -covermode=atomic
 	go tool cover -html=coverage.out -o coverage.html
 	open coverage.html &
 
@@ -36,17 +36,17 @@ benchfmt:
 ## lint: 🚨 Run lint checks
 .PHONY: lint
 lint:
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0 run ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.1 run ./...
 
 ## modernize: ♻️ Check for outdated patterns
 .PHONY: modernize
 modernize:
-	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -test=false ./...
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test=false ./...
 
 ## test: 🚦 Execute all tests
 .PHONY: test
 test:
-	go run gotest.tools/gotestsum@v1.12.0 -f testname -- ./... -race -count=1 -shuffle=on
+	go run gotest.tools/gotestsum@v1.13.0 -f testname -- ./... -race -count=1 -shuffle=on
 
 ## tidy: 📌 Clean and tidy dependencies
 .PHONY: tidy

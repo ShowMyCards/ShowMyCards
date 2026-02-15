@@ -87,3 +87,25 @@ func TrimRight[S byteSeq](s S, cutset byte) S {
 	}
 	return s[:lenStr]
 }
+
+// TrimSpace removes leading and trailing whitespace from a string or byte slice.
+// This is an optimized version that's faster than strings/bytes.TrimSpace for ASCII strings.
+// It removes the following ASCII whitespace characters: space, tab, newline, carriage return, vertical tab, and form feed.
+func TrimSpace[S byteSeq](s S) S {
+	i, j := 0, len(s)-1
+
+	// fast path for empty string
+	if j < 0 {
+		return s
+	}
+
+	// Find first non-whitespace from start
+	for ; i <= j && whitespaceTable[s[i]]; i++ { //nolint:revive // we want to check for multiple whitespace chars
+	}
+
+	// Find first non-whitespace from end
+	for ; i < j && whitespaceTable[s[j]]; j-- { //nolint:revive // we want to check for multiple whitespace chars
+	}
+
+	return s[i : j+1]
+}

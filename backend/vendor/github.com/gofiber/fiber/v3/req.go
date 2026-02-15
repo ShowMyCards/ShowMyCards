@@ -11,8 +11,19 @@ import (
 	"strings"
 
 	"github.com/gofiber/utils/v2"
+	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/idna"
+)
+
+// Pre-allocated byte slices for common header comparisons to avoid allocations
+var (
+	xForwardedPrefix        = []byte("X-Forwarded-")
+	xForwardedProtoBytes    = []byte(HeaderXForwardedProto)
+	xForwardedProtocolBytes = []byte(HeaderXForwardedProtocol)
+	xForwardedSslBytes      = []byte(HeaderXForwardedSsl)
+	xURLSchemeBytes         = []byte(HeaderXUrlScheme)
+	onBytes                 = []byte("on")
 )
 
 // Range represents the parsed HTTP Range header extracted by DefaultReq.Range.
@@ -189,6 +200,137 @@ func (r *DefaultReq) RequestCtx() *fasthttp.RequestCtx {
 	return r.c.fasthttp
 }
 
+// FullURL returns the full request URL (protocol + host + original URL).
+func (c *DefaultCtx) FullURL() string {
+	buf := bytebufferpool.Get()
+	defer bytebufferpool.Put(buf)
+
+	buf.WriteString(c.Scheme())
+	buf.WriteString("://")
+	buf.WriteString(c.Host())
+	buf.WriteString(c.OriginalURL())
+
+	return c.app.toString(buf.Bytes())
+}
+
+// UserAgent returns the User-Agent request header.
+func (c *DefaultCtx) UserAgent() string {
+	return c.app.toString(c.fasthttp.Request.Header.UserAgent())
+}
+
+// Referer returns the Referer request header.
+func (c *DefaultCtx) Referer() string {
+	return c.app.toString(c.fasthttp.Request.Header.Referer())
+}
+
+// AcceptLanguage returns the Accept-Language request header.
+func (c *DefaultCtx) AcceptLanguage() string {
+	return c.app.toString(c.fasthttp.Request.Header.Peek(HeaderAcceptLanguage))
+}
+
+// AcceptEncoding returns the Accept-Encoding request header.
+func (c *DefaultCtx) AcceptEncoding() string {
+	return c.app.toString(c.fasthttp.Request.Header.Peek(HeaderAcceptEncoding))
+}
+
+// HasHeader reports whether the request includes a header with the given key.
+func (c *DefaultCtx) HasHeader(key string) bool {
+	return len(c.fasthttp.Request.Header.Peek(key)) > 0
+}
+
+// MediaType returns the MIME type from the Content-Type header without parameters.
+func (c *DefaultCtx) MediaType() string {
+	contentType := utils.TrimSpace(c.fasthttp.Request.Header.ContentType())
+	if len(contentType) == 0 {
+		return ""
+	}
+	if idx := bytes.IndexByte(contentType, ';'); idx != -1 {
+		contentType = contentType[:idx]
+	}
+	contentType = utils.TrimSpace(contentType)
+	return c.app.toString(contentType)
+}
+
+// Charset returns the charset parameter from the Content-Type header.
+func (c *DefaultCtx) Charset() string {
+	contentType := c.fasthttp.Request.Header.ContentType()
+	if len(contentType) == 0 {
+		return ""
+	}
+	_, after, ok := bytes.Cut(contentType, []byte{';'})
+	if !ok {
+		return ""
+	}
+	params := after
+	for len(params) > 0 {
+		params = utils.TrimSpace(params)
+		if len(params) == 0 {
+			return ""
+		}
+		param := params
+		if idx := bytes.IndexByte(params, ';'); idx != -1 {
+			param = params[:idx]
+			params = params[idx+1:]
+		} else {
+			params = nil
+		}
+
+		param = utils.TrimSpace(param)
+		if len(param) == 0 {
+			continue
+		}
+		before, after, ok := bytes.Cut(param, []byte{'='})
+		if !ok {
+			continue
+		}
+		name := utils.TrimSpace(before)
+		if !bytes.EqualFold(name, []byte("charset")) {
+			continue
+		}
+		value := utils.TrimSpace(after)
+		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+			value = value[1 : len(value)-1]
+		}
+		return c.app.toString(value)
+	}
+	return ""
+}
+
+// IsJSON reports whether the Content-Type header is JSON.
+func (c *DefaultCtx) IsJSON() bool {
+	return utils.EqualFold(c.MediaType(), MIMEApplicationJSON)
+}
+
+// IsForm reports whether the Content-Type header is form-encoded.
+func (c *DefaultCtx) IsForm() bool {
+	return utils.EqualFold(c.MediaType(), MIMEApplicationForm)
+}
+
+// IsMultipart reports whether the Content-Type header is multipart form data.
+func (c *DefaultCtx) IsMultipart() bool {
+	return utils.EqualFold(c.MediaType(), MIMEMultipartForm)
+}
+
+// AcceptsJSON reports whether the Accept header allows JSON.
+func (c *DefaultCtx) AcceptsJSON() bool {
+	return c.Accepts(MIMEApplicationJSON) != ""
+}
+
+// AcceptsHTML reports whether the Accept header allows HTML.
+func (c *DefaultCtx) AcceptsHTML() bool {
+	return c.Accepts(MIMETextHTML) != ""
+}
+
+// AcceptsXML reports whether the Accept header allows XML.
+func (c *DefaultCtx) AcceptsXML() bool {
+	return c.Accepts(MIMEApplicationXML, MIMETextXML) != ""
+}
+
+// AcceptsEventStream reports whether the Accept header allows text/event-stream.
+func (c *DefaultCtx) AcceptsEventStream() bool {
+	return c.Accepts("text/event-stream") != ""
+}
+
 // Cookies are used for getting a cookie value by key.
 // Defaults to the empty string "" if the cookie doesn't exist.
 // If a default value is given, it will return that value if the cookie doesn't exist.
@@ -301,8 +443,10 @@ func GetReqHeader[V GenericType](c Ctx, key string, defaultValue ...V) V {
 // Make copies or use the Immutable setting instead.
 func (r *DefaultReq) GetHeaders() map[string][]string {
 	app := r.c.app
-	headers := make(map[string][]string)
-	for k, v := range r.c.fasthttp.Request.Header.All() {
+	reqHeader := &r.c.fasthttp.Request.Header
+	// Pre-allocate map with known header count to avoid reallocations
+	headers := make(map[string][]string, reqHeader.Len())
+	for k, v := range reqHeader.All() {
 		key := app.toString(k)
 		headers[key] = append(headers[key], app.toString(v))
 	}
@@ -319,11 +463,10 @@ func (r *DefaultReq) GetHeaders() map[string][]string {
 func (r *DefaultReq) Host() string {
 	if r.IsProxyTrusted() {
 		if host := r.Get(HeaderXForwardedHost); host != "" {
-			commaPos := strings.Index(host, ",")
-			if commaPos != -1 {
-				return host[:commaPos]
+			if before, _, found := strings.Cut(host, ","); found {
+				return utils.TrimSpace(before)
 			}
-			return host
+			return utils.TrimSpace(host)
 		}
 	}
 	return r.c.app.toString(r.c.fasthttp.Request.URI().Host())
@@ -496,7 +639,7 @@ func (r *DefaultReq) Is(extension string) bool {
 	if i := strings.IndexByte(ct, ';'); i != -1 {
 		ct = ct[:i]
 	}
-	ct = utils.Trim(ct, ' ')
+	ct = utils.TrimSpace(ct)
 	return utils.EqualFold(ct, extensionHeader)
 }
 
@@ -639,27 +782,26 @@ func (r *DefaultReq) Scheme() string {
 			continue // Neither "X-Forwarded-" nor "X-Url-Scheme"
 		}
 		switch {
-		case bytes.HasPrefix(key, []byte("X-Forwarded-")):
-			if bytes.Equal(key, []byte(HeaderXForwardedProto)) ||
-				bytes.Equal(key, []byte(HeaderXForwardedProtocol)) {
+		case utils.EqualFold(key[:len(xForwardedPrefix)], xForwardedPrefix):
+			if utils.EqualFold(key, xForwardedProtoBytes) ||
+				utils.EqualFold(key, xForwardedProtocolBytes) {
 				v := app.toString(val)
-				commaPos := strings.Index(v, ",")
-				if commaPos != -1 {
-					scheme = v[:commaPos]
+				if before, _, found := strings.Cut(v, ","); found {
+					scheme = utils.TrimSpace(before)
 				} else {
-					scheme = v
+					scheme = utils.TrimSpace(v)
 				}
-			} else if bytes.Equal(key, []byte(HeaderXForwardedSsl)) && bytes.Equal(val, []byte("on")) {
+			} else if utils.EqualFold(key, xForwardedSslBytes) && utils.EqualFold(val, onBytes) {
 				scheme = schemeHTTPS
 			}
 
-		case bytes.Equal(key, []byte(HeaderXUrlScheme)):
-			scheme = app.toString(val)
+		case utils.EqualFold(key, xURLSchemeBytes):
+			scheme = utils.TrimSpace(app.toString(val))
 		default:
 			continue
 		}
 	}
-	return scheme
+	return utils.ToLower(utils.TrimSpace(scheme))
 }
 
 // Protocol returns the HTTP protocol of request: HTTP/1.1 and HTTP/2.
@@ -744,7 +886,7 @@ func (r *DefaultReq) Range(size int64) (Range, error) {
 		rangeData Range
 		ranges    string
 	)
-	rangeStr := utils.Trim(r.Get(HeaderRange), ' ')
+	rangeStr := utils.TrimSpace(r.Get(HeaderRange))
 
 	parseBound := func(value string) (int64, error) {
 		parsed, err := utils.ParseUint(value)
@@ -757,15 +899,15 @@ func (r *DefaultReq) Range(size int64) (Range, error) {
 		return int64(parsed), nil
 	}
 
-	i := strings.IndexByte(rangeStr, '=')
-	if i == -1 || strings.Contains(rangeStr[i+1:], "=") {
+	before, after, found := strings.Cut(rangeStr, "=")
+	if !found || strings.IndexByte(after, '=') >= 0 {
 		return rangeData, ErrRangeMalformed
 	}
-	rangeData.Type = utils.ToLower(utils.Trim(rangeStr[:i], ' '))
+	rangeData.Type = utils.ToLower(utils.TrimSpace(before))
 	if rangeData.Type != "bytes" {
 		return rangeData, ErrRangeMalformed
 	}
-	ranges = utils.Trim(rangeStr[i+1:], ' ')
+	ranges = utils.TrimSpace(after)
 
 	var (
 		singleRange string
@@ -775,12 +917,12 @@ func (r *DefaultReq) Range(size int64) (Range, error) {
 		singleRange = moreRanges
 		if i := strings.IndexByte(moreRanges, ','); i >= 0 {
 			singleRange = moreRanges[:i]
-			moreRanges = utils.Trim(moreRanges[i+1:], ' ')
+			moreRanges = utils.TrimSpace(moreRanges[i+1:])
 		} else {
 			moreRanges = ""
 		}
 
-		singleRange = utils.Trim(singleRange, ' ')
+		singleRange = utils.TrimSpace(singleRange)
 
 		var (
 			startStr, endStr string
@@ -789,8 +931,8 @@ func (r *DefaultReq) Range(size int64) (Range, error) {
 		if i = strings.IndexByte(singleRange, '-'); i == -1 {
 			return rangeData, ErrRangeMalformed
 		}
-		startStr = utils.Trim(singleRange[:i], ' ')
-		endStr = utils.Trim(singleRange[i+1:], ' ')
+		startStr = utils.TrimSpace(singleRange[:i])
+		endStr = utils.TrimSpace(singleRange[i+1:])
 
 		start, startErr := parseBound(startStr)
 		end, endErr := parseBound(endStr)
@@ -798,7 +940,7 @@ func (r *DefaultReq) Range(size int64) (Range, error) {
 			return rangeData, ErrRangeMalformed
 		}
 		if startErr != nil { // -nnn
-			start = size - end
+			start = max(size-end, 0)
 			end = size - 1
 		} else if endErr != nil { // nnn-
 			end = size - 1
@@ -866,11 +1008,21 @@ func (r *DefaultReq) Subdomains(offset ...int) []string {
 		return []string{}
 	}
 
-	parts := strings.Split(host, ".")
+	// Use stack-allocated array for typical domain names (up to 8 labels)
+	// This avoids heap allocation for most common cases
+	var partsBuf [8]string
+	parts := partsBuf[:0]
+
+	for part := range strings.SplitSeq(host, ".") {
+		parts = append(parts, part)
+	}
 
 	// offset == 0, caller wants everything.
 	if o == 0 {
-		return parts
+		// Need to return a copy since partsBuf is on the stack
+		result := make([]string, len(parts))
+		copy(result, parts)
+		return result
 	}
 
 	// If we trim away the whole slice (or more), nothing remains.
@@ -878,7 +1030,10 @@ func (r *DefaultReq) Subdomains(offset ...int) []string {
 		return []string{}
 	}
 
-	return parts[:len(parts)-o]
+	// Return a heap-allocated copy of the relevant portion
+	result := make([]string, len(parts)-o)
+	copy(result, parts[:len(parts)-o])
+	return result
 }
 
 // Stale returns the inverse of Fresh, indicating if the client's cached response is considered stale.
@@ -887,12 +1042,12 @@ func (r *DefaultReq) Stale() bool {
 }
 
 // IsProxyTrusted checks trustworthiness of remote ip.
-// If Config.TrustProxy false, it returns true
+// If Config.TrustProxy false, it returns false.
 // IsProxyTrusted can check remote ip by proxy ranges and ip map.
 func (r *DefaultReq) IsProxyTrusted() bool {
 	config := r.c.app.config
 	if !config.TrustProxy {
-		return true
+		return false
 	}
 
 	ip := r.c.fasthttp.RemoteIP()

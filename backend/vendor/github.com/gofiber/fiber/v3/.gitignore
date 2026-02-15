@@ -12,10 +12,14 @@
 # Output of the go coverage tool
 **/*.out
 
+.cache
+.gocache
+
 # IDE files
 .vscode
 .DS_Store
 .idea
+.claude
 
 # Misc
 *.fiber.gz

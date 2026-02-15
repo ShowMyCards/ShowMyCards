@@ -163,7 +163,7 @@ func (sm *PreStartupMessageData) DeleteEntry(key string) {
 
 func (sm *PreStartupMessageData) addEntry(key, title, value string, priority int, level StartupMessageLevel) {
 	if sm.entries == nil {
-		sm.entries = make([]startupMessageEntry, 0)
+		sm.entries = make([]startupMessageEntry, 0, 8)
 	}
 
 	for i, entry := range sm.entries {
@@ -272,7 +272,7 @@ func (h *Hooks) OnGroupName(handler ...OnGroupNameHandler) {
 	h.app.mutex.Unlock()
 }
 
-// OnListen is a hook to execute user functions on Listen, ListenTLS, Listener.
+// OnListen is a hook to execute user functions on Listen or Listener.
 func (h *Hooks) OnListen(handler ...OnListenHandler) {
 	h.app.mutex.Lock()
 	h.onListen = append(h.onListen, handler...)

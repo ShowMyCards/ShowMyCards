@@ -95,6 +95,8 @@ type Ctx interface {
 	// Optionally, you could override the path.
 	// Make copies or use the Immutable setting to use the value outside the Handler.
 	Path(override ...string) string
+	// RequestID returns the request identifier from the response header or request header.
+	RequestID() string
 	// Req returns a convenience type whose API is limited to operations
 	// on the incoming request.
 	Req() Req
@@ -119,6 +121,9 @@ type Ctx interface {
 	IsMiddleware() bool
 	// HasBody returns true if the request declares a body via Content-Length, Transfer-Encoding, or already buffered payload data.
 	HasBody() bool
+	// OverrideParam overwrites a route parameter value by name.
+	// If the parameter name does not exist in the route, this method does nothing.
+	OverrideParam(name, value string)
 	// IsWebSocket returns true if the request includes a WebSocket upgrade handshake.
 	IsWebSocket() bool
 	// IsPreflight returns true if the request is a CORS preflight.
@@ -147,8 +152,27 @@ type Ctx interface {
 	configDependentPaths()
 	// Reset is a method to reset context fields by given request when to use server handlers.
 	Reset(fctx *fasthttp.RequestCtx)
-	// Release is a method to reset context fields when to use ReleaseCtx()
+	// release is a method to reset context fields when to use ReleaseCtx()
 	release()
+	// Abandon marks this context as abandoned. An abandoned context will not be
+	// returned to the pool when ReleaseCtx is called.
+	//
+	// This is used by the timeout middleware to return immediately while the
+	// handler goroutine continues using the context safely.
+	//
+	// Only call ForceRelease after Abandon if you can guarantee no other goroutine
+	// (including Fiber's requestHandler and ErrorHandler) will touch the context.
+	// The timeout middleware intentionally does NOT call ForceRelease to avoid
+	// races, which means timed-out requests leak their contexts until a safe
+	// reclamation strategy exists.
+	Abandon()
+	// IsAbandoned returns true if Abandon() was called on this context.
+	IsAbandoned() bool
+	// ForceRelease releases an abandoned context back to the pool.
+	// This MUST only be called after all goroutines (including requestHandler and
+	// ErrorHandler) have completely finished using this context. Calling it while
+	// any goroutine is still running causes races.
+	ForceRelease()
 	renderExtensions(bind any)
 	// Bind You can bind body, cookie, headers etc. into the map, map slice, struct easily by using Binding method.
 	// It gives custom binding support, detailed binding options and more.
@@ -168,6 +192,36 @@ type Ctx interface {
 	setSkipNonUseRoutes(skip bool)
 	setRoute(route *Route)
 	getPathOriginal() string
+	// FullURL returns the full request URL (protocol + host + original URL).
+	FullURL() string
+	// UserAgent returns the User-Agent request header.
+	UserAgent() string
+	// Referer returns the Referer request header.
+	Referer() string
+	// AcceptLanguage returns the Accept-Language request header.
+	AcceptLanguage() string
+	// AcceptEncoding returns the Accept-Encoding request header.
+	AcceptEncoding() string
+	// HasHeader reports whether the request includes a header with the given key.
+	HasHeader(key string) bool
+	// MediaType returns the MIME type from the Content-Type header without parameters.
+	MediaType() string
+	// Charset returns the charset parameter from the Content-Type header.
+	Charset() string
+	// IsJSON reports whether the Content-Type header is JSON.
+	IsJSON() bool
+	// IsForm reports whether the Content-Type header is form-encoded.
+	IsForm() bool
+	// IsMultipart reports whether the Content-Type header is multipart form data.
+	IsMultipart() bool
+	// AcceptsJSON reports whether the Accept header allows JSON.
+	AcceptsJSON() bool
+	// AcceptsHTML reports whether the Accept header allows HTML.
+	AcceptsHTML() bool
+	// AcceptsXML reports whether the Accept header allows XML.
+	AcceptsXML() bool
+	// AcceptsEventStream reports whether the Accept header allows text/event-stream.
+	AcceptsEventStream() bool
 	// Accepts checks if the specified extensions or content types are acceptable.
 	Accepts(offers ...string) string
 	// AcceptsCharsets checks if the specified charset is acceptable.
@@ -310,7 +364,7 @@ type Ctx interface {
 	// Stale returns the inverse of Fresh, indicating if the client's cached response is considered stale.
 	Stale() bool
 	// IsProxyTrusted checks trustworthiness of remote ip.
-	// If Config.TrustProxy false, it returns true
+	// If Config.TrustProxy false, it returns false.
 	// IsProxyTrusted can check remote ip by proxy ranges and ip map.
 	IsProxyTrusted() bool
 	// IsFromLocal will return true if request came from local.
