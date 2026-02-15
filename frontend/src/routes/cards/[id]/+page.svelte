@@ -42,7 +42,7 @@
 					<img src={card.image_uri} alt={card.name} class="w-full" />
 				</figure>
 			{:else}
-				<div class="w-full aspect-[5/7] bg-base-300 rounded-lg flex items-center justify-center">
+				<div class="w-full aspect-5/7 bg-base-300 rounded-lg flex items-center justify-center">
 					<p class="opacity-50">No image available</p>
 				</div>
 			{/if}
@@ -119,8 +119,8 @@
 						<div class="divider"></div>
 						<h4 class="font-semibold">Other Printings You Own</h4>
 						<p class="text-sm opacity-70">
-							{card.inventory.other_printings.reduce((sum, i) => sum + i.quantity, 0)} copies across
-							other printings
+							{card.inventory.other_printings.reduce((sum, i) => sum + i.quantity, 0)} copies across other
+							printings
 						</p>
 					{/if}
 				</div>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { PageHeader, Notification } from '$lib';
-	import { Home, ArrowLeft, RefreshCw, AlertTriangle } from '@lucide/svelte';
+	import { Home, ArrowLeft, RefreshCw, TriangleAlert } from '@lucide/svelte';
 
 	const status = $derived(page.status);
 	const errorMessage = $derived(page.error?.message || 'An unexpected error occurred');
@@ -86,7 +86,7 @@
 			<div class="mb-8 w-full max-w-2xl">
 				<Notification type="error">
 					<div class="flex items-start gap-2">
-						<AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
+						<TriangleAlert class="w-5 h-5 shrink-0 mt-0.5" />
 						<div class="text-left">
 							<div class="font-semibold mb-1">Error Details:</div>
 							<div class="text-sm opacity-90">{errorMessage}</div>
