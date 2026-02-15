@@ -21,7 +21,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-X backend/version.Version=${VER
 # ============================================
 # Stage 2: Build SvelteKit frontend
 # ============================================
-FROM node:22-alpine AS frontend-builder
+FROM node:25-alpine AS frontend-builder
 
 WORKDIR /app
 
