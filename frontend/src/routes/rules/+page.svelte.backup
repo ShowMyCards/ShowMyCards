@@ -1,0 +1,408 @@
+<script lang="ts">
+	import {
+		PageHeader,
+		EmptyState,
+		Modal,
+		RuleFormModal,
+		RulesTable,
+		RuleTester,
+		notifications,
+		rulesApi,
+		storageApi,
+		useFormState,
+		useExpressionValidation,
+		TIMEOUTS,
+		type SortingRule,
+		type StorageLocation
+	} from '$lib';
+	import { Plus } from '@lucide/svelte';
+	import { goto, invalidateAll } from '$app/navigation';
+	import type { DragDropState } from '@thisux/sveltednd';
+
+	let { data } = $props();
+
+	// State - use $derived for data-based values
+	let rules = $derived(data.rules || []);
+	let storageLocations = $derived(data.storageLocations || []);
+
+	// Pagination
+	let currentPage = $derived(data.pagination.page);
+	let totalPages = $derived(data.pagination.total_pages);
+
+	// Filtering
+	let filterEnabled = $state<boolean | null>(null);
+
+	// Modals
+	let showCreateModal = $state(false);
+	let showEditModal = $state(false);
+	let showDeleteModal = $state(false);
+
+	// Form state - Create
+	const createForm = useFormState({
+		name: '',
+		expression: '',
+		storage_location_id: '' as number | '',
+		enabled: true
+	});
+
+	// Form state - Edit
+	let editRule = $state<SortingRule | null>(null);
+	const editForm = useFormState({
+		name: '',
+		expression: '',
+		storage_location_id: '' as number | '',
+		enabled: true,
+		priority: 1
+	});
+
+	// Delete state
+	let ruleToDelete = $state<SortingRule | null>(null);
+
+	// Expression validation - Create
+	const createExpressionValidation = useExpressionValidation({
+		debounce: TIMEOUTS.VALIDATION_DEBOUNCE
+	});
+
+	// Expression validation - Edit
+	const editExpressionValidation = useExpressionValidation({
+		debounce: TIMEOUTS.VALIDATION_DEBOUNCE
+	});
+
+	// Rule highlighting
+	let highlightedRuleId = $state<number | null>(null);
+
+	// Local rules state for drag-and-drop (optimistic updates)
+	let localRules = $state<SortingRule[]>([]);
+	let isUpdatingPriorities = $state(false);
+
+	// Handlers
+	async function handlePageChange(page: number) {
+		const url = new URL(window.location.href);
+		url.searchParams.set('page', page.toString());
+		if (filterEnabled !== null) {
+			url.searchParams.set('enabled', filterEnabled.toString());
+		}
+		await goto(url.toString(), { invalidateAll: true });
+	}
+
+	async function handleFilterChange(enabled: boolean | null) {
+		filterEnabled = enabled;
+		const url = new URL(window.location.href);
+		url.searchParams.set('page', '1');
+		if (enabled !== null) {
+			url.searchParams.set('enabled', enabled.toString());
+		} else {
+			url.searchParams.delete('enabled');
+		}
+		await goto(url.toString(), { invalidateAll: true });
+	}
+
+	function insertExpression(expression: string, isCreate: boolean) {
+		if (isCreate) {
+			createForm.setField('expression', expression);
+			createExpressionValidation.setExpression(expression);
+		} else {
+			editForm.setField('expression', expression);
+			editExpressionValidation.setExpression(expression);
+		}
+	}
+
+	async function handleCreateRule() {
+		const values = createForm.values;
+
+		if (!values.name.trim() || !values.expression.trim() || values.storage_location_id === '') {
+			notifications.error('Please fill in all required fields');
+			return;
+		}
+
+		// Check expression validation
+		if (!createExpressionValidation.isValid) {
+			notifications.error('Please fix the expression error');
+			return;
+		}
+
+		await createForm.submit(
+			async (formValues) => {
+				await rulesApi.create({
+					name: formValues.name,
+					expression: formValues.expression,
+					storage_location_id: Number(formValues.storage_location_id),
+					enabled: formValues.enabled,
+					priority: rules.length + 1
+				});
+			},
+			{
+				onSuccess: () => {
+					notifications.success('Rule created successfully');
+					showCreateModal = false;
+					createExpressionValidation.setExpression('');
+					invalidateAll();
+				},
+				onError: (error) => {
+					notifications.error(error.message || 'Failed to create rule');
+				}
+			}
+		);
+	}
+
+	function openEditModal(rule: SortingRule) {
+		editRule = rule;
+		editForm.setField('name', rule.name);
+		editForm.setField('expression', rule.expression);
+		editForm.setField('storage_location_id', rule.storage_location_id);
+		editForm.setField('enabled', rule.enabled);
+		editForm.setField('priority', rule.priority);
+		editExpressionValidation.setExpression(rule.expression);
+		showEditModal = true;
+	}
+
+	async function handleEditRule() {
+		const values = editForm.values;
+
+		if (!editRule || !values.name.trim() || !values.expression.trim() || values.storage_location_id === '') {
+			notifications.error('Please fill in all required fields');
+			return;
+		}
+
+		// Check expression validation
+		if (!editExpressionValidation.isValid) {
+			notifications.error('Please fix the expression error');
+			return;
+		}
+
+		await editForm.submit(
+			async (formValues) => {
+				await rulesApi.update(editRule!.id, {
+					name: formValues.name,
+					expression: formValues.expression,
+					storage_location_id: Number(formValues.storage_location_id),
+					enabled: formValues.enabled,
+					priority: formValues.priority
+				});
+			},
+			{
+				onSuccess: () => {
+					notifications.success('Rule updated successfully');
+					showEditModal = false;
+					invalidateAll();
+				},
+				onError: (error) => {
+					notifications.error(error.message || 'Failed to update rule');
+				},
+				resetOnSuccess: false
+			}
+		);
+	}
+
+	function openDeleteModal(rule: SortingRule) {
+		ruleToDelete = rule;
+		showDeleteModal = true;
+	}
+
+	async function handleDeleteRule() {
+		if (!ruleToDelete) return;
+
+		try {
+			await rulesApi.delete(ruleToDelete.id);
+			notifications.success('Rule deleted successfully');
+			showDeleteModal = false;
+			ruleToDelete = null;
+			await invalidateAll();
+		} catch (error) {
+			notifications.error(error instanceof Error ? error.message : 'Failed to delete rule');
+		}
+	}
+
+	async function handleToggleEnabled(rule: SortingRule) {
+		try {
+			await rulesApi.update(rule.id, { enabled: !rule.enabled });
+			notifications.success(`Rule ${!rule.enabled ? 'enabled' : 'disabled'}`);
+			await invalidateAll();
+		} catch (error) {
+			notifications.error(error instanceof Error ? error.message : 'Failed to update rule');
+		}
+	}
+
+	function openCreateModal() {
+		createForm.reset();
+		createExpressionValidation.setExpression('');
+		showCreateModal = true;
+	}
+
+	function handleRuleMatch(ruleId: number) {
+		highlightedRuleId = ruleId;
+
+		// Scroll to the highlighted rule
+		setTimeout(() => {
+			const ruleRow = document.querySelector(`[data-rule-id="${ruleId}"]`);
+			if (ruleRow) {
+				ruleRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}, 100);
+
+		// Clear highlight after 3 seconds
+		setTimeout(() => {
+			highlightedRuleId = null;
+		}, 3000);
+	}
+
+	function handleDrop(state: DragDropState<{ rule: SortingRule; index: number }>) {
+		const { draggedItem, targetContainer } = state;
+		if (!draggedItem || !targetContainer) return;
+
+		const draggedRule = draggedItem.rule;
+		const targetIndex = parseInt(targetContainer.replace('rule-', ''));
+
+		const draggedIndex = localRules.findIndex((r) => r.id === draggedRule.id);
+
+		if (draggedIndex === -1 || draggedIndex === targetIndex) return;
+
+		// Reorder the array
+		const newRules = [...localRules];
+		const [removed] = newRules.splice(draggedIndex, 1);
+		newRules.splice(targetIndex, 0, removed);
+
+		// Update priorities
+		const updated = newRules.map((rule, index) => ({
+			...rule,
+			priority: index + 1
+		}));
+
+		// Optimistically update local state
+		localRules = updated;
+
+		// Save to backend
+		savePriorities(updated);
+	}
+
+	async function savePriorities(updatedRules: SortingRule[]) {
+		isUpdatingPriorities = true;
+
+		try {
+			// Use batch update endpoint for better performance
+			const updates = updatedRules.map((rule) => ({
+				id: rule.id,
+				priority: rule.priority
+			}));
+
+			const result = await rulesApi.batchUpdatePriorities(updates);
+			notifications.success(`${result.updated_count} rule priorities updated`);
+			// Refresh from backend to ensure consistency
+			await invalidateAll();
+		} catch (error) {
+			notifications.error(error instanceof Error ? error.message : 'Failed to update priorities');
+			// Revert on error by refreshing from backend
+			await invalidateAll();
+		} finally {
+			isUpdatingPriorities = false;
+		}
+	}
+
+	// Update localRules when data changes, but not during priority updates
+	// Use $effect.pre to run before DOM updates and prevent flickering
+	$effect.pre(() => {
+		// Only sync from server if we're not in the middle of updating priorities
+		if (!isUpdatingPriorities) {
+			localRules = rules;
+		}
+	});
+</script>
+
+<div class="mx-auto px-4 py-8">
+	<!-- Page Header -->
+	<PageHeader
+		title="Storage Rules"
+		description="Automatically sort cards into storage locations based on conditions">
+		{#snippet actions()}
+			<button onclick={openCreateModal} class="btn btn-primary">
+				<Plus class="w-4 h-4" />
+				New Rule
+			</button>
+		{/snippet}
+	</PageHeader>
+
+	<!-- Filter tabs -->
+	<div class="tabs tabs-boxed">
+		<button
+			class="tab {filterEnabled === null ? 'tab-active' : ''}"
+			onclick={() => handleFilterChange(null)}>
+			All Rules
+		</button>
+		<button
+			class="tab {filterEnabled === true ? 'tab-active' : ''}"
+			onclick={() => handleFilterChange(true)}>
+			Enabled
+		</button>
+		<button
+			class="tab {filterEnabled === false ? 'tab-active' : ''}"
+			onclick={() => handleFilterChange(false)}>
+			Disabled
+		</button>
+	</div>
+
+	<!-- Rules table and tester -->
+	{#if rules.length === 0}
+		<EmptyState message="No sorting rules yet">
+			<button onclick={openCreateModal} class="btn btn-primary">
+				<Plus class="w-4 h-4" />
+				Create Rule
+			</button>
+		</EmptyState>
+	{:else}
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Rules Table (2/3 width on desktop) -->
+			<div class="lg:col-span-2">
+				<RulesTable
+					rules={localRules}
+					{highlightedRuleId}
+					{currentPage}
+					{totalPages}
+					onEdit={openEditModal}
+					onDelete={openDeleteModal}
+					onToggleEnabled={handleToggleEnabled}
+					onDrop={handleDrop}
+					onPageChange={handlePageChange} />
+			</div>
+
+			<!-- Rule Tester (1/3 width on desktop) -->
+			<div class="lg:col-span-1">
+				<div class="lg:sticky lg:top-4">
+					<RuleTester {rules} onRuleMatch={handleRuleMatch} />
+				</div>
+			</div>
+		</div>
+	{/if}
+</div>
+
+<!-- Create Rule Modal -->
+<RuleFormModal
+	open={showCreateModal}
+	mode="create"
+	formState={createForm}
+	expressionValidation={createExpressionValidation}
+	{storageLocations}
+	onClose={() => (showCreateModal = false)}
+	onSubmit={handleCreateRule}
+	onInsertExpression={(expr) => insertExpression(expr, true)} />
+
+<!-- Edit Rule Modal -->
+<RuleFormModal
+	open={showEditModal}
+	mode="edit"
+	formState={editForm}
+	expressionValidation={editExpressionValidation}
+	{storageLocations}
+	onClose={() => (showEditModal = false)}
+	onSubmit={handleEditRule}
+	onInsertExpression={(expr) => insertExpression(expr, false)} />
+
+<!-- Delete Rule Modal -->
+<Modal open={showDeleteModal} onClose={() => (showDeleteModal = false)} title="Delete Storage Rule">
+	<p>Are you sure you want to delete <strong>{ruleToDelete?.name}</strong>?</p>
+	<p class="text-sm opacity-70 mt-2">This action cannot be undone.</p>
+
+	<div class="modal-action">
+		<button onclick={() => (showDeleteModal = false)} class="btn btn-ghost">Cancel</button>
+		<button onclick={handleDeleteRule} class="btn btn-error">Delete Rule</button>
+	</div>
+</Modal>
