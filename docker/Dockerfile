@@ -57,7 +57,7 @@ COPY --from=frontend-builder /app/package.json ./frontend/
 
 # Install frontend production dependencies
 WORKDIR /app/frontend
-RUN npm install --omit=dev
+RUN npm install --omit=dev --legacy-peer-deps
 WORKDIR /app
 
 # Create data directory for SQLite

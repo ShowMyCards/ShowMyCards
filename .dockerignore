@@ -1,0 +1,29 @@
+# Git and CI
+.git
+.github
+.gitignore
+.dockerignore
+
+# IDE and OS
+.DS_Store
+.idea
+.vscode
+.claude
+
+# Backend build artifacts and data
+backend/bin
+backend/data
+
+# Frontend build artifacts
+frontend/node_modules
+frontend/.svelte-kit
+frontend/build
+frontend/test-results
+
+# Website (not part of the Docker image)
+website
+
+# Documentation
+*.md
+!frontend/README.md
+LICENSE
