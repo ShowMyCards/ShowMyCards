@@ -96,8 +96,7 @@ func (grp *Group) Use(args ...any) Router {
 
 	for _, prefix := range prefixes {
 		if subApp != nil {
-			grp.mount(prefix, subApp)
-			return grp
+			return grp.mount(prefix, subApp)
 		}
 
 		grp.app.register([]string{methodUse}, getGroupPath(grp.Prefix, prefix), grp, handlers...)
@@ -164,6 +163,7 @@ func (grp *Group) Patch(path string, handler any, handlers ...any) Router {
 }
 
 // Add allows you to specify multiple HTTP methods to register a route.
+// The provided handlers are executed in order, starting with `handler` and then the variadic `handlers`.
 func (grp *Group) Add(methods []string, path string, handler any, handlers ...any) Router {
 	converted := collectHandlers("group", append([]any{handler}, handlers...)...)
 	grp.app.register(methods, getGroupPath(grp.Prefix, path), grp, converted...)

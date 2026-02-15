@@ -34,7 +34,7 @@ import (
 )
 
 // Version of current fiber package
-const Version = "3.0.0-rc.3"
+const Version = "3.0.0"
 
 // Handler defines a function to serve HTTP requests.
 type Handler = func(Ctx) error
@@ -517,7 +517,6 @@ func DefaultErrorHandler(c Ctx, err error) error {
 // You can pass optional configuration options by passing a Config struct:
 //
 //	app := fiber.New(fiber.Config{
-//	    Prefork: true,
 //	    ServerHeader: "Fiber",
 //	})
 func New(config ...Config) *App {
@@ -670,7 +669,7 @@ func (app *App) GetBytes(b []byte) []byte {
 
 // Adds an ip address to TrustProxyConfig.ranges or TrustProxyConfig.ips based on whether it is an IP range or not
 func (app *App) handleTrustedProxy(ipAddress string) {
-	if strings.Contains(ipAddress, "/") {
+	if strings.IndexByte(ipAddress, '/') >= 0 {
 		_, ipNet, err := net.ParseCIDR(ipAddress)
 		if err != nil {
 			log.Warnf("IP range %q could not be parsed: %v", ipAddress, err)
@@ -716,16 +715,30 @@ func (app *App) ReloadViews() error {
 	app.mutex.Lock()
 	defer app.mutex.Unlock()
 
-	if app.config.Views == nil {
-		return ErrNoViewEngineConfigured
+	apps := map[string]*App{"": app}
+	if app.mountFields != nil {
+		apps = app.mountFields.appList
 	}
 
-	if viewValue := reflect.ValueOf(app.config.Views); viewValue.Kind() == reflect.Pointer && viewValue.IsNil() {
-		return ErrNoViewEngineConfigured
+	var reloaded bool
+	for _, targetApp := range apps {
+		if targetApp == nil || targetApp.config.Views == nil {
+			continue
+		}
+
+		if viewValue := reflect.ValueOf(targetApp.config.Views); viewValue.Kind() == reflect.Pointer && viewValue.IsNil() {
+			continue
+		}
+
+		if err := targetApp.config.Views.Load(); err != nil {
+			return fmt.Errorf("fiber: failed to reload views: %w", err)
+		}
+
+		reloaded = true
 	}
 
-	if err := app.config.Views.Load(); err != nil {
-		return fmt.Errorf("fiber: failed to reload views: %w", err)
+	if !reloaded {
+		return ErrNoViewEngineConfigured
 	}
 
 	return nil
@@ -846,8 +859,7 @@ func (app *App) Use(args ...any) Router {
 
 	for _, prefix := range prefixes {
 		if subApp != nil {
-			app.mount(prefix, subApp)
-			return app
+			return app.mount(prefix, subApp)
 		}
 
 		app.register([]string{methodUse}, prefix, nil, handlers...)
@@ -910,6 +922,7 @@ func (app *App) Patch(path string, handler any, handlers ...any) Router {
 }
 
 // Add allows you to specify multiple HTTP methods to register a route.
+// The provided handlers are executed in order, starting with `handler` and then the variadic `handlers`.
 func (app *App) Add(methods []string, path string, handler any, handlers ...any) Router {
 	converted := collectHandlers("add", append([]any{handler}, handlers...)...)
 	app.register(methods, path, nil, converted...)
@@ -1301,9 +1314,15 @@ func (app *App) ErrorHandler(ctx Ctx, err error) error {
 		mountedPrefixParts int
 	)
 
-	for prefix, subApp := range app.mountFields.appList {
-		if prefix != "" && strings.HasPrefix(ctx.Path(), prefix) {
-			parts := len(strings.Split(prefix, "/"))
+	normalizedPath := utils.AddTrailingSlashString(ctx.Path())
+
+	for _, prefix := range app.mountFields.appListKeys {
+		subApp := app.mountFields.appList[prefix]
+		normalizedPrefix := utils.AddTrailingSlashString(prefix)
+
+		if prefix != "" && strings.HasPrefix(normalizedPath, normalizedPrefix) {
+			// Count slashes instead of splitting - more efficient
+			parts := strings.Count(prefix, "/") + 1
 			if mountedPrefixParts <= parts {
 				if subApp.configured.ErrorHandler != nil {
 					mountedErrHandler = subApp.config.ErrorHandler
