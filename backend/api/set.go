@@ -36,14 +36,14 @@ func (h *SetHandler) List(c fiber.Ctx) error {
 	params := utils.ParsePaginationParams(c, utils.DefaultPageSize, utils.MaxPageSize)
 
 	var total int64
-	if err := h.db.Model(&models.Set{}).Count(&total).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Model(&models.Set{}).Count(&total).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to count sets", "database count failed", err)
 	}
 
 	var sets []models.Set
 	offset := utils.CalculateOffset(params.Page, params.PageSize)
-	if err := h.db.Order("released_at DESC, name ASC").Offset(offset).Limit(params.PageSize).Find(&sets).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Order("released_at DESC, name ASC").Offset(offset).Limit(params.PageSize).Find(&sets).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch sets", "database query failed", err)
 	}
@@ -60,7 +60,7 @@ func (h *SetHandler) GetByID(c fiber.Ctx) error {
 	}
 
 	var set models.Set
-	if err := h.db.Where("scryfall_id = ?", id).First(&set).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Where("scryfall_id = ?", id).First(&set).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.ReturnError(c, fiber.StatusNotFound, "set not found")
 		}
@@ -78,7 +78,7 @@ func (h *SetHandler) GetByCode(c fiber.Ctx) error {
 	}
 
 	var set models.Set
-	if err := h.db.Where("code = ?", code).First(&set).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Where("code = ?", code).First(&set).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.ReturnError(c, fiber.StatusNotFound, "set not found")
 		}

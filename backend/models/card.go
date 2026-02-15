@@ -3,6 +3,8 @@ package models
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"strings"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
@@ -117,7 +119,7 @@ func GetCardsByIDs(db *gorm.DB, scryfallIDs []string) (map[string]Card, error) {
 
 	var cards []Card
 	if err := db.Where("scryfall_id IN ?", scryfallIDs).Find(&cards).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching cards by IDs: %w", err)
 	}
 
 	cardMap := make(map[string]Card, len(cards))
@@ -125,4 +127,25 @@ func GetCardsByIDs(db *gorm.DB, scryfallIDs []string) (map[string]Card, error) {
 		cardMap[card.ScryfallID] = card
 	}
 	return cardMap, nil
+}
+
+// GetScryfallCardsByIDs fetches cards by their Scryfall IDs, unmarshals them,
+// and returns a map of Scryfall ID to parsed scryfall.Card.
+// Cards that fail to unmarshal are logged and skipped.
+func GetScryfallCardsByIDs(db *gorm.DB, scryfallIDs []string) (map[string]scryfall.Card, error) {
+	cardMap, err := GetCardsByIDs(db, scryfallIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]scryfall.Card, len(cardMap))
+	for id, card := range cardMap {
+		scryfallCard, err := card.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", id, "error", err)
+			continue
+		}
+		result[id] = scryfallCard
+	}
+	return result, nil
 }

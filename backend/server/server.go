@@ -51,6 +51,8 @@ func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient
 
 	// Middleware
 	app.Use(logger.New())
+	// Default allows the standard SvelteKit dev server origin.
+	// Override via ALLOWED_ORIGINS env var (comma-separated) for production deployments.
 	allowedOrigins := []string{"http://localhost:5173"}
 	if origins := os.Getenv("ALLOWED_ORIGINS"); origins != "" {
 		allowedOrigins = strings.Split(origins, ",")

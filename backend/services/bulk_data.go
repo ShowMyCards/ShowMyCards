@@ -178,8 +178,11 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 	s.updateJobMetadata(ctx, jobID, JobMetadata{Phase: "fetching_list"})
 
 	bulkDataURL, err := s.settingsService.Get(ctx, "bulk_data_url")
-	if err != nil {
-		return fmt.Errorf("failed to get bulk data URL setting: %w", err)
+	if err != nil || bulkDataURL == "" {
+		bulkDataURL = "https://api.scryfall.com/bulk-data"
+		if err != nil {
+			slog.Warn("failed to get bulk data URL setting, using default", "error", err, "default", bulkDataURL)
+		}
 	}
 
 	downloadURI, err := s.fetchBulkDataDownloadURI(ctx, bulkDataURL)

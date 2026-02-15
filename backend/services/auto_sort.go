@@ -34,7 +34,7 @@ func (s *AutoSortService) DetermineStorageLocation(ctx context.Context, scryfall
 	}
 
 	evaluator := rules.NewEvaluator(s.db)
-	location, err := evaluator.EvaluateCard(cardData)
+	location, err := evaluator.EvaluateCard(ctx, cardData)
 	if err != nil {
 		return nil, fmt.Errorf("no matching rule: %w", err)
 	}

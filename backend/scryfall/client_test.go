@@ -32,6 +32,10 @@ func (m *mockAPI) ListSets(ctx context.Context) ([]scryfall.Set, error) {
 	return nil, nil
 }
 
+func (m *mockAPI) AutocompleteCard(ctx context.Context, s string) ([]string, error) {
+	return nil, nil
+}
+
 func TestSearch_Success(t *testing.T) {
 	expectedCards := []scryfall.Card{
 		{ID: "card-1", Name: "Lightning Bolt"},

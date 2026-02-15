@@ -63,15 +63,15 @@ func (h *StorageHandler) Get(c fiber.Ctx) error {
 	return c.JSON(location)
 }
 
-// CreateRequest represents the request body for creating a storage location
-type CreateRequest struct {
+// CreateStorageRequest represents the request body for creating a storage location
+type CreateStorageRequest struct {
 	Name        string             `json:"name"`
 	StorageType models.StorageType `json:"storage_type"`
 }
 
 // Create creates a new storage location
 func (h *StorageHandler) Create(c fiber.Ctx) error {
-	var req CreateRequest
+	var req CreateStorageRequest
 	if err := c.Bind().Body(&req); err != nil {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
 	}
@@ -109,7 +109,7 @@ func (h *StorageHandler) Update(c fiber.Ctx) error {
 			"Failed to fetch storage location", "database query failed", err)
 	}
 
-	var req CreateRequest
+	var req CreateStorageRequest
 	if err := c.Bind().Body(&req); err != nil {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
 	}
@@ -219,8 +219,8 @@ func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 			"Failed to aggregate inventory counts", "query failed", err)
 	}
 	countMap := make(map[uint]locationCount, len(counts))
-	for _, c := range counts {
-		countMap[c.StorageLocationID] = c
+	for _, lc := range counts {
+		countMap[lc.StorageLocationID] = lc
 	}
 
 	// Step 3: Fetch only assigned inventory for value calculation
@@ -245,7 +245,7 @@ func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 	for id := range scryfallIDSet {
 		scryfallIDs = append(scryfallIDs, id)
 	}
-	cardMap, err := models.GetCardsByIDs(h.db.WithContext(c.RequestCtx()), scryfallIDs)
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(c.RequestCtx()), scryfallIDs)
 	if err != nil {
 		slog.Warn("failed to fetch some cards", "component", "storage", "error", err)
 	}
@@ -257,12 +257,9 @@ func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 		totalValue := 0.0
 
 		for _, item := range inventoryByLocation[location.ID] {
-			if card, ok := cardMap[item.ScryfallID]; ok {
-				scryfallCard, parseErr := card.ToScryfallCard()
-				if parseErr == nil {
-					price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
-					totalValue += price * float64(item.Quantity)
-				}
+			if scryfallCard, ok := scryfallCardMap[item.ScryfallID]; ok {
+				price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+				totalValue += price * float64(item.Quantity)
 			}
 		}
 

@@ -213,4 +213,33 @@ func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 	return c.JSON(card)
 }
 
+// AutocompleteResponse represents card name autocomplete suggestions
+// tygo:export
+type AutocompleteResponse struct {
+	Suggestions []string `json:"suggestions"`
+}
+
+// Autocomplete returns card name autocomplete suggestions from Scryfall
+func (h *SearchHandler) Autocomplete(c fiber.Ctx) error {
+	query := c.Query("q")
+
+	if query == "" || len(query) < 2 {
+		return c.JSON(AutocompleteResponse{Suggestions: []string{}})
+	}
+
+	result, err := h.client.Autocomplete(c.RequestCtx(), query)
+	if err != nil {
+		slog.Warn("autocomplete failed", "component", "search", "error", err)
+		return c.JSON(AutocompleteResponse{Suggestions: []string{}})
+	}
+
+	// Limit to 5 suggestions
+	suggestions := result
+	if len(suggestions) > 5 {
+		suggestions = suggestions[:5]
+	}
+
+	return c.JSON(AutocompleteResponse{Suggestions: suggestions})
+}
+
 // fiber:context-methods migrated

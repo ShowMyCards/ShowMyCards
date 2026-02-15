@@ -4,29 +4,29 @@ package rules
 
 import (
 	"backend/models"
+	"context"
 	"fmt"
 
 	"github.com/expr-lang/expr"
-	"github.com/expr-lang/expr/vm"
 	"gorm.io/gorm"
 )
 
-// Evaluator handles rule evaluation for card sorting
+// Evaluator handles rule evaluation for card sorting.
+// A new Evaluator should be created per request; it is not safe for concurrent use.
 type Evaluator struct {
-	db       *gorm.DB
-	programs map[string]*vm.Program
+	db *gorm.DB
 }
 
 // NewEvaluator creates a new rule evaluator
 func NewEvaluator(db *gorm.DB) *Evaluator {
-	return &Evaluator{db: db, programs: make(map[string]*vm.Program)}
+	return &Evaluator{db: db}
 }
 
 // EvaluateCard evaluates a card against all enabled rules and returns the matching storage location.
 // It fetches rules from the database on each call — use EvaluateCardWithRules for batch operations.
-func (e *Evaluator) EvaluateCard(cardData map[string]interface{}) (*models.StorageLocation, error) {
+func (e *Evaluator) EvaluateCard(ctx context.Context, cardData map[string]interface{}) (*models.StorageLocation, error) {
 	var rules []models.SortingRule
-	if err := e.db.Where("enabled = ?", true).
+	if err := e.db.WithContext(ctx).Where("enabled = ?", true).
 		Order("priority ASC").
 		Preload("StorageLocation").
 		Find(&rules).Error; err != nil {
@@ -86,15 +86,10 @@ func (e *Evaluator) evaluateExpression(expression string, cardData map[string]in
 		return isColor(cardData, colors...)
 	}
 
-	// Compile the expression (cached)
-	program, ok := e.programs[expression]
-	if !ok {
-		var compileErr error
-		program, compileErr = expr.Compile(expression, expr.Env(env), expr.AsBool())
-		if compileErr != nil {
-			return false, fmt.Errorf("failed to compile expression: %w", compileErr)
-		}
-		e.programs[expression] = program
+	// Compile the expression
+	program, err := expr.Compile(expression, expr.Env(env), expr.AsBool())
+	if err != nil {
+		return false, fmt.Errorf("failed to compile expression: %w", err)
 	}
 
 	// Evaluate the expression

@@ -82,7 +82,7 @@ func migrate(db *gorm.DB) error {
 		&models.Card{},
 		&models.Set{},
 	); err != nil {
-		return err
+		return fmt.Errorf("auto-migrate failed: %w", err)
 	}
 
 	// Run custom migrations for features not supported by AutoMigrate
@@ -119,7 +119,9 @@ func customMigrations(db *gorm.DB) error {
 
 	// Check if cards table exists first
 	var tableExists int64
-	db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='cards'").Scan(&tableExists)
+	if err := db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='cards'").Scan(&tableExists).Error; err != nil {
+		return fmt.Errorf("failed to check cards table existence: %w", err)
+	}
 	if tableExists == 0 {
 		// Table doesn't exist yet, skip (will be created by AutoMigrate)
 		return nil

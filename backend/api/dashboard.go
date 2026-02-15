@@ -3,9 +3,7 @@ package api
 import (
 	"backend/models"
 	"backend/utils"
-	"encoding/json"
 	"log/slog"
-	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
@@ -21,42 +19,37 @@ func NewDashboardHandler(db *gorm.DB) *DashboardHandler {
 	return &DashboardHandler{db: db}
 }
 
-// ItemWithCard represents an item (inventory or list item) with its associated card data
-type ItemWithCard struct {
-	Quantity int
-	RawJSON  string
-}
+// calculateInventoryValue computes the total USD value of inventory items
+// using treatment-aware pricing via ParsePriceFromScryfall.
+func calculateInventoryValue(db *gorm.DB, items []models.Inventory) float64 {
+	if len(items) == 0 {
+		return 0
+	}
 
-// calculateItemsValue computes the total USD value of items by parsing card price data.
-// It iterates through items, extracts the USD price from each card's raw JSON,
-// multiplies by quantity, and returns the sum.
-func calculateItemsValue(items []ItemWithCard) float64 {
-	var totalValue float64
-
+	// Collect unique scryfall IDs
+	scryfallIDs := make([]string, 0, len(items))
+	seen := make(map[string]bool)
 	for _, item := range items {
-		if item.RawJSON == "" {
-			continue
-		}
-
-		// Parse the card JSON to access price information
-		var cardData map[string]interface{}
-		if err := json.Unmarshal([]byte(item.RawJSON), &cardData); err != nil {
-			continue
-		}
-
-		// Extract USD price from nested prices object
-		if pricesObj, ok := cardData["prices"].(map[string]interface{}); ok {
-			if usdPrice, ok := pricesObj["usd"]; ok && usdPrice != nil {
-				if priceStr, ok := usdPrice.(string); ok && priceStr != "" {
-					// Parse price string (e.g., "12.34") to float
-					if price, err := strconv.ParseFloat(priceStr, 64); err == nil {
-						totalValue += price * float64(item.Quantity)
-					}
-				}
-			}
+		if !seen[item.ScryfallID] {
+			scryfallIDs = append(scryfallIDs, item.ScryfallID)
+			seen[item.ScryfallID] = true
 		}
 	}
 
+	// Batch fetch card data
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(db, scryfallIDs)
+	if err != nil {
+		slog.Warn("failed to fetch cards for inventory value calculation", "component", "dashboard", "error", err)
+		return 0
+	}
+
+	var totalValue float64
+	for _, item := range items {
+		if card, ok := scryfallCardMap[item.ScryfallID]; ok {
+			price := utils.ParsePriceFromScryfall(card.Prices, item.Treatment)
+			totalValue += price * float64(item.Quantity)
+		}
+	}
 	return totalValue
 }
 
@@ -92,7 +85,7 @@ func calculateListValues(db *gorm.DB, listItems []models.ListItem) listValueResu
 	}
 
 	// Batch fetch card data for price information
-	cardMap, err := models.GetCardsByIDs(db, scryfallIDs)
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(db, scryfallIDs)
 	if err != nil {
 		slog.Warn("failed to fetch cards for list value calculation", "component", "dashboard", "error", err)
 		return listValueResult{}
@@ -101,12 +94,7 @@ func calculateListValues(db *gorm.DB, listItems []models.ListItem) listValueResu
 	// Calculate collected and remaining values
 	var result listValueResult
 	for _, item := range listItems {
-		if card, ok := cardMap[item.ScryfallID]; ok {
-			scryfallCard, err := card.ToScryfallCard()
-			if err != nil {
-				continue
-			}
-
+		if scryfallCard, ok := scryfallCardMap[item.ScryfallID]; ok {
 			price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
 
 			result.collected += price * float64(item.CollectedQuantity)
@@ -184,15 +172,12 @@ func (h *DashboardHandler) GetStats(c fiber.Ctx) error {
 	stats.UnassignedCards = unassignedCount
 
 	// Calculate total collection value from inventory
-	var inventoryItems []ItemWithCard
-	if err := db.Model(&models.Inventory{}).
-		Select("inventories.quantity, cards.raw_json").
-		Joins("LEFT JOIN cards ON inventories.scryfall_id = cards.scryfall_id").
-		Scan(&inventoryItems).Error; err != nil {
+	var inventoryItems []models.Inventory
+	if err := db.Find(&inventoryItems).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to calculate collection value", "database query failed", err)
 	}
-	stats.TotalCollectionValue = calculateItemsValue(inventoryItems)
+	stats.TotalCollectionValue = calculateInventoryValue(db, inventoryItems)
 
 	// Calculate total wishlist values (both collected and remaining)
 	var listItems []models.ListItem

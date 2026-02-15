@@ -411,14 +411,9 @@ func (h *ListHandler) enrichListItems(ctx context.Context, listID uint, page, pa
 		scryfallIDs[i] = item.ScryfallID
 	}
 
-	cardMap := make(map[string]models.Card)
-	if len(scryfallIDs) > 0 {
-		var cards []models.Card
-		if err := h.db.WithContext(ctx).Where("scryfall_id IN ?", scryfallIDs).Find(&cards).Error; err == nil {
-			for _, card := range cards {
-				cardMap[card.ScryfallID] = card
-			}
-		}
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(ctx), scryfallIDs)
+	if err != nil {
+		slog.Warn("failed to fetch card data for enrichment", "component", "lists", "error", err)
 	}
 
 	enrichedItems := make([]EnrichedListItem, len(items))
@@ -435,19 +430,16 @@ func (h *ListHandler) enrichListItems(ctx context.Context, listID uint, page, pa
 			CollectedQuantity: item.CollectedQuantity,
 		}
 
-		if card, ok := cardMap[item.ScryfallID]; ok {
-			scryfallCard, err := card.ToScryfallCard()
-			if err == nil {
-				enrichedItem.Name = scryfallCard.Name
-				enrichedItem.SetName = scryfallCard.SetName
-				enrichedItem.SetCode = scryfallCard.Set
-				enrichedItem.CollectorNumber = scryfallCard.CollectorNumber
-				enrichedItem.Rarity = string(scryfallCard.Rarity)
-				enrichedItem.CurrentPrice = utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
-				enrichedItem.Finishes = utils.ConvertEnumSliceToStrings(scryfallCard.Finishes)
-				enrichedItem.FrameEffects = utils.ConvertEnumSliceToStrings(scryfallCard.FrameEffects)
-				enrichedItem.PromoTypes = scryfallCard.PromoTypes
-			}
+		if scryfallCard, ok := scryfallCardMap[item.ScryfallID]; ok {
+			enrichedItem.Name = scryfallCard.Name
+			enrichedItem.SetName = scryfallCard.SetName
+			enrichedItem.SetCode = scryfallCard.Set
+			enrichedItem.CollectorNumber = scryfallCard.CollectorNumber
+			enrichedItem.Rarity = string(scryfallCard.Rarity)
+			enrichedItem.CurrentPrice = utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+			enrichedItem.Finishes = utils.ConvertEnumSliceToStrings(scryfallCard.Finishes)
+			enrichedItem.FrameEffects = utils.ConvertEnumSliceToStrings(scryfallCard.FrameEffects)
+			enrichedItem.PromoTypes = scryfallCard.PromoTypes
 		}
 
 		enrichedItems[i] = enrichedItem

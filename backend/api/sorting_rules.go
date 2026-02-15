@@ -284,7 +284,7 @@ func (h *SortingRulesHandler) Evaluate(c fiber.Ctx) error {
 	}
 
 	evaluator := rules.NewEvaluator(h.db)
-	location, err := evaluator.EvaluateCard(cardData)
+	location, err := evaluator.EvaluateCard(c.RequestCtx(), cardData)
 
 	if err != nil {
 		return c.JSON(EvaluateResponse{

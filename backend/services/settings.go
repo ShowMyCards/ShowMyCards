@@ -21,13 +21,13 @@ func NewSettingsService(db *gorm.DB) *SettingsService {
 	service := &SettingsService{db: db}
 
 	// Initialize default settings on first run
-	service.initializeDefaults()
+	service.initializeDefaults(context.Background())
 
 	return service
 }
 
 // initializeDefaults creates default settings if they don't exist
-func (s *SettingsService) initializeDefaults() {
+func (s *SettingsService) initializeDefaults(ctx context.Context) {
 	defaults := map[string]string{
 		"bulk_data_auto_update":           "true",
 		"bulk_data_update_time":           "03:00",
@@ -47,7 +47,7 @@ func (s *SettingsService) initializeDefaults() {
 
 	for key, value := range defaults {
 		var count int64
-		if err := s.db.Model(&models.Setting{}).Where("key = ?", key).Count(&count).Error; err != nil {
+		if err := s.db.WithContext(ctx).Model(&models.Setting{}).Where("key = ?", key).Count(&count).Error; err != nil {
 			slog.Warn("failed to check setting existence", "key", key, "error", err)
 			continue
 		}
@@ -55,7 +55,7 @@ func (s *SettingsService) initializeDefaults() {
 		if count == 0 {
 			// Setting doesn't exist, create it
 			setting := models.Setting{Key: key, Value: value}
-			if err := s.db.Create(&setting).Error; err != nil {
+			if err := s.db.WithContext(ctx).Create(&setting).Error; err != nil {
 				slog.Warn("failed to create default setting", "key", key, "error", err)
 			}
 		}
@@ -64,11 +64,14 @@ func (s *SettingsService) initializeDefaults() {
 
 // Get retrieves a setting value by key
 func (s *SettingsService) Get(ctx context.Context, key string) (string, error) {
-	var setting models.Setting
-	if err := s.db.WithContext(ctx).Where("key = ?", key).First(&setting).Error; err != nil {
+	var settings []models.Setting
+	if err := s.db.WithContext(ctx).Where("key = ?", key).Limit(1).Find(&settings).Error; err != nil {
 		return "", err
 	}
-	return setting.Value, nil
+	if len(settings) == 0 {
+		return "", gorm.ErrRecordNotFound
+	}
+	return settings[0].Value, nil
 }
 
 // Set creates or updates a setting

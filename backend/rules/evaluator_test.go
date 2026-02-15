@@ -2,6 +2,7 @@ package rules
 
 import (
 	"backend/models"
+	"context"
 	"testing"
 
 	"gorm.io/driver/sqlite"
@@ -220,7 +221,7 @@ func TestEvaluateCard_SingleRule(t *testing.T) {
 		},
 	}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err != nil {
 		t.Fatalf("evaluation failed: %v", err)
 	}
@@ -251,7 +252,7 @@ func TestEvaluateCard_PriorityOrder(t *testing.T) {
 		},
 	}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err != nil {
 		t.Fatalf("evaluation failed: %v", err)
 	}
@@ -279,7 +280,7 @@ func TestEvaluateCard_FirstMatchWins(t *testing.T) {
 		},
 	}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err != nil {
 		t.Fatalf("evaluation failed: %v", err)
 	}
@@ -307,7 +308,7 @@ func TestEvaluateCard_SkipsDisabledRules(t *testing.T) {
 		},
 	}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err != nil {
 		t.Fatalf("evaluation failed: %v", err)
 	}
@@ -331,7 +332,7 @@ func TestEvaluateCard_NoMatch(t *testing.T) {
 		},
 	}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err == nil {
 		t.Error("expected error when no rules match")
 	}
@@ -350,7 +351,7 @@ func TestEvaluateCard_NoRules(t *testing.T) {
 		},
 	}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err == nil {
 		t.Error("expected error when no rules exist")
 	}
@@ -368,7 +369,7 @@ func TestEvaluateCard_InvalidExpression(t *testing.T) {
 
 	cardData := map[string]interface{}{}
 
-	result, err := evaluator.EvaluateCard(cardData)
+	result, err := evaluator.EvaluateCard(context.Background(), cardData)
 	if err == nil {
 		t.Error("expected error when rule has invalid expression")
 	}

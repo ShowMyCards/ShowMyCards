@@ -345,41 +345,21 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 		inventoryMap[item.ScryfallID] = append(inventoryMap[item.ScryfallID], item)
 	}
 
-	// Fetch card data from cards table (new architecture)
-	slog.Info("fetching unique cards from cards table", "component", "inventory", "count", len(scryfallIDs))
-	var cards []models.Card
-	cardMap := make(map[string]models.Card)
-
-	if len(scryfallIDs) > 0 {
-		if err := h.db.WithContext(c.RequestCtx()).Where("scryfall_id IN ?", scryfallIDs).Find(&cards).Error; err != nil {
-			return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-				"Failed to fetch card data", "cards query failed", err)
-		}
-
-		// Build map for quick lookup
-		for _, card := range cards {
-			cardMap[card.ScryfallID] = card
-		}
-		slog.Info("found cards in cards table", "component", "inventory", "found", len(cards), "requested", len(scryfallIDs))
+	// Fetch and parse card data
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(c.RequestCtx()), scryfallIDs)
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch card data", "cards query failed", err)
 	}
 
 	// Build enhanced card results using card data
 	enhancedResults := make([]EnhancedCardResult, 0, len(scryfallIDs))
 	for _, scryfallID := range scryfallIDs {
-		card, found := cardMap[scryfallID]
+		scryfallCard, found := scryfallCardMap[scryfallID]
 		if !found {
-			slog.Warn("card not found in cards table, skipping", "component", "inventory", "scryfall_id", scryfallID)
 			continue
 		}
 
-		// Unmarshal to scryfall.Card
-		scryfallCard, err := card.ToScryfallCard()
-		if err != nil {
-			slog.Warn("failed to unmarshal card", "component", "inventory", "scryfall_id", scryfallID, "error", err)
-			continue
-		}
-
-		// Use helper to build the enriched result
 		enhancedCard := buildEnhancedCardResult(scryfallCard, inventoryMap[scryfallID])
 		enhancedResults = append(enhancedResults, enhancedCard)
 	}

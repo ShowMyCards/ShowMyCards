@@ -4,15 +4,16 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const (
-	// SchedulerCheckInterval is how often the scheduler checks for tasks
-	SchedulerCheckInterval = 5 * time.Minute
+	// DefaultSchedulerCheckInterval is the default interval between scheduler checks
+	DefaultSchedulerCheckInterval = 5 * time.Minute
 
-	// JobCleanupRetentionDays is the number of days to retain completed jobs
-	JobCleanupRetentionDays = 30
+	// DefaultJobCleanupRetentionDays is the default number of days to retain completed jobs
+	DefaultJobCleanupRetentionDays = 30
 )
 
 // ScheduledTask defines a task that runs on a schedule
@@ -46,6 +47,7 @@ type Scheduler struct {
 	settingsService *SettingsService
 	ticker          *time.Ticker
 	done            chan bool
+	started         atomic.Bool
 	lastRunMu       sync.RWMutex
 	lastRun         map[string]time.Time
 	runningTasks    sync.Map
@@ -59,7 +61,7 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 		setDataService:  setDataService,
 		jobService:      jobService,
 		settingsService: settingsService,
-		done:            make(chan bool),
+		done:            make(chan bool, 1),
 		lastRun:         make(map[string]time.Time),
 	}
 
@@ -95,9 +97,12 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 
 // Start begins the scheduler loop
 func (s *Scheduler) Start(ctx context.Context) {
-	s.ticker = time.NewTicker(SchedulerCheckInterval)
+	s.started.Store(true)
 
-	slog.Info("scheduler started", "component", "scheduler", "check_interval", SchedulerCheckInterval)
+	checkInterval := time.Duration(s.settingsService.GetInt(ctx, "scheduler_check_interval_minutes", int(DefaultSchedulerCheckInterval.Minutes()))) * time.Minute
+	s.ticker = time.NewTicker(checkInterval)
+
+	slog.Info("scheduler started", "component", "scheduler", "check_interval", checkInterval)
 
 	// Run initial checks immediately on startup
 	go s.checkAndRunTasks(ctx)
@@ -122,6 +127,9 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 // Stop stops the scheduler gracefully
 func (s *Scheduler) Stop() {
+	if !s.started.Load() {
+		return
+	}
 	if s.ticker != nil {
 		s.ticker.Stop()
 	}
@@ -312,7 +320,8 @@ func (s *Scheduler) runSetDataUpdate(ctx context.Context) {
 }
 
 func (s *Scheduler) runJobCleanup(ctx context.Context) {
-	deletedCount, err := s.jobService.CleanupOldJobs(ctx, JobCleanupRetentionDays)
+	retentionDays := s.settingsService.GetInt(ctx, "job_cleanup_retention_days", DefaultJobCleanupRetentionDays)
+	deletedCount, err := s.jobService.CleanupOldJobs(ctx, retentionDays)
 	if err != nil {
 		slog.Error("error cleaning up jobs", "component", "scheduler", "error", err)
 		return

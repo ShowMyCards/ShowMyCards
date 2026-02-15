@@ -14,5 +14,6 @@ func SearchRoutes(app *fiber.App, client *scryfall.Client, db *gorm.DB, settings
 	handler := api.NewSearchHandler(client, db, settingsService)
 
 	app.Get("/search", handler.Search)
+	app.Get("/search/autocomplete", handler.Autocomplete)
 	app.Get("/cards/:id", handler.GetCard)
 }
