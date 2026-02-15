@@ -18,6 +18,7 @@
 		type StorageLocationWithCount
 	} from '$lib';
 	import SetIcon from '$lib/components/SetIcon.svelte';
+	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
@@ -148,7 +149,7 @@
 
 	{#if cards.length === 0}
 		<EmptyState message={emptyMessage}>
-			<a href="/search" class="btn btn-primary">Search for Cards</a>
+			<a href={resolve('/search')} class="btn btn-primary">Search for Cards</a>
 		</EmptyState>
 	{:else if filteredCards.length === 0}
 		<EmptyState message="No cards match your filter">
@@ -215,7 +216,7 @@
 									}} />
 							</td>
 							<td>
-								<a href="/cards/{card.id}" class="font-semibold hover:text-primary">
+								<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
 									{card.name}
 								</a>
 							</td>

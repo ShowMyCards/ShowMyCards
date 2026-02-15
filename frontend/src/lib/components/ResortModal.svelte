@@ -108,7 +108,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each result.movements as movement}
+							{#each result.movements as movement, i (i)}
 								<tr>
 									<td>
 										<div class="font-medium">{movement.card_name}</div>

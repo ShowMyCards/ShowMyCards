@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ListSummary } from '$lib';
+	import { resolve } from '$app/paths';
 	import { ListTodo } from '@lucide/svelte';
 
 	let { list }: { list: ListSummary } = $props();
@@ -49,7 +50,7 @@
 
 			<!-- Browse Button -->
 			<div class="shrink-0">
-				<a href="/lists/{list.id}" class="btn btn-primary btn-sm"> Browse </a>
+				<a href={resolve(`/lists/${list.id}`)} class="btn btn-primary btn-sm"> Browse </a>
 			</div>
 		</div>
 	</div>

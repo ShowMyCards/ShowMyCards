@@ -55,7 +55,7 @@ export function useExpressionValidation(options?: { debounce?: number }) {
 				isValid: data.valid,
 				error: data.error
 			};
-		} catch (e) {
+		} catch {
 			validationResult = {
 				isValid: false,
 				error: 'Validation request failed'

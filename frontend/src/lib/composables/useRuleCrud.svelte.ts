@@ -127,7 +127,7 @@ export function useRuleCrud(getRules: () => SortingRule[]) {
 			return;
 		}
 
-		const success = await submitAction(
+		await submitAction(
 			'create',
 			{
 				rule: JSON.stringify({

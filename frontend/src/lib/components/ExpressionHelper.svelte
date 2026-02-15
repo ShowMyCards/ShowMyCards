@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronDown, ChevronUp, BookOpen, Code2 } from '@lucide/svelte';
+	import { BookOpen } from '@lucide/svelte';
 
 	interface ExampleExpression {
 		expression: string;

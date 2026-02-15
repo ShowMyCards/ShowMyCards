@@ -29,7 +29,7 @@
 			</div>
 
 			<div class="space-y-2">
-				{#each shortcuts as shortcut}
+				{#each shortcuts as shortcut (shortcut.key)}
 					<div class="flex items-center justify-between">
 						<span class="text-base-content/80">{shortcut.description}</span>
 						<kbd class="kbd kbd-sm">{shortcut.key}</kbd>

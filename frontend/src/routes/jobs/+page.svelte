@@ -18,6 +18,7 @@
 	} from '$lib';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	let { data }: { data: PageData } = $props();
 
@@ -64,7 +65,7 @@
 	}
 
 	function handlePageChange(newPage: number) {
-		goto(`/jobs?page=${newPage}`);
+		goto(resolve(`/jobs?page=${newPage}` as '/jobs'));
 	}
 
 	// Calculate job statistics
@@ -122,7 +123,7 @@
 		<div class="mb-8">
 			<h2 class="text-2xl font-bold mb-4">Scheduled Tasks</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-				{#each data.scheduledTasks as task}
+				{#each data.scheduledTasks as task (task.name)}
 					<ScheduledTaskCard {task} />
 				{/each}
 			</div>

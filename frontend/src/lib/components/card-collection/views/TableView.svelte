@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { selection, getCardTreatmentName, scryfallImageUrl } from '$lib';
+	import { resolve } from '$app/paths';
 	import CardPreview from '../../CardPreview.svelte';
 	import SetIcon from '../../SetIcon.svelte';
 	import type { DisplayableCard, TableColumn } from '../types';
@@ -12,7 +13,7 @@
 		onItemRemove?: (itemId: string | number) => void;
 	}
 
-	let { items, columns, selectable = false, onItemRemove }: Props = $props();
+	let { items, columns, selectable = false }: Props = $props();
 
 	// Default columns if none provided
 	const defaultColumns: TableColumn[] = [
@@ -129,7 +130,7 @@
 								{@render column.render(item)}
 							{:else if column.key === 'name'}
 								<CardPreview src={imageUrl} alt={item.name} isFoil={itemIsFoil}>
-									<a href="/cards/{item.scryfallId}" class="font-semibold hover:text-primary transition-colors">
+									<a href={resolve(`/cards/${item.scryfallId}`)} class="font-semibold hover:text-primary transition-colors">
 										{item.name}
 									</a>
 								</CardPreview>

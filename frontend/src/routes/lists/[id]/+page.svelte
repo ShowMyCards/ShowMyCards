@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { deserialize, enhance } from '$app/forms';
 	import type { PageData, ActionData } from './$types';
 	import {
@@ -205,7 +206,7 @@
 	{#if data.list}
 		<PageHeader title={data.list.name} description={data.list.description}>
 			{#snippet actions()}
-				<a href="/lists" class="btn bg-base-100 btn-sm">
+				<a href={resolve('/lists')} class="btn bg-base-100 btn-sm">
 					<ArrowLeft class="w-4 h-4" />
 					Back
 				</a>
@@ -313,7 +314,7 @@
 		</div>
 	{:else}
 		<EmptyState message="List not found">
-			<a href="/lists" class="btn btn-primary">Back to Lists</a>
+			<a href={resolve('/lists')} class="btn btn-primary">Back to Lists</a>
 		</EmptyState>
 	{/if}
 </div>

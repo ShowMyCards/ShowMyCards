@@ -52,7 +52,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 			totalPages: jobsResult.total_pages || 0,
 			error: null
 		};
-	} catch (error) {
+	} catch {
 		return {
 			jobs: [] as JobResponse[],
 			scheduledTasks: [] as ScheduledTaskInfo[],

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { PageHeader, getCardTreatmentName } from '$lib';
+	import { resolve } from '$app/paths';
 	import { ArrowLeft, ExternalLink } from '@lucide/svelte';
 	import PriceLozenge from '$lib/components/PriceLozenge.svelte';
 
@@ -11,6 +12,7 @@
 
 	// Group inventory by treatment
 	const inventoryByTreatment = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local variable in derived computation
 		const map = new Map<string, number>();
 		for (const inv of card.inventory.this_printing) {
 			const treatment = inv.treatment || 'nonfoil';
@@ -29,7 +31,7 @@
 
 <div class="container mx-auto px-4 py-8 max-w-6xl">
 	<!-- Back button -->
-	<a href="/search" class="btn btn-ghost btn-sm mb-4">
+	<a href={resolve('/search')} class="btn btn-ghost btn-sm mb-4">
 		<ArrowLeft class="w-4 h-4" />
 		Back to Search
 	</a>
@@ -134,7 +136,7 @@
 							{#each otherPrintings as printing (printing.id)}
 								{@const ownedCount = printing.inventory.this_printing.reduce((sum: number, i: {quantity: number}) => sum + i.quantity, 0)}
 								<a
-									href="/cards/{printing.id}"
+									href={resolve(`/cards/${printing.id}`)}
 									class="card bg-base-100 hover:bg-base-300 transition-colors cursor-pointer">
 									{#if printing.image_uri}
 										<figure class="px-2 pt-2">

@@ -7,6 +7,7 @@
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import { deserialize } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
 
 	let {
@@ -28,9 +29,7 @@
 	const isKeyboardTarget = $derived(keyboard.hoveredId === card.id);
 
 	// Local reactive state for inventory (initialized from prop, then managed locally)
-	// svelte-ignore state_referenced_locally (we're doing this on purpose)
 	let inventory = $state<Inventory[]>([...card.inventory.this_printing]);
-	// svelte-ignore state_referenced_locally (we're doing this on purpose)
 	let totalQuantity = $state(card.inventory.total_quantity);
 
 	let adding = $state(false);
@@ -305,7 +304,7 @@
 		</div>
 	{/if}
 	<!-- Clickable image to card details -->
-	<a href="/cards/{card.id}" class="block">
+	<a href={resolve(`/cards/${card.id}`)} class="block">
 		{#if card.image_uri}
 			<figure class="cursor-pointer hover:opacity-90 transition-opacity">
 				<img src={card.image_uri} alt={card.name} loading="lazy" />
@@ -321,7 +320,7 @@
 		<div class="flex items-center justify-between mb-2">
 			<div>
 				<!-- Clickable name to card details -->
-				<a href="/cards/{card.id}" class="card-title text-lg hover:text-primary transition-colors">
+				<a href={resolve(`/cards/${card.id}`)} class="card-title text-lg hover:text-primary transition-colors">
 					{card.name}
 				</a>
 				<div class="text-sm opacity-70">{card.set_name}</div>

@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	// Module-level: shared across all component instances
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- module-level cache, not reactive state
 	const svgCache = new Map<string, string>();
 	let gradientInjected = false;
 
@@ -117,6 +118,7 @@
 	role="img"
 	aria-label={setName}>
 	{#if svgContent}
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -- SVG content is sanitized by sanitizeSvg() -->
 		{@html svgContent}
 	{/if}
 </span>

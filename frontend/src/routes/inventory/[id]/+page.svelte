@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { PageHeader, InventoryBrowser } from '$lib';
+	import { resolve } from '$app/paths';
 	import { ArrowLeft } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -21,7 +22,7 @@
 				title={data.location.name}
 				description={`${data.location.storage_type} • ${data.totalCards} card${data.totalCards === 1 ? '' : 's'}`}>
 				{#snippet actions()}
-					<a href="/inventory" class="btn bg-base-100 btn-sm">
+					<a href={resolve('/inventory')} class="btn bg-base-100 btn-sm">
 						<ArrowLeft class="w-4 h-4" />
 						Back to Locations
 					</a>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { enhance, deserialize } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import type { ActionData, PageData } from './$types';
 	import {
 		CardResultCard,
@@ -10,7 +11,6 @@
 		Pagination,
 		ViewToggle,
 		CardFilter,
-		CardImage,
 		TreatmentBadge,
 		isFoilTreatment,
 		getCardTreatmentName,
@@ -18,7 +18,7 @@
 		usePersistedViewMode,
 		type EnhancedCardResult
 	} from '$lib';
-	import { Search, Lightbulb, Plus, Minus } from '@lucide/svelte';
+	import { Search, Lightbulb } from '@lucide/svelte';
 	import SetIcon from '$lib/components/SetIcon.svelte';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
@@ -259,7 +259,7 @@
 								{@const totalQty = card.inventory.total_quantity}
 								<tr class="hover:bg-base-300">
 									<td>
-										<a href="/cards/{card.id}" class="font-semibold hover:text-primary">
+										<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
 											{card.name}
 										</a>
 									</td>
@@ -312,7 +312,7 @@
 						<span>Did you mean:</span>
 					</div>
 					<div class="flex flex-wrap gap-2">
-						{#each suggestions as suggestion}
+						{#each suggestions as suggestion (suggestion)}
 							<button
 								type="button"
 								class="btn btn-sm btn-outline"

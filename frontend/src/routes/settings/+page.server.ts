@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 			settings,
 			error: null
 		};
-	} catch (error) {
+	} catch {
 		return {
 			settings: {},
 			error: 'Failed to load settings'
@@ -59,7 +59,7 @@ export const actions = {
 				success: true,
 				action: 'save'
 			};
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to save settings' });
 		}
 	},
@@ -85,7 +85,7 @@ export const actions = {
 				job_id: result.job_id,
 				message: `Import started (Job ID: ${result.job_id})`
 			};
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to trigger import' });
 		}
 	}

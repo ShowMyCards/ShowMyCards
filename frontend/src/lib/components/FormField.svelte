@@ -43,7 +43,6 @@
 		minlength,
 		maxlength,
 		pattern,
-		patternMessage,
 		validate,
 		validateOnBlur = true
 	}: Props = $props();

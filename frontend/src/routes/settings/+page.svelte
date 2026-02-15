@@ -10,11 +10,13 @@
 	import SettingActions from '$lib/components/SettingActions.svelte';
 	import DisplaySettings from '$lib/components/DisplaySettings.svelte';
 	import BulkImportCard from '$lib/components/BulkImportCard.svelte';
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
+	// eslint-disable-next-line svelte/prefer-writable-derived -- settings is modified locally for form binding
 	let settings = $state<Record<string, string>>({});
 	let saving = $state(false);
 
@@ -126,7 +128,7 @@
 								{:else if settings.bulk_data_last_update_status === 'in_progress'}
 									<Lozenge color="warning" size="xsmall">In Progress</Lozenge>
 								{/if}
-								· <a href="/jobs" class="link link-primary text-sm">View job history</a>
+								· <a href={resolve('/jobs')} class="link link-primary text-sm">View job history</a>
 							</p>
 						{/if}
 					</div>

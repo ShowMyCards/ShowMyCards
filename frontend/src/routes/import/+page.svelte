@@ -25,6 +25,8 @@
 	let inputText = $state('');
 	let selectedStorageLocation = $state<number | 'auto'>('auto');
 
+	const textareaPlaceholder = '4 e:who cn:1056\n2! !"Lightning Bolt"\n1!! e:cmr cn:361\nsol ring';
+
 	// Preview state - combines parsing and searching
 	interface PreviewCard {
 		parsed: ParsedCard;
@@ -183,9 +185,6 @@
 		let successCount = 0;
 		let errorCount = 0;
 
-		// Only import cards that are ready
-		const readyCards = previewCards.filter((c) => c.status === 'ready');
-
 		for (let i = 0; i < previewCards.length; i++) {
 			const card = previewCards[i];
 			if (card.status !== 'ready' || !card.searchResult || !card.resolvedTreatment) {
@@ -273,7 +272,7 @@
 			<textarea
 				bind:value={inputText}
 				class="textarea textarea-bordered w-full h-64 font-mono text-sm"
-				placeholder={'4 e:who cn:1056\n2! !"Lightning Bolt"\n1!! e:cmr cn:361\nsol ring'}
+				placeholder={textareaPlaceholder}
 				disabled={isPreviewing}></textarea>
 
 			<div class="flex flex-wrap gap-2 mt-4">
@@ -466,7 +465,7 @@
 							{parseErrors.length} line{parseErrors.length !== 1 ? 's' : ''} could not be parsed
 						</h3>
 						<ul class="text-sm text-base-content/70 space-y-1">
-							{#each parseErrors as error}
+							{#each parseErrors as error (error.lineNumber)}
 								<li class="font-mono">Line {error.lineNumber}: {error.line}</li>
 							{/each}
 						</ul>

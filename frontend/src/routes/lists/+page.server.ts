@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 		return {
 			lists
 		};
-	} catch (error) {
+	} catch {
 		return {
 			lists: [],
 			error: 'Failed to load lists'
@@ -84,7 +84,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'delete' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to delete list' });
 		}
 	}

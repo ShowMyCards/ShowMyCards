@@ -12,9 +12,10 @@
 	} from '$lib';
 	import { Plus } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
-	import type { PageData, ActionData } from './$types';
+	import { resolve } from '$app/paths';
+	import type { PageData } from './$types';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	// State - use $derived for data-based values
 	let rules = $derived(data.rules || []);
@@ -47,7 +48,7 @@
 		if (filterEnabled !== null) {
 			url.searchParams.set('enabled', filterEnabled.toString());
 		}
-		await goto(url.toString(), { invalidateAll: true });
+		await goto(resolve(`${url.pathname}${url.search}` as '/rules'), { invalidateAll: true });
 	}
 
 	async function handleFilterChange(enabled: boolean | null) {
@@ -59,7 +60,7 @@
 		} else {
 			url.searchParams.delete('enabled');
 		}
-		await goto(url.toString(), { invalidateAll: true });
+		await goto(resolve(`${url.pathname}${url.search}` as '/rules'), { invalidateAll: true });
 	}
 </script>
 

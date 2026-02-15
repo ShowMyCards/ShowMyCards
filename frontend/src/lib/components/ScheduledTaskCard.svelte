@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Lozenge } from '$lib';
+	import { resolve } from '$app/paths';
 	import type { ScheduledTaskInfo } from '$lib';
 
 	let { task }: { task: ScheduledTaskInfo } = $props();
@@ -113,7 +114,7 @@
 
 		{#if task.last_job_id}
 			<div class="mt-3">
-				<a href="/jobs#{task.last_job_id}" class="link link-primary text-sm"> View last job → </a>
+				<a href={resolve(`/jobs#${task.last_job_id}` as '/jobs')} class="link link-primary text-sm"> View last job → </a>
 			</div>
 		{/if}
 	</div>
