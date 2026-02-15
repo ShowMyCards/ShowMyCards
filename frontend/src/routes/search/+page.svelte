@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { enhance, deserialize } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import type { ActionData, PageData } from './$types';
 	import {
 		CardResultCard,
@@ -10,7 +11,6 @@
 		Pagination,
 		ViewToggle,
 		CardFilter,
-		CardImage,
 		TreatmentBadge,
 		isFoilTreatment,
 		getCardTreatmentName,
@@ -18,7 +18,7 @@
 		usePersistedViewMode,
 		type EnhancedCardResult
 	} from '$lib';
-	import { Search, Lightbulb, Plus, Minus } from '@lucide/svelte';
+	import { Search, Lightbulb } from '@lucide/svelte';
 	import SetIcon from '$lib/components/SetIcon.svelte';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
@@ -236,7 +236,10 @@
 				<!-- Grid View -->
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
 					{#each paginatedCards as card (card.id)}
-						<CardResultCard {card} onremove={handleRemove} storageLocations={data.storageLocations} />
+						<CardResultCard
+							{card}
+							onremove={handleRemove}
+							storageLocations={data.storageLocations} />
 					{/each}
 				</div>
 			{:else}
@@ -259,13 +262,17 @@
 								{@const totalQty = card.inventory.total_quantity}
 								<tr class="hover:bg-base-300">
 									<td>
-										<a href="/cards/{card.id}" class="font-semibold hover:text-primary">
+										<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
 											{card.name}
 										</a>
 									</td>
 									<td>
 										<div class="flex items-center gap-2">
-											<SetIcon setCode={card.set_code} setName={card.set_name} rarity="common" {isFoil} />
+											<SetIcon
+												setCode={card.set_code}
+												setName={card.set_name}
+												rarity="common"
+												{isFoil} />
 											<span class="text-sm">{card.set_name}</span>
 										</div>
 									</td>
@@ -299,7 +306,10 @@
 			<!-- Pagination -->
 			{#if totalFilteredPages > 1}
 				<div class="mt-6">
-					<Pagination {currentPage} totalPages={totalFilteredPages} onPageChange={handlePageChange} />
+					<Pagination
+						{currentPage}
+						totalPages={totalFilteredPages}
+						onPageChange={handlePageChange} />
 				</div>
 			{/if}
 		{:else}
@@ -312,7 +322,7 @@
 						<span>Did you mean:</span>
 					</div>
 					<div class="flex flex-wrap gap-2">
-						{#each suggestions as suggestion}
+						{#each suggestions as suggestion (suggestion)}
 							<button
 								type="button"
 								class="btn btn-sm btn-outline"

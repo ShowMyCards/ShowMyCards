@@ -26,9 +26,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 		// Fetch ALL list items for client-side filtering/pagination
 		// First, get page 1 to know total pages
-		const firstPageResponse = await fetch(
-			`${BACKEND_URL}/lists/${id}/items?page=1&page_size=100`
-		);
+		const firstPageResponse = await fetch(`${BACKEND_URL}/lists/${id}/items?page=1&page_size=100`);
 		if (!firstPageResponse.ok) {
 			return {
 				list,
@@ -74,7 +72,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			totalCollectedValue: firstPageData.total_collected_value || 0,
 			totalRemainingValue: firstPageData.total_remaining_value || 0
 		};
-	} catch (error) {
+	} catch {
 		return {
 			list: null,
 			items: [],
@@ -130,7 +128,7 @@ export const actions: Actions = {
 				searchResults: allResults,
 				query
 			};
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Search failed', searchResults: [] });
 		}
 	},
@@ -162,7 +160,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'add' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to add items' });
 		}
 	},
@@ -195,7 +193,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'update' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to update item' });
 		}
 	},
@@ -220,7 +218,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'delete' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to delete item' });
 		}
 	}

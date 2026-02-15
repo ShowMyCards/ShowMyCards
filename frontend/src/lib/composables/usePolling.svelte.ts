@@ -33,7 +33,7 @@ export function usePolling(
 	}
 ) {
 	let intervalId = $state<ReturnType<typeof setInterval> | null>(null);
-	let isPolling = $derived(intervalId !== null);
+	const isPolling = $derived(intervalId !== null);
 	let error = $state<string | null>(null);
 
 	/**

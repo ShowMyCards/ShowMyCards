@@ -71,6 +71,7 @@ All code reviews must follow FRONTEND_REVIEW_STANDARDS.md. Do not flag items lis
 ## Commands
 
 From the project root (`ShowMyCards/`):
+
 ```bash
 make dev-frontend     # Run frontend dev server (port 5173)
 make build-frontend   # Build SvelteKit frontend
@@ -81,6 +82,7 @@ make format           # Format frontend code
 ```
 
 From the frontend directory:
+
 ```bash
 bun run dev           # Start dev server (default port 5173)
 bun run build         # Build for production
@@ -499,6 +501,7 @@ For the complete domain model reference, see the backend [CLAUDE.md](../backend/
 Key models available as TypeScript types:
 
 **Core Models** (from `models.ts`):
+
 - **StorageLocation** - Storage locations for cards (Box, Binder)
 - **Inventory** - Cards in collection with ScryfallID, Treatment, Quantity, StorageLocation
 - **List** - User-defined card lists (wishlists, decks)
@@ -508,6 +511,7 @@ Key models available as TypeScript types:
 - **Setting** - Application settings
 
 **API Response Types** (from `api.ts`):
+
 - **SearchResponse** - Paginated search results
 - **EnhancedCardResult** - Card with inventory data (this printing, other printings)
 - **CardPrices** - Price data (USD, EUR, foil variants)

@@ -10,7 +10,13 @@ export const load: PageServerLoad = async ({ fetch }) => {
 			fetch(`${BACKEND_URL}/storage`)
 		]);
 
-		let cards: InventoryCardsResponse = { data: [], total_cards: 0, total_pages: 0, page: 1, page_size: 20 };
+		let cards: InventoryCardsResponse = {
+			data: [],
+			total_cards: 0,
+			total_pages: 0,
+			page: 1,
+			page_size: 20
+		};
 		let storageLocations: StorageLocation[] = [];
 
 		if (cardsResponse.ok) {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { PageHeader, Notification } from '$lib';
+	import { Notification } from '$lib';
+	import { resolve } from '$app/paths';
 	import { Home, ArrowLeft, RefreshCw, TriangleAlert } from '@lucide/svelte';
 
 	const status = $derived(page.status);
@@ -103,7 +104,7 @@
 				Go Back
 			</button>
 
-			<a href="/" class="btn btn-outline">
+			<a href={resolve('/')} class="btn btn-outline">
 				<Home class="w-4 h-4" />
 				Home
 			</a>

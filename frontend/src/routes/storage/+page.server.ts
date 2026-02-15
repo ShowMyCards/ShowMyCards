@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 		return {
 			locations
 		};
-	} catch (error) {
+	} catch {
 		return {
 			locations: [],
 			error: 'Failed to load storage locations'
@@ -64,7 +64,7 @@ export const actions: Actions = {
 			const location = await response.json();
 
 			return { success: true, action: 'create', data: location };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to create storage location' });
 		}
 	},
@@ -109,7 +109,7 @@ export const actions: Actions = {
 			const location = await response.json();
 
 			return { success: true, action: 'update', data: location };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to update storage location' });
 		}
 	},
@@ -135,7 +135,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'delete' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to delete storage location' });
 		}
 	}

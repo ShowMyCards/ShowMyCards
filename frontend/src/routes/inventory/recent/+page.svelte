@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { CardResultCard, PageHeader, EmptyState, StatsCard } from '$lib';
-	import { Clock } from '@lucide/svelte';
+	import { resolve } from '$app/paths';
 
 	let { data }: { data: PageData } = $props();
 
@@ -24,9 +24,7 @@
 		title="Recently Added"
 		description="Your most recently added cards - quick access for quantity adjustments">
 		{#snippet actions()}
-			<a href="/inventory" class="btn btn-ghost">
-				View All Inventory
-			</a>
+			<a href={resolve('/inventory')} class="btn btn-ghost"> View All Inventory </a>
 		{/snippet}
 	</PageHeader>
 
@@ -52,8 +50,9 @@
 			{/each}
 		</div>
 	{:else}
-		<EmptyState message="No cards in your collection yet. Search for cards and add them to your inventory.">
-			<a href="/search" class="btn btn-primary">Search Cards</a>
+		<EmptyState
+			message="No cards in your collection yet. Search for cards and add them to your inventory.">
+			<a href={resolve('/search')} class="btn btn-primary">Search Cards</a>
 		</EmptyState>
 	{/if}
 </div>

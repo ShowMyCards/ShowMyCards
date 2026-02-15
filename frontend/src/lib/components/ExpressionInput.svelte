@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useExpressionValidation, TIMEOUTS } from '$lib';
+	import { useExpressionValidation } from '$lib';
 
 	interface Props {
 		value: string;

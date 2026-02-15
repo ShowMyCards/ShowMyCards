@@ -1,20 +1,17 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import {
-		PageHeader,
-		Lozenge,
-		notifications,
-		getActionError
-	} from '$lib';
+	import { PageHeader, Lozenge, notifications, getActionError } from '$lib';
 	import SettingRow from '$lib/components/SettingRow.svelte';
 	import SettingActions from '$lib/components/SettingActions.svelte';
 	import DisplaySettings from '$lib/components/DisplaySettings.svelte';
 	import BulkImportCard from '$lib/components/BulkImportCard.svelte';
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
+	// eslint-disable-next-line svelte/prefer-writable-derived -- settings is modified locally for form binding
 	let settings = $state<Record<string, string>>({});
 	let saving = $state(false);
 
@@ -35,7 +32,13 @@
 
 	function handleSaveEnhance() {
 		saving = true;
-		return async ({ result, update }: { result: { type: string; data?: Record<string, unknown> }; update: () => Promise<void> }) => {
+		return async ({
+			result,
+			update
+		}: {
+			result: { type: string; data?: Record<string, unknown> };
+			update: () => Promise<void>;
+		}) => {
 			saving = false;
 			await update();
 			if (result.type === 'success') {
@@ -57,10 +60,7 @@
 
 	<div class="space-y-6">
 		<!-- Scryfall Search Configuration -->
-		<form
-			method="POST"
-			action="?/save"
-			use:enhance={handleSaveEnhance}>
+		<form method="POST" action="?/save" use:enhance={handleSaveEnhance}>
 			<input type="hidden" name="settings" value={JSON.stringify(settings)} />
 			<div class="card bg-base-200 shadow-lg">
 				<div class="card-body">
@@ -107,10 +107,7 @@
 		</form>
 
 		<!-- Bulk Data Configuration -->
-		<form
-			method="POST"
-			action="?/save"
-			use:enhance={handleSaveEnhance}>
+		<form method="POST" action="?/save" use:enhance={handleSaveEnhance}>
 			<input type="hidden" name="settings" value={JSON.stringify(settings)} />
 			<div class="card bg-base-200 shadow-lg">
 				<div class="card-body">
@@ -126,7 +123,7 @@
 								{:else if settings.bulk_data_last_update_status === 'in_progress'}
 									<Lozenge color="warning" size="xsmall">In Progress</Lozenge>
 								{/if}
-								· <a href="/jobs" class="link link-primary text-sm">View job history</a>
+								· <a href={resolve('/jobs')} class="link link-primary text-sm">View job history</a>
 							</p>
 						{/if}
 					</div>

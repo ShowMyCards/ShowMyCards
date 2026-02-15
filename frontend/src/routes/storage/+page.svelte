@@ -8,13 +8,12 @@
 		FormField,
 		StorageLocationRow,
 		notifications,
-		getActionError,
-		type StorageLocation
+		getActionError
 	} from '$lib';
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 	import { Plus } from '@lucide/svelte';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	// Derive storage locations from server data
 	const storageLocations = $derived(data.locations || []);
@@ -112,16 +111,14 @@
 				required />
 
 			<FormField label="Storage Type" id="create-type" required>
-				{#snippet children()}
-					<select
-						id="create-type"
-						name="storage_type"
-						bind:value={createFormValues.storage_type}
-						class="select select-bordered w-full">
-						<option value="Box">Box</option>
-						<option value="Binder">Binder</option>
-					</select>
-				{/snippet}
+				<select
+					id="create-type"
+					name="storage_type"
+					bind:value={createFormValues.storage_type}
+					class="select select-bordered w-full">
+					<option value="Box">Box</option>
+					<option value="Binder">Binder</option>
+				</select>
 			</FormField>
 		</div>
 

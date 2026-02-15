@@ -31,7 +31,7 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 
 		const data = await response.json();
 		return json(data);
-	} catch (error) {
+	} catch {
 		return json({ valid: false, error: 'Validation request failed' }, { status: 500 });
 	}
 };

@@ -78,7 +78,7 @@
 			} else {
 				searchResults = [];
 			}
-		} catch (error) {
+		} catch {
 			searchResults = [];
 		} finally {
 			isSearching = false;
@@ -125,7 +125,7 @@
 				selectedTreatment = 'nonfoil';
 				evaluationError = 'Could not fetch full card data. Evaluation may be incomplete.';
 			}
-		} catch (error) {
+		} catch {
 			selectedCard = card;
 			selectedTreatment = 'nonfoil';
 			evaluationError = 'Could not fetch full card data. Evaluation may be incomplete.';
@@ -172,7 +172,7 @@
 				const error = await response.json();
 				evaluationError = error.error || 'Failed to evaluate rules';
 			}
-		} catch (error) {
+		} catch {
 			evaluationError = 'Failed to evaluate rules';
 		} finally {
 			isEvaluating = false;

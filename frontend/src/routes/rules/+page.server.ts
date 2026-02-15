@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 			},
 			storageLocations: locationsData.data || []
 		};
-	} catch (error) {
+	} catch {
 		return {
 			rules: [],
 			pagination: { page: 1, page_size: 20, total: 0, total_pages: 1 },
@@ -71,7 +71,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'create' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to create rule' });
 		}
 	},
@@ -103,7 +103,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'update' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to update rule' });
 		}
 	},
@@ -127,7 +127,7 @@ export const actions: Actions = {
 			}
 
 			return { success: true, action: 'delete' };
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to delete rule' });
 		}
 	},
@@ -161,7 +161,7 @@ export const actions: Actions = {
 				action: 'toggle',
 				message: `Rule ${enabled ? 'enabled' : 'disabled'}`
 			};
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to toggle rule' });
 		}
 	},
@@ -199,7 +199,7 @@ export const actions: Actions = {
 				action: 'batchUpdate',
 				message: `${result.updated_count} rule priorities updated`
 			};
-		} catch (error) {
+		} catch {
 			return fail(500, { error: 'Failed to update priorities' });
 		}
 	}

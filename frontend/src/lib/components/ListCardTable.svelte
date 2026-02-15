@@ -37,9 +37,7 @@
 			{#each items as item (item.id)}
 				{@const isFoil = isFoilTreatment(item.treatment)}
 				{@const progress =
-					item.desired_quantity > 0
-						? (item.collected_quantity / item.desired_quantity) * 100
-						: 0}
+					item.desired_quantity > 0 ? (item.collected_quantity / item.desired_quantity) * 100 : 0}
 				{@const isComplete = item.collected_quantity >= item.desired_quantity}
 				{@const isUncollected = item.collected_quantity === 0}
 				<tr class="hover:bg-base-300" class:opacity-60={isUncollected}>
@@ -87,8 +85,7 @@
 										if (result.type === 'success') {
 											notifications.success('Updated!');
 										} else if (result.type === 'failure') {
-											const errorMsg =
-												getActionError(result.data, 'Failed to update');
+											const errorMsg = getActionError(result.data, 'Failed to update');
 											notifications.error(errorMsg);
 										}
 									};
@@ -123,8 +120,7 @@
 										if (result.type === 'success') {
 											notifications.success('Removed from list!');
 										} else if (result.type === 'failure') {
-											const errorMsg =
-												getActionError(result.data, 'Failed to remove');
+											const errorMsg = getActionError(result.data, 'Failed to remove');
 											notifications.error(errorMsg);
 										}
 									};

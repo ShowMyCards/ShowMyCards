@@ -42,14 +42,14 @@ describe('getCardTreatmentName', () => {
 		expect(result).toBe('Extended Art - Oilslick Foil');
 	});
 
-	it('should handle inverted showcase', () => {
+	it('should handle inverted showcase (inverted is informational, not a style effect)', () => {
 		const result = getCardTreatmentName(['nonfoil', 'foil'], ['inverted', 'showcase'], 'nonfoil');
-		expect(result).toBe('Inverted - Showcase');
+		expect(result).toBe('Showcase');
 	});
 
 	it('should handle shattered glass foil', () => {
 		const result = getCardTreatmentName(['foil'], ['shatteredglass', 'confettifoil'], 'foil');
-		expect(result).toBe('Shatteredglass - Confetti Foil');
+		expect(result).toBe('Shattered Glass - Confetti Foil');
 	});
 
 	it('should only show special foil when foil finish is selected', () => {
@@ -103,10 +103,9 @@ describe('getCardTreatmentName', () => {
 
 	it('should handle all style effects', () => {
 		const styleEffects = [
-			{ effect: 'inverted', expected: 'Inverted' },
 			{ effect: 'showcase', expected: 'Showcase' },
 			{ effect: 'extendedart', expected: 'Extended Art' },
-			{ effect: 'shatteredglass', expected: 'Shatteredglass' }
+			{ effect: 'shatteredglass', expected: 'Shattered Glass' }
 		];
 
 		styleEffects.forEach(({ effect, expected }) => {

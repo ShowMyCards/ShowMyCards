@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { afterNavigate, invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { PageData } from './$types';
 	import { PageHeader, Notification, EmptyState, ResortModal } from '$lib';
 	import { Box, BookOpen, Grid2x2, Package, AlertCircle, RefreshCw } from '@lucide/svelte';
@@ -45,7 +46,7 @@
 
 	{#if data.locations.length === 0 && data.unassignedCount === 0}
 		<EmptyState message="No inventory found">
-			<a href="/search" class="btn btn-primary">
+			<a href={resolve('/search')} class="btn btn-primary">
 				<Package class="w-4 h-4" />
 				Search for Cards
 			</a>
@@ -72,7 +73,7 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a href="/inventory/unassigned" class="btn btn-primary btn-sm">
+								<a href={resolve('/inventory/unassigned')} class="btn btn-primary btn-sm">
 									<Grid2x2 class="w-4 h-4" />
 									Browse
 								</a>
@@ -104,7 +105,7 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a href="/inventory/{location.id}" class="btn btn-primary btn-sm">
+								<a href={resolve(`/inventory/${location.id}`)} class="btn btn-primary btn-sm">
 									<Grid2x2 class="w-4 h-4" />
 									Browse
 								</a>

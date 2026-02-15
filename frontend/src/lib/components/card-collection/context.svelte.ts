@@ -20,7 +20,9 @@ export function setCardCollectionContext(context: CardCollectionContext) {
 export function getCardCollectionContext(): CardCollectionContext {
 	const context = getContext<CardCollectionContext | undefined>(CONTEXT_KEY);
 	if (!context) {
-		throw new Error('CardCollection context not found. Ensure component is used within CardCollection.');
+		throw new Error(
+			'CardCollection context not found. Ensure component is used within CardCollection.'
+		);
 	}
 	return context;
 }

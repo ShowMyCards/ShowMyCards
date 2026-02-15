@@ -13,11 +13,11 @@ When performing a code review, work through each section in order. For every
 finding, assign exactly one severity from the table below. Do not invent new
 severities or categories.
 
-| Severity | Meaning | Action |
-|----------|---------|--------|
-| **MUST FIX** | Bugs, broken reactivity, accessibility failures, data leaks to client | Block merge |
-| **SHOULD FIX** | Meaningful improvements to maintainability, idiom conformance, or component design | Fix in this PR or create a tracked issue |
-| **CONSIDER** | Minor suggestions that are genuinely better but where the current code is acceptable | Author's discretion — no follow-up required |
+| Severity       | Meaning                                                                              | Action                                      |
+| -------------- | ------------------------------------------------------------------------------------ | ------------------------------------------- |
+| **MUST FIX**   | Bugs, broken reactivity, accessibility failures, data leaks to client                | Block merge                                 |
+| **SHOULD FIX** | Meaningful improvements to maintainability, idiom conformance, or component design   | Fix in this PR or create a tracked issue    |
+| **CONSIDER**   | Minor suggestions that are genuinely better but where the current code is acceptable | Author's discretion — no follow-up required |
 
 Present findings as a structured list grouped by severity. Each finding must
 reference a specific file and line range, state what the problem is, explain
@@ -55,14 +55,14 @@ The codebase must use Svelte 5 runes exclusively. Flag any Svelte 4 patterns.
 
 ### Must Use (Svelte 5)
 
-| Pattern | Rune |
-|---------|------|
-| Reactive state | `let x = $state(initial)` |
-| Derived values | `let y = $derived(expr)` or `$derived.by(() => ...)` |
-| Side effects | `$effect(() => { ... })` |
-| Component props | `let { prop1, prop2 } = $props()` |
-| Bindable props | `let { value = $bindable() } = $props()` |
-| Event callbacks | Pass as props: `let { onclick } = $props()` |
+| Pattern          | Rune                                                 |
+| ---------------- | ---------------------------------------------------- |
+| Reactive state   | `let x = $state(initial)`                            |
+| Derived values   | `let y = $derived(expr)` or `$derived.by(() => ...)` |
+| Side effects     | `$effect(() => { ... })`                             |
+| Component props  | `let { prop1, prop2 } = $props()`                    |
+| Bindable props   | `let { value = $bindable() } = $props()`             |
+| Event callbacks  | Pass as props: `let { onclick } = $props()`          |
 | Slots / children | `{@render children()}` and `{@render namedSlot?.()}` |
 
 ### Must NOT Use (Svelte 4 — flag as MUST FIX)
@@ -261,6 +261,7 @@ review**. Ensure the following are configured:
 - `typescript` in strict mode — type safety.
 
 **Do not flag in review:**
+
 - Formatting, indentation, or import ordering (handled by Prettier).
 - Unused imports or variables (handled by ESLint / `svelte-check`).
 - TypeScript errors that would be caught by `svelte-check`.

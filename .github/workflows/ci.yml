@@ -39,4 +39,4 @@ jobs:
         run: cd frontend && bun run lint
 
       - name: Unit tests
-        run: cd frontend && bunx vitest --run
+        run: cd frontend && bunx vitest --run --project server

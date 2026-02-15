@@ -102,7 +102,7 @@
 							disabled={isMoving}
 							aria-label="Select destination location">
 							<option value={undefined}>Select location...</option>
-							{#each locations as location}
+							{#each locations as location (location.id)}
 								<option value={location.id}>
 									{location.storage_type === 'Binder' ? '📖' : '📦'}
 									{location.name}

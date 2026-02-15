@@ -25,6 +25,7 @@
 		placeholder = 'Filter by name, set, or treatment...'
 	}: Props = $props();
 
+	// eslint-disable-next-line svelte/prefer-writable-derived -- inputValue is also set locally in handleInput
 	let inputValue = $state('');
 
 	// Sync internal state with prop changes

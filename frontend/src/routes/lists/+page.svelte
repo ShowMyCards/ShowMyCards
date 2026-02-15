@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import {
 		PageHeader,
@@ -13,7 +13,7 @@
 	} from '$lib';
 	import { Plus } from '@lucide/svelte';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	let showCreateModal = $state(false);
 	let createName = $state('');
@@ -115,15 +115,13 @@
 				placeholder="What are you collecting?"
 				bind:value={createDescription}
 				helper="Optional description">
-				{#snippet children()}
-					<textarea
-						id="create-description"
-						name="description"
-						bind:value={createDescription}
-						class="textarea textarea-bordered w-full"
-						rows="3"
-						placeholder="What are you collecting?"></textarea>
-				{/snippet}
+				<textarea
+					id="create-description"
+					name="description"
+					bind:value={createDescription}
+					class="textarea textarea-bordered w-full"
+					rows="3"
+					placeholder="What are you collecting?"></textarea>
 			</FormField>
 		</div>
 

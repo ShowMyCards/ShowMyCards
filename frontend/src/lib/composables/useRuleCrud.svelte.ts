@@ -34,9 +34,7 @@ async function submitAction(
 		const result = deserialize(await response.text());
 
 		if (result.type === 'success') {
-			notifications.success(
-				getActionMessage(result.data, options.successMessage)
-			);
+			notifications.success(getActionMessage(result.data, options.successMessage));
 			options.onSuccess?.();
 			await invalidateAll();
 			return true;
@@ -127,7 +125,7 @@ export function useRuleCrud(getRules: () => SortingRule[]) {
 			return;
 		}
 
-		const success = await submitAction(
+		await submitAction(
 			'create',
 			{
 				rule: JSON.stringify({

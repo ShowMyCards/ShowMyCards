@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '$lib';
-	import { getCardTreatmentName, getActionError, notifications, keyboard, selection, audio } from '$lib';
+	import {
+		getCardTreatmentName,
+		getActionError,
+		notifications,
+		keyboard,
+		selection,
+		audio
+	} from '$lib';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import { deserialize } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
 
 	let {
@@ -28,9 +36,7 @@
 	const isKeyboardTarget = $derived(keyboard.hoveredId === card.id);
 
 	// Local reactive state for inventory (initialized from prop, then managed locally)
-	// svelte-ignore state_referenced_locally (we're doing this on purpose)
 	let inventory = $state<Inventory[]>([...card.inventory.this_printing]);
-	// svelte-ignore state_referenced_locally (we're doing this on purpose)
 	let totalQuantity = $state(card.inventory.total_quantity);
 
 	let adding = $state(false);
@@ -271,7 +277,9 @@
 
 	// Selection handling - select all inventory IDs for this card
 	const inventoryIds = $derived(inventory.map((i) => i.id));
-	const isSelected = $derived(inventoryIds.length > 0 && inventoryIds.every((id) => selection.isSelected(id)));
+	const isSelected = $derived(
+		inventoryIds.length > 0 && inventoryIds.every((id) => selection.isSelected(id))
+	);
 	const isPartiallySelected = $derived(
 		!isSelected && inventoryIds.some((id) => selection.isSelected(id))
 	);
@@ -305,13 +313,14 @@
 		</div>
 	{/if}
 	<!-- Clickable image to card details -->
-	<a href="/cards/{card.id}" class="block">
+	<a href={resolve(`/cards/${card.id}`)} class="block">
 		{#if card.image_uri}
 			<figure class="cursor-pointer hover:opacity-90 transition-opacity">
 				<img src={card.image_uri} alt={card.name} loading="lazy" />
 			</figure>
 		{:else}
-			<div class="w-full aspect-5/7 bg-base-300 flex items-center justify-center cursor-pointer hover:opacity-90">
+			<div
+				class="w-full aspect-5/7 bg-base-300 flex items-center justify-center cursor-pointer hover:opacity-90">
 				<p class="opacity-50">No image</p>
 			</div>
 		{/if}
@@ -321,7 +330,9 @@
 		<div class="flex items-center justify-between mb-2">
 			<div>
 				<!-- Clickable name to card details -->
-				<a href="/cards/{card.id}" class="card-title text-lg hover:text-primary transition-colors">
+				<a
+					href={resolve(`/cards/${card.id}`)}
+					class="card-title text-lg hover:text-primary transition-colors">
 					{card.name}
 				</a>
 				<div class="text-sm opacity-70">{card.set_name}</div>
@@ -397,5 +408,4 @@
 	{existingPrintings}
 	{existingLocations}
 	onClose={() => (showConflictModal = false)}
-	onChoose={handleConflictChoice}
-/>
+	onChoose={handleConflictChoice} />
