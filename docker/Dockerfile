@@ -36,7 +36,7 @@ RUN bun run build
 # ============================================
 # Stage 3: Runtime image
 # ============================================
-FROM alpine:3.21
+FROM alpine:3.23
 
 WORKDIR /app
 
