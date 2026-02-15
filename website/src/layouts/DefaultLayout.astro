@@ -4,28 +4,27 @@ import Footer from "../components/Footer.astro";
 import Navigation from "../components/Navigation.astro";
 
 import "../styles/global.css";
-const { title } = Astro.props;
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
 ---
 
 <html lang='en'>
   <head>
     <meta charset='utf-8' />
-    <meta
-      name='viewport'
-      content='width=device-width, initial-scale=1'
-    />
-    <BaseHead title={title} />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
+    <BaseHead title={title} description={description} />
   </head>
-  <body>
+  <body class='flex min-h-screen flex-col'>
     <Navigation />
-    <h1>{title}</h1>
-    <article>
+    <main class='flex-1'>
       <slot />
-    </article>
+    </main>
     <Footer />
-  </body><style>
-    h1 {
-      font-size: 2rem;
-    }
-  </style>
+  </body>
 </html>

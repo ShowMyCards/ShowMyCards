@@ -1,0 +1,41 @@
+---
+import DefaultLayout from "../layouts/DefaultLayout.astro";
+---
+
+<DefaultLayout title='Documentation' description='ShowMyCards documentation.'>
+  <section class='mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8'>
+    <div class='mx-auto max-w-2xl'>
+      <h1 class='text-3xl font-bold tracking-tight text-white sm:text-4xl'>
+        Documentation
+      </h1>
+      <p class='mt-6 text-lg leading-8 text-surface-300'>
+        Learn how to install, configure, and use ShowMyCards.
+      </p>
+    </div>
+
+    <div class='mx-auto mt-16 max-w-2xl'>
+      <nav class='space-y-8'>
+        <div>
+          <h2 class='text-lg font-semibold text-white'>Installation guide</h2>
+          <p class='mt-2 text-surface-400'>
+            Get ShowMyCards up and running on your machine with Docker or from source.
+          </p>
+          <ul class='mt-4 space-y-3'>
+            <li>
+              <a href='/download' class='text-brand-400 hover:text-brand-300 transition-colors'>
+                Installation &rarr;
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h2 class='text-lg font-semibold text-white'>User manual</h2>
+          <p class='mt-2 text-surface-400'>
+            Learn how to manage your collection, search for cards, and organise your decks.
+          </p>
+        </div>
+      </nav>
+    </div>
+  </section>
+</DefaultLayout>

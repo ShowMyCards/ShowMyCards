@@ -2,6 +2,58 @@
 import DefaultLayout from "../layouts/DefaultLayout.astro";
 ---
 
-<DefaultLayout title='Home'>
-  <p>This is the home page.</p>
+<DefaultLayout title='Home' description='Self-hosted MTG collection management.'>
+  <!-- Hero -->
+  <section class='relative overflow-hidden'>
+    <div class='mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8'>
+      <div class='mx-auto max-w-2xl text-center'>
+        <h1 class='text-4xl font-bold tracking-tight text-white sm:text-6xl'>
+          ShowMyCards
+        </h1>
+        <p class='mt-6 text-lg leading-8 text-surface-300'>
+          Self-hosted Magic: The Gathering collection management. Track your cards, manage your decks, and keep your collection organised &mdash; all on your own hardware.
+        </p>
+        <div class='mt-10 flex items-center justify-center gap-x-6'>
+          <a
+            href='/download'
+            class='rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 transition-colors'
+          >
+            Get started
+          </a>
+          <a
+            href='/docs'
+            class='text-sm font-semibold text-surface-300 hover:text-white transition-colors'
+          >
+            Documentation <span aria-hidden='true'>&rarr;</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Highlights -->
+  <section class='border-t border-surface-800'>
+    <div class='mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8'>
+      <div class='grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-3'>
+        <div>
+          <h3 class='text-lg font-semibold text-white'>Self-hosted</h3>
+          <p class='mt-2 text-sm leading-6 text-surface-400'>
+            Run it on your own machine or server. Your data stays with you.
+          </p>
+        </div>
+        <div>
+          <h3 class='text-lg font-semibold text-white'>Scryfall-powered</h3>
+          <p class='mt-2 text-sm leading-6 text-surface-400'>
+            Card data sourced from Scryfall for comprehensive, up-to-date information.
+          </p>
+        </div>
+        <div>
+          <h3 class='text-lg font-semibold text-white'>Open source</h3>
+          <p class='mt-2 text-sm leading-6 text-surface-400'>
+            Free and open source. Inspect, modify, and contribute to the code.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
 </DefaultLayout>
