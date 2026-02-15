@@ -1,4 +1,6 @@
-.PHONY: all build build-backend build-frontend dev dev-backend dev-frontend test test-backend test-frontend types clean docker docker-build docker-up docker-down install
+.PHONY: all build build-backend build-frontend dev dev-backend dev-frontend test test-backend test-frontend types clean docker docker-build docker-up docker-down install release
+
+VERSION ?= dev
 
 # Default target
 all: build
@@ -17,7 +19,7 @@ types:
 build: build-backend build-frontend
 
 build-backend:
-	cd backend && go build -o bin/server .
+	cd backend && go build -ldflags "-X backend/version.Version=$(VERSION)" -o bin/server .
 
 build-frontend:
 	cd frontend && bun run build
@@ -71,6 +73,19 @@ docker-up:
 docker-down:
 	docker compose down
 
+# Release: tag and push a version
+release:
+	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=1.2.3" && exit 1)
+	@test "$(VERSION)" != "dev" || (echo "VERSION must be a semver, not 'dev'" && exit 1)
+	@echo "Switching to main and pulling latest..."
+	git checkout main
+	git pull origin main
+	@if [ -n "$$(git status --porcelain)" ]; then echo "Error: working directory is not clean" && exit 1; fi
+	@if git rev-parse "v$(VERSION)" >/dev/null 2>&1; then echo "Error: tag v$(VERSION) already exists" && exit 1; fi
+	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
+	git push origin "v$(VERSION)"
+	@echo "Released v$(VERSION)"
+
 # Help
 help:
 	@echo "ShowMyCards Makefile"
@@ -81,7 +96,7 @@ help:
 	@echo "  install          Install all dependencies"
 	@echo "  types            Generate TypeScript types from Go models"
 	@echo "  build            Build backend and frontend"
-	@echo "  build-backend    Build Go backend"
+	@echo "  build-backend    Build Go backend (use VERSION=x.y.z to set version)"
 	@echo "  build-frontend   Build SvelteKit frontend"
 	@echo "  dev-backend      Run backend dev server"
 	@echo "  dev-frontend     Run frontend dev server"
@@ -94,6 +109,9 @@ help:
 	@echo "  clean            Remove build artifacts"
 	@echo ""
 	@echo "Docker:"
-	@echo "  docker-build           Build Docker image"
-	@echo "  docker-up              Start container"
-	@echo "  docker-down            Stop container"
+	@echo "  docker-build     Build Docker image"
+	@echo "  docker-up        Start container"
+	@echo "  docker-down      Stop container"
+	@echo ""
+	@echo "Release:"
+	@echo "  release          Tag and push a release (VERSION=x.y.z required)"

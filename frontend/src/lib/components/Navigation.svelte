@@ -1,5 +1,18 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { menuItems } from '$lib/data/navigation';
+	import { apiClient } from '$lib/api/client';
+
+	let appVersion = $state('');
+
+	onMount(async () => {
+		try {
+			const health = await apiClient.get<{ version: string }>('/health');
+			appVersion = health.version;
+		} catch {
+			// Silently ignore — version display is non-critical
+		}
+	});
 </script>
 
 <div class="drawer-side is-drawer-close:overflow-visible">
@@ -21,5 +34,10 @@
 				</li>
 			{/each}
 		</ul>
+		{#if appVersion}
+			<div class="w-full px-4 py-3 is-drawer-close:hidden">
+				<span class="text-xs text-base-content/40">v{appVersion}</span>
+			</div>
+		{/if}
 	</div>
 </div>

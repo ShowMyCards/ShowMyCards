@@ -13,8 +13,10 @@ RUN apk add --no-cache gcc musl-dev
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
+ARG VERSION=dev
+
 COPY backend/ .
-RUN CGO_ENABLED=1 GOOS=linux go build -o /server .
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-X backend/version.Version=${VERSION}" -o /server .
 
 # ============================================
 # Stage 2: Build SvelteKit frontend

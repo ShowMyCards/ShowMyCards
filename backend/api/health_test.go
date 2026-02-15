@@ -26,7 +26,7 @@ func setupHealthTest(t *testing.T) *gorm.DB {
 
 func TestHealth_Success(t *testing.T) {
 	db := setupHealthTest(t)
-	handler := NewHealthHandler(db)
+	handler := NewHealthHandler(db, "test")
 
 	app := fiber.New()
 	app.Get("/health", handler.Check)

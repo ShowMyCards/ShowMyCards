@@ -3,6 +3,7 @@
 
 services:
   showmycards:
+    image: ghcr.io/showmycards/showmycards:latest
     build:
       context: .
       dockerfile: docker/Dockerfile

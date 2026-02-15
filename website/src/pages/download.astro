@@ -19,8 +19,15 @@ import DefaultLayout from "../layouts/DefaultLayout.astro";
         <p class='mt-4 text-surface-400'>
           The quickest way to get started. Runs both the backend and frontend in a single container.
         </p>
-        <pre class='mt-6 overflow-x-auto rounded-lg bg-surface-950 p-4 text-sm text-surface-300'><code>docker pull showmycards/showmycards:latest
-docker compose up -d</code></pre>
+        <pre class='mt-6 overflow-x-auto rounded-lg bg-surface-950 p-4 text-sm text-surface-300'><code>docker run -d \
+  --name showmycards \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -v showmycards-data:/app/data \
+  ghcr.io/showmycards/showmycards:latest</code></pre>
+        <p class='mt-4 text-sm text-surface-500'>
+          Prefer Docker Compose? See the <a href='https://github.com/showmycards/showmycards/blob/main/docker-compose.yml' class='text-brand-400 hover:text-brand-300 underline transition-colors' target='_blank' rel='noopener noreferrer'>docker-compose.yml</a> in the repository.
+        </p>
       </div>
 
       <div class='rounded-xl border border-surface-800 bg-surface-900 p-8'>

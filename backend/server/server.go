@@ -4,6 +4,7 @@ import (
 	"backend/database"
 	"backend/scryfall"
 	"backend/services"
+	"backend/version"
 	"context"
 	"fmt"
 	"log/slog"
@@ -106,7 +107,7 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) setupRoutes() {
-	HealthRoutes(s.app, s.db.DB)
+	HealthRoutes(s.app, s.db.DB, version.Version)
 	DashboardRoutes(s.app, s.db.DB)
 	StorageRoutes(s.app, s.db.DB)
 	SortingRulesRoutes(s.app, s.db.DB)

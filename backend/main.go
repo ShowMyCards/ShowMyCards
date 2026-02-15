@@ -12,6 +12,7 @@ import (
 	"backend/scryfall"
 	"backend/server"
 	"backend/services"
+	"backend/version"
 )
 
 func parseLogLevel(s string) slog.Level {
@@ -32,6 +33,8 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: logLevel,
 	})))
+
+	slog.Info("starting showmycards", "version", version.Version)
 
 	// Initialize database client
 	dbPath := os.Getenv("DATABASE_PATH")
@@ -68,6 +71,12 @@ func main() {
 	jobService := services.NewJobService(dbClient.DB)
 	bulkDataService := services.NewBulkDataService(dbClient.DB, jobService, settingsService)
 	setDataService := services.NewSetDataService(dbClient.DB, jobService, settingsService, scryfallClient, dataDir)
+
+	// Check database version compatibility
+	if err := version.CheckAndUpdate(context.Background(), settingsService); err != nil {
+		slog.Error("version check failed", "error", err)
+		os.Exit(1)
+	}
 
 	// Create application-level cancellable context for background tasks
 	ctx, cancel := context.WithCancel(context.Background())
