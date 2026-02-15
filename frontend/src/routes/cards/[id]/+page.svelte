@@ -80,10 +80,9 @@
 								)}
 								{@const isFoil = treatment.includes('foil')}
 								<div
-									class="stat bg-base-100 rounded-lg p-4"
-									class:bg-gradient-to-br={isFoil}
-									class:from-yellow-100={isFoil}
-									class:to-amber-200={isFoil}>
+									class="stat rounded-lg p-4"
+									class:bg-base-100={!isFoil}
+									class:bg-base-300={isFoil}>
 									<div class="stat-title">{treatmentName}</div>
 									<div class="stat-value text-2xl">{quantity}</div>
 									{#if card.prices}
@@ -133,6 +132,7 @@
 						<h3 class="card-title text-lg">Other Printings ({otherPrintings.length})</h3>
 						<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 							{#each otherPrintings as printing (printing.id)}
+								{@const ownedCount = printing.inventory.this_printing.reduce((sum: number, i: {quantity: number}) => sum + i.quantity, 0)}
 								<a
 									href="/cards/{printing.id}"
 									class="card bg-base-100 hover:bg-base-300 transition-colors cursor-pointer">
@@ -147,9 +147,9 @@
 									{/if}
 									<div class="card-body p-3">
 										<p class="text-sm font-medium">{printing.set_name}</p>
-										{#if printing.inventory.total_quantity > 0}
+										{#if ownedCount > 0}
 											<div class="badge badge-primary badge-sm">
-												{printing.inventory.total_quantity} owned
+												{ownedCount} owned
 											</div>
 										{/if}
 									</div>

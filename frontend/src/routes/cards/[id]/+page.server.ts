@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 	try {
 		// Fetch the card details from the backend
-		const cardResponse = await fetch(`${BACKEND_URL}/search/${id}`);
+		const cardResponse = await fetch(`${BACKEND_URL}/cards/${id}`);
 
 		if (!cardResponse.ok) {
 			if (cardResponse.status === 404) {

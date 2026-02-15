@@ -86,6 +86,12 @@ func (s *SetDataService) TriggerInitialImport(ctx context.Context) error {
 
 	slog.Info("initial set import job created", "job_id", job.ID)
 
+	// Record that an import was just triggered so the scheduler's catch-up
+	// doesn't create a duplicate job before this one finishes.
+	if err := s.settingsService.SetTime(ctx, "set_data_last_update", time.Now()); err != nil {
+		slog.Warn("failed to record initial set import time", "error", err)
+	}
+
 	go func() {
 		if err := s.DownloadAndImport(ctx, job.ID); err != nil {
 			slog.Error("initial set data import failed", "error", err)

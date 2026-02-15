@@ -17,6 +17,7 @@ services:
       - BACKEND_PORT=3000
       - FRONTEND_PORT=3001
       - ORIGIN=http://localhost:3001
+      - ALLOWED_ORIGINS=http://localhost:3001
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]

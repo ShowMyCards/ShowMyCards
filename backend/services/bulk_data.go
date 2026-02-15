@@ -86,6 +86,12 @@ func (s *BulkDataService) TriggerInitialImport(ctx context.Context) error {
 
 	slog.Info("initial import job created", "job_id", job.ID)
 
+	// Record that an import was just triggered so the scheduler's catch-up
+	// doesn't create a duplicate job before this one finishes.
+	if err := s.settingsService.SetTime(ctx, "bulk_data_last_update", time.Now()); err != nil {
+		slog.Warn("failed to record initial import time", "error", err)
+	}
+
 	// Run import in background with context
 	go func() {
 		if err := s.DownloadAndImport(ctx, job.ID); err != nil {

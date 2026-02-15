@@ -197,7 +197,7 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-// GetCard retrieves a single card by Scryfall ID
+// GetCard retrieves a single card by Scryfall ID with inventory data
 func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 	cardID := c.Params("id")
 
@@ -210,7 +210,35 @@ func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 		return utils.HandleScryfallError(c, err, "failed to get card")
 	}
 
-	return c.JSON(card)
+	cardResult := BuildCardResult(card)
+
+	// Look up inventory by oracle_id
+	inventoryData := CardInventoryData{
+		ThisPrinting:   []models.Inventory{},
+		OtherPrintings: []models.Inventory{},
+		TotalQuantity:  0,
+	}
+
+	var inventory []models.Inventory
+	if err := h.db.WithContext(c.RequestCtx()).Preload("StorageLocation").
+		Where("oracle_id = ?", card.OracleID).
+		Find(&inventory).Error; err != nil {
+		slog.Warn("inventory lookup failed", "component", "search", "error", err)
+	}
+
+	for _, inv := range inventory {
+		inventoryData.TotalQuantity += inv.Quantity
+		if inv.ScryfallID == card.ID {
+			inventoryData.ThisPrinting = append(inventoryData.ThisPrinting, inv)
+		} else {
+			inventoryData.OtherPrintings = append(inventoryData.OtherPrintings, inv)
+		}
+	}
+
+	return c.JSON(EnhancedCardResult{
+		CardResult: cardResult,
+		Inventory:  inventoryData,
+	})
 }
 
 // AutocompleteResponse represents card name autocomplete suggestions
