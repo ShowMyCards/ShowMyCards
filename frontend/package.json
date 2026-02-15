@@ -18,7 +18,7 @@
 		"types:generate": "cd ../backend && go run github.com/gzuidhof/tygo@latest generate && echo 'TypeScript types generated from Go models'"
 	},
 	"devDependencies": {
-		"@eslint/js": "^9.0.0",
+		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.58.2",
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-node": "^5.5.2",
