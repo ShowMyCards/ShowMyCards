@@ -16,8 +16,7 @@
 /**
  * BulkDataHandler handles bulk data-related HTTP requests
  */
-export interface BulkDataHandler {
-}
+export interface BulkDataHandler {}
 
 //////////
 // source: constants.go
@@ -45,22 +44,22 @@ export const DefaultJobRetentionDays = 30;
  * ItemWithCard represents an item (inventory or list item) with its associated card data
  */
 export interface ItemWithCard {
-  Quantity: number /* int */;
-  RawJSON: string;
+	Quantity: number /* int */;
+	RawJSON: string;
 }
 /**
  * DashboardStats represents the statistics for the dashboard
  * tygo:export
  */
 export interface DashboardStats {
-  total_inventory_cards: number /* int64 */; // Sum of inventory.quantity
-  total_wishlist_cards: number /* int64 */; // Sum of list_item.collected_quantity
-  total_collection_value: number /* float64 */; // Value from inventory
-  total_collected_from_lists: number /* float64 */; // Value of cards collected from lists
-  total_remaining_lists_value: number /* float64 */; // Value of cards still needed from lists
-  total_storage_locations: number /* int64 */;
-  total_lists: number /* int64 */;
-  unassigned_cards: number /* int64 */;
+	total_inventory_cards: number /* int64 */; // Sum of inventory.quantity
+	total_wishlist_cards: number /* int64 */; // Sum of list_item.collected_quantity
+	total_collection_value: number /* float64 */; // Value from inventory
+	total_collected_from_lists: number /* float64 */; // Value of cards collected from lists
+	total_remaining_lists_value: number /* float64 */; // Value of cards still needed from lists
+	total_storage_locations: number /* int64 */;
+	total_lists: number /* int64 */;
+	unassigned_cards: number /* int64 */;
 }
 
 //////////
@@ -69,114 +68,113 @@ export interface DashboardStats {
 /**
  * InventoryHandler handles inventory endpoints
  */
-export interface InventoryHandler {
-}
+export interface InventoryHandler {}
 /**
  * CreateInventoryRequest represents the request body for creating an inventory item
  */
 export interface CreateInventoryRequest {
-  scryfall_id: string;
-  oracle_id: string;
-  treatment?: string;
-  quantity: number /* int */;
-  storage_location_id?: number /* uint */;
+	scryfall_id: string;
+	oracle_id: string;
+	treatment?: string;
+	quantity: number /* int */;
+	storage_location_id?: number /* uint */;
 }
 /**
  * UpdateInventoryRequest represents the request body for updating an inventory item
  */
 export interface UpdateInventoryRequest {
-  scryfall_id?: string;
-  oracle_id?: string;
-  treatment?: string;
-  quantity?: number /* int */;
-  storage_location_id?: number /* uint */;
-  clear_storage?: boolean;
+	scryfall_id?: string;
+	oracle_id?: string;
+	treatment?: string;
+	quantity?: number /* int */;
+	storage_location_id?: number /* uint */;
+	clear_storage?: boolean;
 }
 /**
  * InventoryCardsResponse represents paginated card results with inventory data
  * tygo:export
  */
 export interface InventoryCardsResponse {
-  data: EnhancedCardResult[];
-  page: number /* int */;
-  page_size: number /* int */;
-  total_cards: number /* int */;
-  total_pages: number /* int */;
+	data: EnhancedCardResult[];
+	page: number /* int */;
+	page_size: number /* int */;
+	total_cards: number /* int */;
+	total_pages: number /* int */;
 }
 /**
  * ExistingPrintingInfo represents info about an existing printing in inventory
  * tygo:export
  */
 export interface ExistingPrintingInfo {
-  scryfall_id: string;
-  treatment: string;
-  quantity: number /* int */;
-  storage_location?: any /* models.StorageLocation */;
+	scryfall_id: string;
+	treatment: string;
+	quantity: number /* int */;
+	storage_location?: any /* models.StorageLocation */;
 }
 /**
  * ByOracleResponse represents the response for checking existing printings
  * tygo:export
  */
 export interface ByOracleResponse {
-  oracle_id: string;
-  printings: ExistingPrintingInfo[];
-  locations: any /* models.StorageLocation */[]; // Unique locations where this card exists
+	oracle_id: string;
+	printings: ExistingPrintingInfo[];
+	locations: any /* models.StorageLocation */[]; // Unique locations where this card exists
 }
 /**
  * BatchMoveRequest represents the request body for moving multiple inventory items
  * tygo:export
  */
 export interface BatchMoveRequest {
-  ids: number /* uint */[];
-  storage_location_id?: number /* uint */;
+	ids: number /* uint */[];
+	storage_location_id?: number /* uint */;
 }
 /**
  * BatchMoveResponse represents the response for batch move operations
  * tygo:export
  */
 export interface BatchMoveResponse {
-  updated: number /* int */;
+	updated: number /* int */;
 }
 /**
  * BatchDeleteRequest represents the request body for deleting multiple inventory items
  * tygo:export
  */
 export interface BatchDeleteRequest {
-  ids: number /* uint */[];
+	ids: number /* uint */[];
 }
 /**
  * BatchDeleteResponse represents the response for batch delete operations
  * tygo:export
  */
 export interface BatchDeleteResponse {
-  deleted: number /* int */;
+	deleted: number /* int */;
 }
 /**
  * ResortRequest represents the request body for re-sorting inventory items
  * tygo:export
  */
 export interface ResortRequest {
-  ids?: number /* uint */[]; // If empty, resort all items
+	ids?: number /* uint */[]; // If empty, resort all items
 }
 /**
  * ResortMovement represents a single card movement during resort
  * tygo:export
  */
 export interface ResortMovement {
-  card_name: string;
-  treatment: string;
-  from_location?: string; // nil means unassigned
-  to_location?: string; // nil means unassigned
+	card_name: string;
+	treatment: string;
+	from_location?: string; // nil means unassigned
+	to_location?: string; // nil means unassigned
 }
 /**
  * ResortResponse represents the response for resort operations
  * tygo:export
  */
 export interface ResortResponse {
-  processed: number /* int */;
-  updated: number /* int */;
-  errors: number /* int */;
-  movements?: ResortMovement[];
+	processed: number /* int */;
+	updated: number /* int */;
+	errors: number /* int */;
+	movements?: ResortMovement[];
 }
 
 //////////
@@ -185,8 +183,7 @@ export interface ResortResponse {
 /**
  * JobsHandler handles job-related HTTP requests
  */
-export interface JobsHandler {
-}
+export interface JobsHandler {}
 
 //////////
 // source: lists.go
@@ -194,114 +191,113 @@ export interface JobsHandler {
 /**
  * ListHandler handles list endpoints
  */
-export interface ListHandler {
-}
+export interface ListHandler {}
 /**
  * ListSummary represents a list with summary statistics
  * tygo:export
  */
 export interface ListSummary {
-  id: number /* uint */;
-  created_at: string;
-  updated_at: string;
-  name: string;
-  description: string;
-  total_items: number /* int */;
-  total_cards_wanted: number /* int */;
-  total_cards_collected: number /* int */;
-  completion_percentage: number /* int */;
+	id: number /* uint */;
+	created_at: string;
+	updated_at: string;
+	name: string;
+	description: string;
+	total_items: number /* int */;
+	total_cards_wanted: number /* int */;
+	total_cards_collected: number /* int */;
+	completion_percentage: number /* int */;
 }
 /**
  * CreateListRequest represents the request body for creating a list
  * tygo:export
  */
 export interface CreateListRequest {
-  name: string;
-  description: string;
+	name: string;
+	description: string;
 }
 /**
  * UpdateListRequest represents the request body for updating a list
  * tygo:export
  */
 export interface UpdateListRequest {
-  name: string;
-  description: string;
+	name: string;
+	description: string;
 }
 /**
  * EnrichedListItem represents a list item with card data from Scryfall
  * tygo:export
  */
 export interface EnrichedListItem {
-  id: number /* uint */;
-  created_at: string;
-  updated_at: string;
-  list_id: number /* uint */;
-  scryfall_id: string;
-  oracle_id: string;
-  treatment: string;
-  desired_quantity: number /* int */;
-  collected_quantity: number /* int */;
-  /**
-   * Enriched fields (populated from Scryfall API)
-   */
-  name?: string;
-  set_name?: string;
-  set_code?: string;
-  collector_number?: string;
-  rarity?: string;
-  current_price?: number /* float64 */;
-  finishes?: string[];
-  frame_effects?: string[];
-  promo_types?: string[];
+	id: number /* uint */;
+	created_at: string;
+	updated_at: string;
+	list_id: number /* uint */;
+	scryfall_id: string;
+	oracle_id: string;
+	treatment: string;
+	desired_quantity: number /* int */;
+	collected_quantity: number /* int */;
+	/**
+	 * Enriched fields (populated from Scryfall API)
+	 */
+	name?: string;
+	set_name?: string;
+	set_code?: string;
+	collector_number?: string;
+	rarity?: string;
+	current_price?: number /* float64 */;
+	finishes?: string[];
+	frame_effects?: string[];
+	promo_types?: string[];
 }
 /**
  * ListItemsResponse represents paginated list items with aggregate stats
  * tygo:export
  */
 export interface ListItemsResponse {
-  data: EnrichedListItem[];
-  page: number /* int */;
-  page_size: number /* int */;
-  total_items: number /* int64 */;
-  total_pages: number /* int */;
-  total_wanted: number /* int */;
-  total_collected: number /* int */;
-  completion_percent: number /* int */;
-  total_collected_value: number /* float64 */;
-  total_remaining_value: number /* float64 */;
+	data: EnrichedListItem[];
+	page: number /* int */;
+	page_size: number /* int */;
+	total_items: number /* int64 */;
+	total_pages: number /* int */;
+	total_wanted: number /* int */;
+	total_collected: number /* int */;
+	completion_percent: number /* int */;
+	total_collected_value: number /* float64 */;
+	total_remaining_value: number /* float64 */;
 }
 /**
  * Step 4: Calculate aggregate stats across ALL items (not just current page)
  * These stats appear in the response header regardless of which page is being viewed
  */
 export interface AggregateStats {
-  TotalWanted: number /* int */;
-  TotalCollected: number /* int */;
+	TotalWanted: number /* int */;
+	TotalCollected: number /* int */;
 }
 /**
  * CreateListItemRequest represents a single item to add to a list
  * tygo:export
  */
 export interface CreateListItemRequest {
-  scryfall_id: string;
-  oracle_id: string;
-  treatment: string;
-  desired_quantity: number /* int */;
+	scryfall_id: string;
+	oracle_id: string;
+	treatment: string;
+	desired_quantity: number /* int */;
 }
 /**
  * CreateItemsBatchRequest represents the request body for batch adding items
  * tygo:export
  */
 export interface CreateItemsBatchRequest {
-  items: CreateListItemRequest[];
+	items: CreateListItemRequest[];
 }
 /**
  * UpdateListItemRequest represents the request body for updating a list item
  * tygo:export
  */
 export interface UpdateListItemRequest {
-  desired_quantity?: number /* int */;
-  collected_quantity?: number /* int */;
+	desired_quantity?: number /* int */;
+	collected_quantity?: number /* int */;
 }
 
 //////////
@@ -312,20 +308,19 @@ export interface UpdateListItemRequest {
  * tygo:export
  */
 export interface ScheduledTaskInfo {
-  name: string;
-  type: string; // "bulk_data_update" | "job_cleanup"
-  enabled: boolean;
-  schedule: string; // e.g., "03:00 daily"
-  next_run: string;
-  last_run?: string;
-  last_job_id?: number /* uint */;
-  last_job_status?: string;
+	name: string;
+	type: string; // "bulk_data_update" | "job_cleanup"
+	enabled: boolean;
+	schedule: string; // e.g., "03:00 daily"
+	next_run: string;
+	last_run?: string;
+	last_job_id?: number /* uint */;
+	last_job_status?: string;
 }
 /**
  * SchedulerHandler handles scheduler-related API requests
  */
-export interface SchedulerHandler {
-}
+export interface SchedulerHandler {}
 
 //////////
 // source: search.go
@@ -333,77 +328,76 @@ export interface SchedulerHandler {
 /**
  * SearchHandler handles card search endpoints
  */
-export interface SearchHandler {
-}
+export interface SearchHandler {}
 /**
  * SearchResponse wraps search results with pagination metadata
  * tygo:export
  */
 export interface SearchResponse {
-  data: EnhancedCardResult[];
-  page: number /* int */;
-  total_cards: number /* int */;
-  has_more: boolean;
+	data: EnhancedCardResult[];
+	page: number /* int */;
+	total_cards: number /* int */;
+	has_more: boolean;
 }
 /**
  * CardPrices represents card pricing information
  * tygo:export
  */
 export interface CardPrices {
-  usd?: string;
-  usd_foil?: string;
-  usd_etched?: string;
-  eur?: string;
-  eur_foil?: string;
-  tix?: string;
+	usd?: string;
+	usd_foil?: string;
+	usd_etched?: string;
+	eur?: string;
+	eur_foil?: string;
+	tix?: string;
 }
 /**
  * CardResult represents a card in search results
  * tygo:export
  */
 export interface CardResult {
-  id: string;
-  oracle_id: string;
-  name: string;
-  set_code?: string;
-  set_name?: string;
-  collector_number?: string;
-  image_uri?: string;
-  color_identity: string[];
-  finishes: string[];
-  frame_effects?: string[];
-  promo_types?: string[];
-  edhrec_rank?: number /* int */;
-  prices: CardPrices;
+	id: string;
+	oracle_id: string;
+	name: string;
+	set_code?: string;
+	set_name?: string;
+	collector_number?: string;
+	image_uri?: string;
+	color_identity: string[];
+	finishes: string[];
+	frame_effects?: string[];
+	promo_types?: string[];
+	edhrec_rank?: number /* int */;
+	prices: CardPrices;
 }
 /**
  * CardInventoryData represents inventory information for a card
  * tygo:export
  */
 export interface CardInventoryData {
-  this_printing: import("./models").Inventory[];
-  other_printings: import("./models").Inventory[];
-  total_quantity: number /* int */;
+	this_printing: import('./models').Inventory[];
+	other_printings: import('./models').Inventory[];
+	total_quantity: number /* int */;
 }
 /**
  * EnhancedCardResult represents a card with inventory information
  * tygo:export
  */
 export interface EnhancedCardResult {
-  id: string;
-  oracle_id: string;
-  name: string;
-  set_code?: string;
-  set_name?: string;
-  collector_number?: string;
-  image_uri?: string;
-  color_identity: string[];
-  finishes: string[];
-  frame_effects?: string[];
-  promo_types?: string[];
-  edhrec_rank?: number /* int */;
-  prices: CardPrices;
-  inventory: CardInventoryData;
+	id: string;
+	oracle_id: string;
+	name: string;
+	set_code?: string;
+	set_name?: string;
+	collector_number?: string;
+	image_uri?: string;
+	color_identity: string[];
+	finishes: string[];
+	frame_effects?: string[];
+	promo_types?: string[];
+	edhrec_rank?: number /* int */;
+	prices: CardPrices;
+	inventory: CardInventoryData;
 }
 
 //////////
@@ -412,15 +406,14 @@ export interface EnhancedCardResult {
 /**
  * SetHandler handles set endpoints
  */
-export interface SetHandler {
-}
+export interface SetHandler {}
 /**
  * TriggerImportResponse represents the response from triggering an import
  * tygo:export
  */
 export interface TriggerImportResponse {
-  message: string;
-  job_id: number /* uint */;
+	message: string;
+	job_id: number /* uint */;
 }
 
 //////////
@@ -429,8 +422,7 @@ export interface TriggerImportResponse {
 /**
  * SettingsHandler handles settings-related HTTP requests
  */
-export interface SettingsHandler {
-}
+export interface SettingsHandler {}
 
 //////////
 // source: sorting_rules.go
@@ -438,75 +430,74 @@ export interface SettingsHandler {
 /**
  * SortingRulesHandler handles sorting rule endpoints
  */
-export interface SortingRulesHandler {
-}
+export interface SortingRulesHandler {}
 /**
  * CreateSortingRuleRequest represents the request body for creating a sorting rule
  */
 export interface CreateSortingRuleRequest {
-  name: string;
-  priority: number /* int */;
-  expression: string;
-  storage_location_id: number /* uint */;
-  enabled?: boolean;
+	name: string;
+	priority: number /* int */;
+	expression: string;
+	storage_location_id: number /* uint */;
+	enabled?: boolean;
 }
 /**
  * UpdateSortingRuleRequest represents the request body for updating a sorting rule
  */
 export interface UpdateSortingRuleRequest {
-  name?: string;
-  priority?: number /* int */;
-  expression?: string;
-  storage_location_id?: number /* uint */;
-  enabled?: boolean;
+	name?: string;
+	priority?: number /* int */;
+	expression?: string;
+	storage_location_id?: number /* uint */;
+	enabled?: boolean;
 }
 /**
  * EvaluateRequest represents the request body for evaluating a card against rules
  */
 export interface EvaluateRequest {
-  card_data: { [key: string]: any};
-  treatment?: string; // Optional treatment (foil, nonfoil, etched, etc.)
+	card_data: { [key: string]: any };
+	treatment?: string; // Optional treatment (foil, nonfoil, etched, etc.)
 }
 /**
  * EvaluateResponse represents the response for rule evaluation
  */
 export interface EvaluateResponse {
-  matched: boolean;
-  storage_location?: any /* models.StorageLocation */;
-  error?: string;
+	matched: boolean;
+	storage_location?: any /* models.StorageLocation */;
+	error?: string;
 }
 /**
  * ValidateExpressionRequest represents the request body for validating an expression
  */
 export interface ValidateExpressionRequest {
-  expression: string;
+	expression: string;
 }
 /**
  * ValidateExpressionResponse represents the response for expression validation
  */
 export interface ValidateExpressionResponse {
-  valid: boolean;
-  error?: string;
+	valid: boolean;
+	error?: string;
 }
 /**
  * BatchUpdatePriorityItem represents a single rule priority update
  */
 export interface BatchUpdatePriorityItem {
-  id: number /* uint */;
-  priority: number /* int */;
+	id: number /* uint */;
+	priority: number /* int */;
 }
 /**
  * BatchUpdatePrioritiesRequest represents the request body for batch updating priorities
  */
 export interface BatchUpdatePrioritiesRequest {
-  updates: BatchUpdatePriorityItem[];
+	updates: BatchUpdatePriorityItem[];
 }
 /**
  * BatchUpdatePrioritiesResponse represents the response for batch priority updates
  */
 export interface BatchUpdatePrioritiesResponse {
-  updated_count: number /* int */;
-  error?: string;
+	updated_count: number /* int */;
+	error?: string;
 }
 
 //////////
@@ -519,26 +510,25 @@ It contains handlers for inventory, storage, lists, sorting rules, and other end
 /**
  * StorageHandler handles storage location endpoints
  */
-export interface StorageHandler {
-}
+export interface StorageHandler {}
 /**
  * CreateRequest represents the request body for creating a storage location
  */
 export interface CreateRequest {
-  name: string;
-  storage_type: any /* models.StorageType */;
+	name: string;
+	storage_type: any /* models.StorageType */;
 }
 /**
  * StorageLocationWithCount represents a storage location with its card count
  * tygo:export
  */
 export interface StorageLocationWithCount {
-  id: number /* uint */;
-  created_at: string;
-  updated_at: string;
-  name: string;
-  storage_type: any /* models.StorageType */;
-  card_count: number /* int */; // Sum of quantities
-  item_count: number /* int */; // Count of distinct records
-  total_value: number /* float64 */; // USD total value
+	id: number /* uint */;
+	created_at: string;
+	updated_at: string;
+	name: string;
+	storage_type: any /* models.StorageType */;
+	card_count: number /* int */; // Sum of quantities
+	item_count: number /* int */; // Count of distinct records
+	total_value: number /* float64 */; // USD total value
 }

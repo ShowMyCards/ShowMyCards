@@ -8,7 +8,7 @@
 		FormField,
 		StorageLocationRow,
 		notifications,
-		getActionError,
+		getActionError
 	} from '$lib';
 	import type { PageData } from './$types';
 	import { Plus } from '@lucide/svelte';

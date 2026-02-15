@@ -134,7 +134,10 @@
 						<h3 class="card-title text-lg">Other Printings ({otherPrintings.length})</h3>
 						<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 							{#each otherPrintings as printing (printing.id)}
-								{@const ownedCount = printing.inventory.this_printing.reduce((sum: number, i: {quantity: number}) => sum + i.quantity, 0)}
+								{@const ownedCount = printing.inventory.this_printing.reduce(
+									(sum: number, i: { quantity: number }) => sum + i.quantity,
+									0
+								)}
 								<a
 									href={resolve(`/cards/${printing.id}`)}
 									class="card bg-base-100 hover:bg-base-300 transition-colors cursor-pointer">

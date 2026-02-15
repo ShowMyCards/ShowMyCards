@@ -24,9 +24,7 @@
 			result = response;
 
 			if (response.errors === 0) {
-				notifications.success(
-					`Re-sorted ${response.processed} items: ${response.updated} updated`
-				);
+				notifications.success(`Re-sorted ${response.processed} items: ${response.updated} updated`);
 			} else {
 				notifications.warning(
 					`Re-sorted ${response.processed} items: ${response.updated} updated, ${response.errors} errors`
@@ -145,9 +143,7 @@
 					</table>
 				</div>
 			{:else if result.updated === 0}
-				<p class="text-sm opacity-70">
-					No items needed to be moved based on current rules.
-				</p>
+				<p class="text-sm opacity-70">No items needed to be moved based on current rules.</p>
 			{/if}
 
 			<div class="flex justify-end">

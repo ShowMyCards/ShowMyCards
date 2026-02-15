@@ -87,8 +87,9 @@
 		<h2 class="card-title mb-4">Manual Import</h2>
 
 		<p class="text-sm opacity-70 mb-4">
-			Manually trigger a bulk data import. This will download the latest card data from Scryfall
-			and replace existing data. <a href={resolve('/jobs')} class="link link-primary">View import history</a>
+			Manually trigger a bulk data import. This will download the latest card data from Scryfall and
+			replace existing data. <a href={resolve('/jobs')} class="link link-primary"
+				>View import history</a>
 		</p>
 
 		<SettingActions>
@@ -101,9 +102,7 @@
 						importing = false;
 						await update();
 						if (result.type === 'success') {
-							notifications.success(
-								getActionMessage(result.data, 'Import started successfully!')
-							);
+							notifications.success(getActionMessage(result.data, 'Import started successfully!'));
 							startPolling();
 						} else if (result.type === 'failure') {
 							const errorMsg = getActionError(result.data, 'Failed to trigger import');

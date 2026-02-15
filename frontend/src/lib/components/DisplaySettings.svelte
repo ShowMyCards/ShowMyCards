@@ -65,9 +65,7 @@
 				</select>
 			</SettingRow>
 
-			<SettingRow
-				label="Enable Sounds"
-				description="Play sounds when sorting rules match cards">
+			<SettingRow label="Enable Sounds" description="Play sounds when sorting rules match cards">
 				<input
 					type="checkbox"
 					class="toggle toggle-primary"

@@ -1,11 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import {
-		PageHeader,
-		Lozenge,
-		notifications,
-		getActionError
-	} from '$lib';
+	import { PageHeader, Lozenge, notifications, getActionError } from '$lib';
 	import SettingRow from '$lib/components/SettingRow.svelte';
 	import SettingActions from '$lib/components/SettingActions.svelte';
 	import DisplaySettings from '$lib/components/DisplaySettings.svelte';
@@ -37,7 +32,13 @@
 
 	function handleSaveEnhance() {
 		saving = true;
-		return async ({ result, update }: { result: { type: string; data?: Record<string, unknown> }; update: () => Promise<void> }) => {
+		return async ({
+			result,
+			update
+		}: {
+			result: { type: string; data?: Record<string, unknown> };
+			update: () => Promise<void>;
+		}) => {
 			saving = false;
 			await update();
 			if (result.type === 'success') {
@@ -59,10 +60,7 @@
 
 	<div class="space-y-6">
 		<!-- Scryfall Search Configuration -->
-		<form
-			method="POST"
-			action="?/save"
-			use:enhance={handleSaveEnhance}>
+		<form method="POST" action="?/save" use:enhance={handleSaveEnhance}>
 			<input type="hidden" name="settings" value={JSON.stringify(settings)} />
 			<div class="card bg-base-200 shadow-lg">
 				<div class="card-body">
@@ -109,10 +107,7 @@
 		</form>
 
 		<!-- Bulk Data Configuration -->
-		<form
-			method="POST"
-			action="?/save"
-			use:enhance={handleSaveEnhance}>
+		<form method="POST" action="?/save" use:enhance={handleSaveEnhance}>
 			<input type="hidden" name="settings" value={JSON.stringify(settings)} />
 			<div class="card bg-base-200 shadow-lg">
 				<div class="card-body">

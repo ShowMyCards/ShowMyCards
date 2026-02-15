@@ -114,15 +114,21 @@ export function getSourceData<T extends CardSourceType>(
 /**
  * Check if a card is from a specific source type
  */
-export function isInventoryCard(card: DisplayableCard): card is DisplayableCard & { _sourceType: 'inventory' } {
+export function isInventoryCard(
+	card: DisplayableCard
+): card is DisplayableCard & { _sourceType: 'inventory' } {
 	return card._sourceType === 'inventory';
 }
 
-export function isSearchResult(card: DisplayableCard): card is DisplayableCard & { _sourceType: 'search' } {
+export function isSearchResult(
+	card: DisplayableCard
+): card is DisplayableCard & { _sourceType: 'search' } {
 	return card._sourceType === 'search';
 }
 
-export function isListItem(card: DisplayableCard): card is DisplayableCard & { _sourceType: 'list' } {
+export function isListItem(
+	card: DisplayableCard
+): card is DisplayableCard & { _sourceType: 'list' } {
 	return card._sourceType === 'list';
 }
 

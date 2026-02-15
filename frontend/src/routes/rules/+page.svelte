@@ -151,7 +151,10 @@
 	onInsertExpression={(expr) => crud.insertExpression(expr, false)} />
 
 <!-- Delete Rule Modal -->
-<Modal open={crud.showDeleteModal} onClose={() => (crud.showDeleteModal = false)} title="Delete Storage Rule">
+<Modal
+	open={crud.showDeleteModal}
+	onClose={() => (crud.showDeleteModal = false)}
+	title="Delete Storage Rule">
 	<p>Are you sure you want to delete <strong>{crud.ruleToDelete?.name}</strong>?</p>
 	<p class="text-sm opacity-70 mt-2">This action cannot be undone.</p>
 

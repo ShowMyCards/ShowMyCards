@@ -235,7 +235,9 @@
 		isImporting = false;
 
 		if (successCount > 0) {
-			notifications.success(`Added ${successCount} card${successCount !== 1 ? 's' : ''} to inventory`);
+			notifications.success(
+				`Added ${successCount} card${successCount !== 1 ? 's' : ''} to inventory`
+			);
 		}
 		if (errorCount > 0) {
 			notifications.error(`Failed to import ${errorCount} card${errorCount !== 1 ? 's' : ''}`);
@@ -266,7 +268,8 @@
 			</h2>
 
 			<p class="text-sm text-base-content/70 mb-2">
-				Enter one card per line using Scryfall search syntax. Prefix with quantity and treatment markers.
+				Enter one card per line using Scryfall search syntax. Prefix with quantity and treatment
+				markers.
 			</p>
 
 			<textarea
@@ -288,7 +291,10 @@
 						Parse & Preview
 					{/if}
 				</button>
-				<button class="btn btn-ghost" onclick={handleClear} disabled={!inputText.trim() || isPreviewing}>
+				<button
+					class="btn btn-ghost"
+					onclick={handleClear}
+					disabled={!inputText.trim() || isPreviewing}>
 					<X class="w-4 h-4" />
 					Clear
 				</button>
@@ -398,7 +404,8 @@
 											<div class="font-medium">{card.searchResult.name}</div>
 											<div class="text-xs text-base-content/60">{card.searchResult.set_name}</div>
 										{:else if card.status === 'searching'}
-											<span class="text-base-content/50 text-xs font-mono">{card.parsed.query}</span>
+											<span class="text-base-content/50 text-xs font-mono"
+												>{card.parsed.query}</span>
 										{:else}
 											<span class="text-xs font-mono">{card.parsed.query}</span>
 										{/if}
@@ -485,7 +492,8 @@
 			<div>
 				<h3 class="font-semibold mb-2">Syntax</h3>
 				<p class="text-sm text-base-content/70 mb-3">
-					Each line follows the pattern: <code class="bg-base-300 px-1 rounded">[quantity][treatment] [scryfall query]</code>
+					Each line follows the pattern: <code class="bg-base-300 px-1 rounded"
+						>[quantity][treatment] [scryfall query]</code>
 				</p>
 
 				<div class="overflow-x-auto">
@@ -534,8 +542,12 @@
 
 		<div class="mt-4 pt-4 border-t border-base-300">
 			<p class="text-sm text-base-content/70">
-				Uses <a href="https://scryfall.com/docs/syntax" target="_blank" rel="noopener" class="link link-primary">Scryfall search syntax</a>.
-				Common filters: <code class="bg-base-300 px-1 rounded">e:SET</code> (set),
+				Uses <a
+					href="https://scryfall.com/docs/syntax"
+					target="_blank"
+					rel="noopener"
+					class="link link-primary">Scryfall search syntax</a
+				>. Common filters: <code class="bg-base-300 px-1 rounded">e:SET</code> (set),
 				<code class="bg-base-300 px-1 rounded">cn:NUM</code> (collector number),
 				<code class="bg-base-300 px-1 rounded">!"Exact Name"</code> (exact match).
 			</p>

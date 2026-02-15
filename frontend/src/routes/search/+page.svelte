@@ -236,7 +236,10 @@
 				<!-- Grid View -->
 				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
 					{#each paginatedCards as card (card.id)}
-						<CardResultCard {card} onremove={handleRemove} storageLocations={data.storageLocations} />
+						<CardResultCard
+							{card}
+							onremove={handleRemove}
+							storageLocations={data.storageLocations} />
 					{/each}
 				</div>
 			{:else}
@@ -265,7 +268,11 @@
 									</td>
 									<td>
 										<div class="flex items-center gap-2">
-											<SetIcon setCode={card.set_code} setName={card.set_name} rarity="common" {isFoil} />
+											<SetIcon
+												setCode={card.set_code}
+												setName={card.set_name}
+												rarity="common"
+												{isFoil} />
 											<span class="text-sm">{card.set_name}</span>
 										</div>
 									</td>
@@ -299,7 +306,10 @@
 			<!-- Pagination -->
 			{#if totalFilteredPages > 1}
 				<div class="mt-6">
-					<Pagination {currentPage} totalPages={totalFilteredPages} onPageChange={handlePageChange} />
+					<Pagination
+						{currentPage}
+						totalPages={totalFilteredPages}
+						onPageChange={handlePageChange} />
 				</div>
 			{/if}
 		{:else}

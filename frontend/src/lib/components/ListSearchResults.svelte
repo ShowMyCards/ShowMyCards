@@ -71,8 +71,7 @@
 												card.frame_effects || [],
 												treatment
 											)}
-											<span class="badge badge-sm badge-outline capitalize"
-												>{treatmentName}</span>
+											<span class="badge badge-sm badge-outline capitalize">{treatmentName}</span>
 										{/each}
 									</div>
 								</td>
@@ -91,11 +90,7 @@
 		<!-- Treatment-specific tabs -->
 		{#each uniqueTreatments as treatment (treatment)}
 			{@const treatmentCards = cardsByTreatment.get(treatment) || []}
-			<input
-				type="radio"
-				name="search_tabs"
-				class="tab capitalize"
-				aria-label={treatment} />
+			<input type="radio" name="search_tabs" class="tab capitalize" aria-label={treatment} />
 			<div class="tab-content bg-base-200 border-base-300 rounded-box p-4">
 				<div class="flex items-center justify-between mb-4">
 					<h3 class="font-semibold capitalize">
@@ -133,8 +128,7 @@
 									<td>{card.set_name}</td>
 									<td>#{card.collector_number}</td>
 									<td>
-										<span class="badge badge-sm badge-outline capitalize"
-											>{treatmentName}</span>
+										<span class="badge badge-sm badge-outline capitalize">{treatmentName}</span>
 									</td>
 									<td>
 										{#if isInList(card.id, treatment)}

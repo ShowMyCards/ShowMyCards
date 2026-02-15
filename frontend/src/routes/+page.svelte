@@ -3,7 +3,15 @@
 	import { resolve } from '$app/paths';
 	import { PageHeader, StatsCard, notifications } from '$lib';
 	import type { PageData } from './$types';
-	import { Search, Archive, Package, ClipboardList, Clock, Settings, History } from '@lucide/svelte';
+	import {
+		Search,
+		Archive,
+		Package,
+		ClipboardList,
+		Clock,
+		Settings,
+		History
+	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -77,7 +85,9 @@
 	</div>
 
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-		<a href={resolve('/search')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a
+			href={resolve('/search')}
+			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<Search class="h-6 w-6" />
@@ -87,7 +97,9 @@
 			</div>
 		</a>
 
-		<a href={resolve('/inventory')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a
+			href={resolve('/inventory')}
+			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<Archive class="h-6 w-6" />
@@ -97,7 +109,9 @@
 			</div>
 		</a>
 
-		<a href={resolve('/inventory/recent')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a
+			href={resolve('/inventory/recent')}
+			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<History class="h-6 w-6" />
@@ -107,7 +121,9 @@
 			</div>
 		</a>
 
-		<a href={resolve('/storage')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a
+			href={resolve('/storage')}
+			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<Package class="h-6 w-6" />
@@ -117,7 +133,9 @@
 			</div>
 		</a>
 
-		<a href={resolve('/rules')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a
+			href={resolve('/rules')}
+			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<ClipboardList class="h-6 w-6" />
@@ -137,7 +155,9 @@
 			</div>
 		</a>
 
-		<a href={resolve('/settings')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a
+			href={resolve('/settings')}
+			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<Settings class="h-6 w-6" />

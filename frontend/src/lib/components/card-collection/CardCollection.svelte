@@ -2,7 +2,13 @@
 	import { browser } from '$app/environment';
 	import type { Snippet } from 'svelte';
 	import { EmptyState, Pagination } from '$lib';
-	import type { DisplayableCard, ViewMode, PaginationState, TableColumn, StorageLocation } from './types';
+	import type {
+		DisplayableCard,
+		ViewMode,
+		PaginationState,
+		TableColumn,
+		StorageLocation
+	} from './types';
 	import GridView from './views/GridView.svelte';
 	import TableView from './views/TableView.svelte';
 	import ViewToggle from './controls/ViewToggle.svelte';

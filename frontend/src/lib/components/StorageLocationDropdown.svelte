@@ -13,7 +13,6 @@
 		const value = event.currentTarget.value;
 		onchange(value === 'auto' ? 'auto' : parseInt(value));
 	}
-
 </script>
 
 <select
@@ -24,7 +23,8 @@
 	<option value="auto">Auto (from rules)</option>
 	{#each locations as location (location.id)}
 		<option value={location.id}>
-			{location.storage_type === 'Binder' ? '📖' : '📦'} {location.name}
+			{location.storage_type === 'Binder' ? '📖' : '📦'}
+			{location.name}
 		</option>
 	{/each}
 </select>

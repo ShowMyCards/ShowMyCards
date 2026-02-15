@@ -222,7 +222,11 @@
 							</td>
 							<td>
 								<div class="flex items-center gap-2">
-									<SetIcon setCode={card.set_code} setName={card.set_name} rarity="common" {isFoil} />
+									<SetIcon
+										setCode={card.set_code}
+										setName={card.set_name}
+										rarity="common"
+										{isFoil} />
 									<span class="text-sm">{card.set_name}</span>
 								</div>
 							</td>

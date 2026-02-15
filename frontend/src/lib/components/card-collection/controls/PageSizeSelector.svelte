@@ -17,7 +17,11 @@
 
 <div class="flex items-center gap-2">
 	<label for="page-size" class="text-sm opacity-70">Show:</label>
-	<select id="page-size" class="select select-sm select-bordered" value={pageSize} onchange={handleChange}>
+	<select
+		id="page-size"
+		class="select select-sm select-bordered"
+		value={pageSize}
+		onchange={handleChange}>
 		{#each pageSizes as size (size)}
 			<option value={size}>{size}</option>
 		{/each}

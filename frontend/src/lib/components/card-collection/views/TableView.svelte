@@ -113,7 +113,10 @@
 				{@const treatmentName = getTreatmentName(item)}
 				{@const itemIsFoil = isFoil(item)}
 
-				<tr class="hover:bg-base-300" class:bg-accent={isSelected(item)} class:bg-opacity-20={isSelected(item)}>
+				<tr
+					class="hover:bg-base-300"
+					class:bg-accent={isSelected(item)}
+					class:bg-opacity-20={isSelected(item)}>
 					{#if selectable}
 						<td>
 							<input
@@ -130,7 +133,9 @@
 								{@render column.render(item)}
 							{:else if column.key === 'name'}
 								<CardPreview src={imageUrl} alt={item.name} isFoil={itemIsFoil}>
-									<a href={resolve(`/cards/${item.scryfallId}`)} class="font-semibold hover:text-primary transition-colors">
+									<a
+										href={resolve(`/cards/${item.scryfallId}`)}
+										class="font-semibold hover:text-primary transition-colors">
 										{item.name}
 									</a>
 								</CardPreview>

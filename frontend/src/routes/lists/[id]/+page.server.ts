@@ -26,9 +26,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 		// Fetch ALL list items for client-side filtering/pagination
 		// First, get page 1 to know total pages
-		const firstPageResponse = await fetch(
-			`${BACKEND_URL}/lists/${id}/items?page=1&page_size=100`
-		);
+		const firstPageResponse = await fetch(`${BACKEND_URL}/lists/${id}/items?page=1&page_size=100`);
 		if (!firstPageResponse.ok) {
 			return {
 				list,

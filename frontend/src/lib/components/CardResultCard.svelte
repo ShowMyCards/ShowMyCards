@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '$lib';
-	import { getCardTreatmentName, getActionError, notifications, keyboard, selection, audio } from '$lib';
+	import {
+		getCardTreatmentName,
+		getActionError,
+		notifications,
+		keyboard,
+		selection,
+		audio
+	} from '$lib';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
@@ -270,7 +277,9 @@
 
 	// Selection handling - select all inventory IDs for this card
 	const inventoryIds = $derived(inventory.map((i) => i.id));
-	const isSelected = $derived(inventoryIds.length > 0 && inventoryIds.every((id) => selection.isSelected(id)));
+	const isSelected = $derived(
+		inventoryIds.length > 0 && inventoryIds.every((id) => selection.isSelected(id))
+	);
 	const isPartiallySelected = $derived(
 		!isSelected && inventoryIds.some((id) => selection.isSelected(id))
 	);
@@ -310,7 +319,8 @@
 				<img src={card.image_uri} alt={card.name} loading="lazy" />
 			</figure>
 		{:else}
-			<div class="w-full aspect-5/7 bg-base-300 flex items-center justify-center cursor-pointer hover:opacity-90">
+			<div
+				class="w-full aspect-5/7 bg-base-300 flex items-center justify-center cursor-pointer hover:opacity-90">
 				<p class="opacity-50">No image</p>
 			</div>
 		{/if}
@@ -320,7 +330,9 @@
 		<div class="flex items-center justify-between mb-2">
 			<div>
 				<!-- Clickable name to card details -->
-				<a href={resolve(`/cards/${card.id}`)} class="card-title text-lg hover:text-primary transition-colors">
+				<a
+					href={resolve(`/cards/${card.id}`)}
+					class="card-title text-lg hover:text-primary transition-colors">
 					{card.name}
 				</a>
 				<div class="text-sm opacity-70">{card.set_name}</div>
@@ -396,5 +408,4 @@
 	{existingPrintings}
 	{existingLocations}
 	onClose={() => (showConflictModal = false)}
-	onChoose={handleConflictChoice}
-/>
+	onChoose={handleConflictChoice} />

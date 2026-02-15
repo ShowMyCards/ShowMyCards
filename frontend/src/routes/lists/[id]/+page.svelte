@@ -244,7 +244,8 @@
 								(page {currentPage} of {totalFilteredPages})
 							{/if}
 						{:else}
-							{data.items.length} {data.items.length === 1 ? 'card' : 'cards'}
+							{data.items.length}
+							{data.items.length === 1 ? 'card' : 'cards'}
 							{#if totalFilteredPages > 1}
 								(page {currentPage} of {totalFilteredPages})
 							{/if}

@@ -86,7 +86,11 @@ class KeyboardStore {
 
 		// Ignore if focused on input/textarea/select
 		const target = event.target as HTMLElement;
-		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+		if (
+			target.tagName === 'INPUT' ||
+			target.tagName === 'TEXTAREA' ||
+			target.tagName === 'SELECT'
+		) {
 			return;
 		}
 
