@@ -1,5 +1,9 @@
 package utils
 
+import (
+	"github.com/gofiber/utils/v2/internal/caseconv"
+)
+
 type byteSeq interface {
 	~string | ~[]byte
 }
@@ -10,7 +14,7 @@ func EqualFold[S byteSeq](b, s S) bool {
 		return false
 	}
 
-	table := toUpperTable
+	table := caseconv.ToUpperTable
 	n := len(b)
 	i := 0
 
@@ -92,10 +96,13 @@ func TrimRight[S byteSeq](s S, cutset byte) S {
 // This is an optimized version that's faster than strings/bytes.TrimSpace for ASCII strings.
 // It removes the following ASCII whitespace characters: space, tab, newline, carriage return, vertical tab, and form feed.
 func TrimSpace[S byteSeq](s S) S {
-	i, j := 0, len(s)-1
+	n := len(s)
+	if n == 0 {
+		return s
+	}
 
-	// fast path for empty string
-	if j < 0 {
+	i, j := 0, n-1
+	if !whitespaceTable[s[i]] && !whitespaceTable[s[j]] {
 		return s
 	}
 
