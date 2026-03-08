@@ -17,6 +17,9 @@ services:
       - BACKEND_PORT=3000
       - FRONTEND_PORT=3001
       - ORIGIN=http://localhost:3001
+      # ALLOWED_ORIGINS controls which frontend origins the backend accepts (CORS).
+      # Set this to the URL users access the frontend from.
+      # Comma-separated for multiple origins (e.g. http://localhost:3001,https://cards.example.com).
       - ALLOWED_ORIGINS=http://localhost:3001
     restart: unless-stopped
     healthcheck:
