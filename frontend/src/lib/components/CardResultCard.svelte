@@ -36,7 +36,10 @@
 	const isKeyboardTarget = $derived(keyboard.hoveredId === card.id);
 
 	// Local reactive state for inventory (initialized from prop, then managed locally)
+	// Intentionally captures initial value — diverges from prop via optimistic add/remove
+	// svelte-ignore state_referenced_locally
 	let inventory = $state<Inventory[]>([...card.inventory.this_printing]);
+	// svelte-ignore state_referenced_locally
 	let totalQuantity = $state(card.inventory.total_quantity);
 
 	let adding = $state(false);

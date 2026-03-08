@@ -25,6 +25,7 @@ export { rulesApi } from './api/resources/rules';
 export { jobsApi } from './api/resources/jobs';
 export { settingsApi } from './api/resources/settings';
 export { searchApi } from './api/resources/search';
+export { dataApi } from './api/resources/data';
 
 // Composables
 export { useFormState } from './composables/useFormState.svelte';
@@ -150,6 +151,9 @@ export type {
 
 // Re-export scheduler and dashboard types from API
 export type { ScheduledTaskInfo, DashboardStats } from './types/api';
+
+// Re-export data import/export types
+export type { ExportData, ImportResponse } from './types/api';
 
 // Utilities
 export { getCardTreatmentName, getAvailableTreatments } from './utils/card-treatment';
