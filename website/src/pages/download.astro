@@ -31,6 +31,49 @@ import DefaultLayout from "../layouts/DefaultLayout.astro";
       </div>
 
       <div class='rounded-xl border border-surface-800 bg-surface-900 p-8'>
+        <h2 class='text-xl font-semibold text-white'>Configuration</h2>
+        <p class='mt-4 text-surface-400'>
+          ShowMyCards works out of the box for local use. If you're deploying on a custom domain or behind a reverse proxy, set these environment variables:
+        </p>
+        <div class='mt-6 overflow-x-auto'>
+          <table class='w-full text-left text-sm text-surface-300'>
+            <thead class='border-b border-surface-700 text-surface-400'>
+              <tr>
+                <th class='pb-3 pr-6 font-medium'>Variable</th>
+                <th class='pb-3 pr-6 font-medium'>Service</th>
+                <th class='pb-3 font-medium'>Description</th>
+              </tr>
+            </thead>
+            <tbody class='divide-y divide-surface-800'>
+              <tr>
+                <td class='py-3 pr-6 font-mono text-brand-400'>ALLOWED_ORIGINS</td>
+                <td class='py-3 pr-6'>Backend</td>
+                <td class='py-3'>Origins allowed to call the API (CORS). Set to the URL users access the frontend from. Comma-separated for multiple origins. Default: <code class='text-surface-300'>http://localhost:5173</code></td>
+              </tr>
+              <tr>
+                <td class='py-3 pr-6 font-mono text-brand-400'>PUBLIC_BACKEND_URL</td>
+                <td class='py-3 pr-6'>Frontend</td>
+                <td class='py-3'>URL the frontend uses to reach the backend API. Default: <code class='text-surface-300'>http://localhost:3000</code></td>
+              </tr>
+              <tr>
+                <td class='py-3 pr-6 font-mono text-brand-400'>ORIGIN</td>
+                <td class='py-3 pr-6'>Frontend</td>
+                <td class='py-3'>The frontend's own origin (required in production by SvelteKit).</td>
+              </tr>
+              <tr>
+                <td class='py-3 pr-6 font-mono text-brand-400'>PORT</td>
+                <td class='py-3 pr-6'>Both</td>
+                <td class='py-3'>Port each service listens on. Backend default: <code class='text-surface-300'>3000</code>, Frontend default: <code class='text-surface-300'>3001</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class='mt-4 text-sm text-surface-500'>
+          For example, if users access ShowMyCards at <code class='text-surface-400'>https://cards.example.com</code>, set <code class='text-surface-400'>ALLOWED_ORIGINS=https://cards.example.com</code> on the backend and <code class='text-surface-400'>ORIGIN=https://cards.example.com</code> on the frontend.
+        </p>
+      </div>
+
+      <div class='rounded-xl border border-surface-800 bg-surface-900 p-8'>
         <h2 class='text-xl font-semibold text-white'>From source</h2>
         <p class='mt-4 text-surface-400'>
           Clone the repository and build it yourself. Requires Go and Bun.

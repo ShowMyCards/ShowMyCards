@@ -59,6 +59,21 @@ Or for the marketing website:
 make dev-website
 ```
 
+## Environment Variables
+
+All configuration is via environment variables. No `.env` files are required for local development — the defaults work out of the box.
+
+| Variable | Used by | Default | Description |
+|----------|---------|---------|-------------|
+| `PORT` | Backend | `3000` | Port the backend API listens on |
+| `ALLOWED_ORIGINS` | Backend | `http://localhost:5173` | Comma-separated origins allowed to call the API (CORS). Set this to the URL users access the frontend from. Use `*` to allow all origins. |
+| `PUBLIC_BACKEND_URL` | Frontend | `http://localhost:3000` | URL the frontend uses to reach the backend API |
+| `ORIGIN` | Frontend | — | The origin of the frontend itself (required in production by SvelteKit) |
+
+When deploying behind a reverse proxy or on a custom domain, you'll typically need to set `ALLOWED_ORIGINS` to match the frontend's origin. For example, if users access the frontend at `https://cards.example.com`, set `ALLOWED_ORIGINS=https://cards.example.com` on the backend.
+
+For Docker deployments, these are set in `docker-compose.yml`. See also `BACKEND_PORT` and `FRONTEND_PORT` which map to `PORT` inside each service.
+
 ## Type Generation
 
 TypeScript types are automatically generated from Go structs using [Tygo](https://github.com/gzuidhof/tygo).
