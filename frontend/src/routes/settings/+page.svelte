@@ -50,12 +50,9 @@
 		try {
 			const text = await file.text();
 			const parsed = JSON.parse(text);
-			if (
-				typeof parsed !== 'object' ||
-				parsed === null ||
-				typeof parsed.version !== 'number'
-			) {
-				importError = 'The selected file does not appear to be a valid ShowMyCards export (missing or invalid version field).';
+			if (typeof parsed !== 'object' || parsed === null || typeof parsed.version !== 'number') {
+				importError =
+					'The selected file does not appear to be a valid ShowMyCards export (missing or invalid version field).';
 				importPreview = null;
 				return;
 			}
@@ -249,7 +246,8 @@
 			<div class="card-body">
 				<h2 class="card-title mb-2">Data Management</h2>
 				<p class="text-sm opacity-70 mb-4">
-					Export your collection as a JSON file for backup or migration. Import a previously exported file to restore or merge data.
+					Export your collection as a JSON file for backup or migration. Import a previously
+					exported file to restore or merge data.
 				</p>
 
 				<div class="flex flex-wrap gap-3">
@@ -278,23 +276,48 @@
 				{/if}
 
 				{#if importPreview}
-					{@const hasData = !!(importPreview.storage_locations?.length || importPreview.sorting_rules?.length || importPreview.inventory?.length || importPreview.lists?.length)}
+					{@const hasData = !!(
+						importPreview.storage_locations?.length ||
+						importPreview.sorting_rules?.length ||
+						importPreview.inventory?.length ||
+						importPreview.lists?.length
+					)}
 					<div class="alert {hasData ? 'alert-info' : 'alert-warning'} mt-4">
 						<div>
 							{#if hasData}
 								<p class="font-semibold mb-2">Ready to import:</p>
 								<ul class="list-disc list-inside text-sm space-y-1">
 									{#if importPreview.storage_locations?.length}
-										<li>{importPreview.storage_locations.length} storage location{importPreview.storage_locations.length !== 1 ? 's' : ''}</li>
+										<li>
+											{importPreview.storage_locations.length} storage location{importPreview
+												.storage_locations.length !== 1
+												? 's'
+												: ''}
+										</li>
 									{/if}
 									{#if importPreview.sorting_rules?.length}
-										<li>{importPreview.sorting_rules.length} sorting rule{importPreview.sorting_rules.length !== 1 ? 's' : ''}</li>
+										<li>
+											{importPreview.sorting_rules.length} sorting rule{importPreview.sorting_rules
+												.length !== 1
+												? 's'
+												: ''}
+										</li>
 									{/if}
 									{#if importPreview.inventory?.length}
-										<li>{importPreview.inventory.length} inventory item{importPreview.inventory.length !== 1 ? 's' : ''}</li>
+										<li>
+											{importPreview.inventory.length} inventory item{importPreview.inventory
+												.length !== 1
+												? 's'
+												: ''}
+										</li>
 									{/if}
 									{#if importPreview.lists?.length}
-										<li>{importPreview.lists.length} list{importPreview.lists.length !== 1 ? 's' : ''} ({importPreview.lists.reduce((sum, l) => sum + (l.items?.length ?? 0), 0)} items total)</li>
+										<li>
+											{importPreview.lists.length} list{importPreview.lists.length !== 1 ? 's' : ''} ({importPreview.lists.reduce(
+												(sum, l) => sum + (l.items?.length ?? 0),
+												0
+											)} items total)
+										</li>
 									{/if}
 								</ul>
 								<p class="text-sm opacity-70 mt-2">
@@ -318,7 +341,10 @@
 								</div>
 							{:else}
 								<p class="font-semibold">This export file contains no data.</p>
-								<p class="text-sm opacity-70 mt-1">The file is a valid export but has no storage locations, inventory, lists, or sorting rules to import.</p>
+								<p class="text-sm opacity-70 mt-1">
+									The file is a valid export but has no storage locations, inventory, lists, or
+									sorting rules to import.
+								</p>
 								<div class="mt-3">
 									<button class="btn btn-ghost btn-sm" onclick={cancelImport}>Dismiss</button>
 								</div>
@@ -333,25 +359,49 @@
 							<p class="font-semibold mb-2">Import complete:</p>
 							<ul class="list-disc list-inside text-sm space-y-1">
 								{#if importResult.storage_locations_created}
-									<li>{importResult.storage_locations_created} storage location{importResult.storage_locations_created !== 1 ? 's' : ''} created</li>
+									<li>
+										{importResult.storage_locations_created} storage location{importResult.storage_locations_created !==
+										1
+											? 's'
+											: ''} created
+									</li>
 								{/if}
 								{#if importResult.sorting_rules_created}
-									<li>{importResult.sorting_rules_created} sorting rule{importResult.sorting_rules_created !== 1 ? 's' : ''} created</li>
+									<li>
+										{importResult.sorting_rules_created} sorting rule{importResult.sorting_rules_created !==
+										1
+											? 's'
+											: ''} created
+									</li>
 								{/if}
 								{#if importResult.inventory_items_created}
-									<li>{importResult.inventory_items_created} inventory item{importResult.inventory_items_created !== 1 ? 's' : ''} created</li>
+									<li>
+										{importResult.inventory_items_created} inventory item{importResult.inventory_items_created !==
+										1
+											? 's'
+											: ''} created
+									</li>
 								{/if}
 								{#if importResult.lists_created}
-									<li>{importResult.lists_created} list{importResult.lists_created !== 1 ? 's' : ''} created</li>
+									<li>
+										{importResult.lists_created} list{importResult.lists_created !== 1 ? 's' : ''} created
+									</li>
 								{/if}
 								{#if importResult.list_items_created}
-									<li>{importResult.list_items_created} list item{importResult.list_items_created !== 1 ? 's' : ''} created</li>
+									<li>
+										{importResult.list_items_created} list item{importResult.list_items_created !==
+										1
+											? 's'
+											: ''} created
+									</li>
 								{/if}
 							</ul>
 							{#if importResult.warnings?.length}
 								<details class="mt-2">
 									<summary class="cursor-pointer text-sm font-medium">
-										{importResult.warnings.length} warning{importResult.warnings.length !== 1 ? 's' : ''}
+										{importResult.warnings.length} warning{importResult.warnings.length !== 1
+											? 's'
+											: ''}
 									</summary>
 									<ul class="list-disc list-inside text-xs mt-1 space-y-0.5 opacity-80">
 										{#each importResult.warnings as warning, i (i)}
