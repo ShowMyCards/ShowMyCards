@@ -4,9 +4,11 @@ package services
 
 import (
 	"backend/models"
+	"backend/version"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -275,6 +277,10 @@ func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkData
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("User-Agent", version.UserAgent())
+	req.Header.Set("Accept", "application/json")
+
+	slog.Info("fetching bulk data list", "url", bulkDataURL)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
@@ -283,7 +289,13 @@ func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkData
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("bulk data list returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		slog.Error("bulk data list request failed",
+			"status", resp.StatusCode,
+			"url", bulkDataURL,
+			"response_body", string(body),
+		)
+		return "", fmt.Errorf("bulk data list returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var bulkDataList BulkDataListResponse
@@ -309,6 +321,10 @@ func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadUR
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("User-Agent", version.UserAgent())
+	req.Header.Set("Accept", "application/json")
+
+	slog.Info("downloading bulk data", "url", downloadURI)
 
 	resp, err := s.downloadClient.Do(req)
 	if err != nil {
@@ -317,7 +333,13 @@ func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadUR
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bulk data download returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		slog.Error("bulk data download failed",
+			"status", resp.StatusCode,
+			"url", downloadURI,
+			"response_body", string(body),
+		)
+		return fmt.Errorf("bulk data download returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	decoder := json.NewDecoder(resp.Body)

@@ -78,8 +78,8 @@ type CardInventoryData struct {
 // EnhancedCardResult represents a card with inventory information
 // tygo:export
 type EnhancedCardResult struct {
-	CardResult
-	Inventory CardInventoryData `json:"inventory"`
+	CardResult `tstype:",extends"`
+	Inventory  CardInventoryData `json:"inventory"`
 }
 
 // Search searches for cards by query string

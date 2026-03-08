@@ -14,6 +14,11 @@ import (
 // Defaults to "dev" for local development.
 var Version = "dev"
 
+// UserAgent returns the User-Agent string for outbound HTTP requests.
+func UserAgent() string {
+	return "ShowMyCards/" + Version
+}
+
 // SettingsStore is the subset of the settings service needed for version checks.
 type SettingsStore interface {
 	Get(ctx context.Context, key string) (string, error)

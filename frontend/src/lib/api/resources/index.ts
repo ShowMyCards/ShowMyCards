@@ -11,3 +11,4 @@ export * from './rules';
 export * from './jobs';
 export * from './settings';
 export * from './search';
+export * from './data';

@@ -3,6 +3,7 @@ package services
 import (
 	"backend/models"
 	scryfallclient "backend/scryfall"
+	"backend/version"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -260,6 +261,7 @@ func (s *SetDataService) downloadIconIfNeeded(ctx context.Context, iconURL, setC
 	if err != nil {
 		return "", false, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("User-Agent", version.UserAgent())
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {

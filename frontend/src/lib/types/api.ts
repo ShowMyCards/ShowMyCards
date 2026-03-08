@@ -30,6 +30,14 @@ export const DefaultCardsPageSize = 50;
  */
 export const MaxCardsPageSize = 100;
 /**
+ * MaxBatchIDs is the maximum number of IDs in a batch move/delete operation
+ */
+export const MaxBatchIDs = 1000;
+/**
+ * MaxBatchItems is the maximum number of items in a batch create operation
+ */
+export const MaxBatchItems = 500;
+/**
  * Job constants
  */
 /**
@@ -41,12 +49,9 @@ export const DefaultJobRetentionDays = 30;
 // source: dashboard.go
 
 /**
- * ItemWithCard represents an item (inventory or list item) with its associated card data
+ * DashboardHandler handles dashboard endpoints
  */
-export interface ItemWithCard {
-	Quantity: number /* int */;
-	RawJSON: string;
-}
+export interface DashboardHandler {}
 /**
  * DashboardStats represents the statistics for the dashboard
  * tygo:export
@@ -61,6 +66,103 @@ export interface DashboardStats {
 	total_lists: number /* int64 */;
 	unassigned_cards: number /* int64 */;
 }
+
+//////////
+// source: data.go
+
+/**
+ * CurrentExportVersion is the latest export format version.
+ * Bump this when the export schema changes and add a migration function.
+ */
+export const CurrentExportVersion = 1;
+/**
+ * DataHandler handles data import and export endpoints
+ */
+export interface DataHandler {}
+/**
+ * ExportData represents the full application data export
+ * tygo:export
+ */
+export interface ExportData {
+	version: number /* int */;
+	exported_at: string;
+	storage_locations: ExportStorageLocation[];
+	sorting_rules: ExportSortingRule[];
+	inventory: ExportInventoryItem[];
+	lists: ExportList[];
+}
+/**
+ * ExportStorageLocation represents a storage location in export format
+ * tygo:export
+ */
+export interface ExportStorageLocation {
+	ref_id: number /* uint */;
+	name: string;
+	storage_type: any /* models.StorageType */;
+}
+/**
+ * ExportSortingRule represents a sorting rule in export format
+ * tygo:export
+ */
+export interface ExportSortingRule {
+	name: string;
+	priority: number /* int */;
+	expression: string;
+	storage_location_ref_id: number /* uint */;
+	enabled: boolean;
+}
+/**
+ * ExportInventoryItem represents an inventory item in export format
+ * tygo:export
+ */
+export interface ExportInventoryItem {
+	scryfall_id: string;
+	oracle_id: string;
+	treatment: string;
+	quantity: number /* int */;
+	storage_location_ref_id?: number /* uint */;
+}
+/**
+ * ExportList represents a list with its items in export format
+ * tygo:export
+ */
+export interface ExportList {
+	ref_id: number /* uint */;
+	name: string;
+	description?: string;
+	items: ExportListItem[];
+}
+/**
+ * ExportListItem represents a list item in export format
+ * tygo:export
+ */
+export interface ExportListItem {
+	scryfall_id: string;
+	oracle_id: string;
+	treatment: string;
+	desired_quantity: number /* int */;
+	collected_quantity: number /* int */;
+}
+/**
+ * ImportResponse represents the result of an import operation
+ * tygo:export
+ */
+export interface ImportResponse {
+	storage_locations_created: number /* int */;
+	sorting_rules_created: number /* int */;
+	inventory_items_created: number /* int */;
+	lists_created: number /* int */;
+	list_items_created: number /* int */;
+	warnings?: string[];
+}
+
+//////////
+// source: health.go
+
+/**
+ * HealthHandler handles health check endpoints
+ */
+export interface HealthHandler {}
 
 //////////
 // source: inventory.go
@@ -267,14 +369,6 @@ export interface ListItemsResponse {
 	total_remaining_value: number /* float64 */;
 }
 /**
- * Step 4: Calculate aggregate stats across ALL items (not just current page)
- * These stats appear in the response header regardless of which page is being viewed
- */
-export interface AggregateStats {
-	TotalWanted: number /* int */;
-	TotalCollected: number /* int */;
-}
-/**
  * CreateListItemRequest represents a single item to add to a list
  * tygo:export
  */
@@ -383,21 +477,15 @@ export interface CardInventoryData {
  * EnhancedCardResult represents a card with inventory information
  * tygo:export
  */
-export interface EnhancedCardResult {
-	id: string;
-	oracle_id: string;
-	name: string;
-	set_code?: string;
-	set_name?: string;
-	collector_number?: string;
-	image_uri?: string;
-	color_identity: string[];
-	finishes: string[];
-	frame_effects?: string[];
-	promo_types?: string[];
-	edhrec_rank?: number /* int */;
-	prices: CardPrices;
+export interface EnhancedCardResult extends CardResult {
 	inventory: CardInventoryData;
+}
+/**
+ * AutocompleteResponse represents card name autocomplete suggestions
+ * tygo:export
+ */
+export interface AutocompleteResponse {
+	suggestions: string[];
 }
 
 //////////
@@ -512,9 +600,9 @@ It contains handlers for inventory, storage, lists, sorting rules, and other end
  */
 export interface StorageHandler {}
 /**
- * CreateRequest represents the request body for creating a storage location
+ * CreateStorageRequest represents the request body for creating a storage location
  */
-export interface CreateRequest {
+export interface CreateStorageRequest {
 	name: string;
 	storage_type: any /* models.StorageType */;
 }

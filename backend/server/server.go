@@ -34,7 +34,7 @@ type Server struct {
 // NewServer creates a new server instance
 func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient *scryfall.Client, settingsService *services.SettingsService, jobService *services.JobService, bulkDataService *services.BulkDataService, setDataService *services.SetDataService, dataDir string) *Server {
 	app := fiber.New(fiber.Config{
-		BodyLimit:    4 * 1024 * 1024, // 4MB
+		BodyLimit:    50 * 1024 * 1024, // 50MB — raised from 4MB for /data/import (fasthttp enforces globally)
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -116,6 +116,7 @@ func (s *Server) setupRoutes() {
 	SearchRoutes(s.app, s.scryfall, s.db.DB, s.settingsService)
 	SettingsRoutes(s.app, s.settingsService)
 	JobsRoutes(s.app, s.jobService)
+	DataRoutes(s.app, s.db.DB)
 	BulkDataRoutes(s.app, s.bulkDataService, s.appCtx)
 	SetRoutes(s.app, s.db.DB, s.setDataService, s.dataDir, s.appCtx)
 	s.RegisterSchedulerRoutes(s.app)
