@@ -43,7 +43,7 @@
 		"vitest-browser-svelte": "^2.0.2"
 	},
 	"dependencies": {
-		"@lucide/svelte": "^0.564.0",
+		"@lucide/svelte": "^0.575.0",
 		"@tailwindcss/typography": "^0.5.19",
 		"@thisux/sveltednd": "^0.0.20",
 		"sveltekit-sse": "^0.14.3",
