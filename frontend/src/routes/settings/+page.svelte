@@ -251,7 +251,7 @@
 				</p>
 
 				<div class="flex flex-wrap gap-3">
-					<a href={resolve(dataApi.exportUrl())} class="btn btn-primary" download>
+					<a href={resolve('/api/data/export')} class="btn btn-primary" download>
 						<Download class="w-4 h-4" />
 						Export Data
 					</a>
