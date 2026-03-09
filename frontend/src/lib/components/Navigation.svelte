@@ -2,14 +2,16 @@
 	import { onMount } from 'svelte';
 	import { menuItems } from '$lib/data/navigation';
 	import { resolve } from '$app/paths';
-	import { apiClient } from '$lib/api/client';
 
 	let appVersion = $state('');
 
 	onMount(async () => {
 		try {
-			const health = await apiClient.get<{ version: string }>('/health');
-			appVersion = health.version;
+			const response = await fetch('/api/health');
+			if (response.ok) {
+				const health = await response.json();
+				appVersion = health.version;
+			}
 		} catch {
 			// Silently ignore — version display is non-critical
 		}
