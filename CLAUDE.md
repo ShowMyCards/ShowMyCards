@@ -55,7 +55,7 @@ make dev-frontend   # SvelteKit on port 5173
 ### Environment Variables
 
 All configuration is via environment variables. The frontend reads
-`VITE_BACKEND_URL` (defaults to `http://localhost:3000`). The backend reads
+`PUBLIC_BACKEND_URL` (defaults to `http://localhost:3000`). The backend reads
 `PORT` (defaults to `3000`). For Docker deployments, environment variables are
 set in `docker-compose.yml`. Never hardcode connection strings, API URLs, ports,
 or feature flags.
@@ -181,3 +181,10 @@ When modifying API endpoints:
 - When making changes, prefer the simplest approach that works. Do not
   introduce abstractions, patterns, or dependencies without a concrete
   present need.
+- **No direct backend calls from the browser.** The frontend runs behind a
+  reverse proxy in production — `BACKEND_URL` (localhost) is only reachable
+  from the SvelteKit server, not from the user's browser. All API calls from
+  client-side Svelte components must use relative URLs (e.g. `/api/health`)
+  that hit SvelteKit server routes, which then proxy to the backend.
+  Server-side code (`+page.server.ts`, `+server.ts`) can use `BACKEND_URL`
+  directly.

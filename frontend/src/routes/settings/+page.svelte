@@ -251,8 +251,7 @@
 				</p>
 
 				<div class="flex flex-wrap gap-3">
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external backend URL, not a SvelteKit route -->
-					<a href={dataApi.exportUrl()} class="btn btn-primary" download>
+					<a href={resolve(dataApi.exportUrl())} class="btn btn-primary" download>
 						<Download class="w-4 h-4" />
 						Export Data
 					</a>
