@@ -59,6 +59,7 @@ export interface Inventory {
 	scryfall_id: string;
 	oracle_id: string;
 	treatment: string;
+	language: string;
 	quantity: number /* int */;
 	storage_location_id?: number /* uint */;
 	/**

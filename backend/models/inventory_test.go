@@ -316,6 +316,56 @@ func TestInventory_DefaultQuantity(t *testing.T) {
 	}
 }
 
+func TestInventory_LanguageDefaultsToEnglishWhenBlank(t *testing.T) {
+	db := setupInventoryTestDB(t)
+
+	inventory := &Inventory{
+		ScryfallID: "test-id",
+		OracleID:   "oracle-id",
+		Treatment:  "nonfoil",
+		Quantity:   1,
+		// Language not set
+	}
+	if err := db.Create(inventory).Error; err != nil {
+		t.Fatalf("failed to create inventory: %v", err)
+	}
+
+	if inventory.Language != "en" {
+		t.Errorf("expected Language to default to 'en', got '%s'", inventory.Language)
+	}
+
+	var loaded Inventory
+	if err := db.First(&loaded, inventory.ID).Error; err != nil {
+		t.Fatalf("failed to reload inventory: %v", err)
+	}
+	if loaded.Language != "en" {
+		t.Errorf("expected reloaded Language to be 'en', got '%s'", loaded.Language)
+	}
+}
+
+func TestInventory_LanguageRoundTrip(t *testing.T) {
+	db := setupInventoryTestDB(t)
+
+	inventory := &Inventory{
+		ScryfallID: "test-id",
+		OracleID:   "oracle-id",
+		Treatment:  "nonfoil",
+		Language:   "de",
+		Quantity:   1,
+	}
+	if err := db.Create(inventory).Error; err != nil {
+		t.Fatalf("failed to create inventory: %v", err)
+	}
+
+	var loaded Inventory
+	if err := db.First(&loaded, inventory.ID).Error; err != nil {
+		t.Fatalf("failed to reload inventory: %v", err)
+	}
+	if loaded.Language != "de" {
+		t.Errorf("expected Language 'de', got '%s'", loaded.Language)
+	}
+}
+
 // LOW-VALUE: Only tests that GORM can save arbitrary strings to a varchar column. No validation logic exists for Treatment.
 func TestInventory_Treatments(t *testing.T) {
 	db := setupInventoryTestDB(t)

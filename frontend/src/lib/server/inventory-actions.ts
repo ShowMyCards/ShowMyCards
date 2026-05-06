@@ -14,6 +14,7 @@ export async function handleAddInventory(request: Request, fetch: typeof globalT
 	const scryfallId = formData.get('scryfall_id');
 	const oracleId = formData.get('oracle_id');
 	const treatment = formData.get('treatment');
+	const language = formData.get('language');
 	const quantity = formData.get('quantity');
 	const storageLocationId = formData.get('storage_location_id');
 
@@ -28,6 +29,11 @@ export async function handleAddInventory(request: Request, fetch: typeof globalT
 			treatment: treatment,
 			quantity: quantity ? parseInt(quantity.toString()) : 1
 		};
+
+		// Backend defaults to 'en' when language is omitted.
+		if (language) {
+			body.language = language.toString();
+		}
 
 		// Only include storage_location_id if explicitly set (not 'auto')
 		if (storageLocationId && storageLocationId !== 'auto') {

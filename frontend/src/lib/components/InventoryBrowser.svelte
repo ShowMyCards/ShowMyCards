@@ -2,6 +2,7 @@
 	import { browser } from '$app/environment';
 	import { invalidateAll } from '$app/navigation';
 	import {
+		AddLanguageToggle,
 		CardResultCard,
 		EmptyState,
 		Pagination,
@@ -37,7 +38,14 @@
 		header
 	}: Props = $props();
 
-	let removedCardIds = $state(new Set<string>());
+	// Stack key combines scryfall_id with language so EN and DE copies of the
+	// same printing are tracked as distinct stacks (the backend groups them this way).
+	function stackKey(card: EnhancedCardResult): string {
+		const lang = card.inventory.this_printing[0]?.language ?? 'en';
+		return `${card.id}:${lang}`;
+	}
+
+	let removedStackKeys = $state(new Set<string>());
 
 	// View mode state with localStorage persistence
 	const view = usePersistedViewMode('smc-inventory-view-mode', 'grid');
@@ -77,7 +85,7 @@
 	 * Filter cards by search text (name, set, treatment)
 	 */
 	function filterCards(cardsList: EnhancedCardResult[]): EnhancedCardResult[] {
-		let filtered = cardsList.filter((c) => !removedCardIds.has(c.id));
+		let filtered = cardsList.filter((c) => !removedStackKeys.has(stackKey(c)));
 
 		if (filterText.trim()) {
 			const search = filterText.toLowerCase().trim();
@@ -105,9 +113,9 @@
 		filteredCards.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 	);
 
-	function handleRemove(cardId: string) {
-		removedCardIds.add(cardId);
-		removedCardIds = removedCardIds; // Trigger reactivity
+	function handleRemove(key: string) {
+		removedStackKeys.add(key);
+		removedStackKeys = removedStackKeys; // Trigger reactivity
 	}
 
 	function handleBulkComplete() {
@@ -133,7 +141,10 @@
 				onSearchChange={handleSearchChange}
 				showStatusFilter={false}
 				placeholder="Filter by name, set, or treatment..." />
-			<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+			<div class="flex items-center gap-2">
+				<AddLanguageToggle />
+				<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+			</div>
 		</div>
 		<div class="text-sm opacity-70">
 			{#if filterText}
@@ -158,8 +169,8 @@
 	{:else if view.viewMode === 'grid'}
 		<!-- Grid View -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-			{#each paginatedCards as card (card.id)}
-				<CardResultCard {card} onremove={handleRemove} selectable />
+			{#each paginatedCards as card (stackKey(card))}
+				<CardResultCard {card} onremove={() => handleRemove(stackKey(card))} selectable />
 			{/each}
 		</div>
 	{:else}
@@ -190,12 +201,13 @@
 						<th>Card Name</th>
 						<th>Set</th>
 						<th>#</th>
+						<th>Lang</th>
 						<th>Treatment(s)</th>
 						<th>Qty</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each paginatedCards as card (card.id)}
+					{#each paginatedCards as card (stackKey(card))}
 						{@const primaryTreatment = getPrimaryTreatment(card)}
 						{@const isFoil = isFoilTreatment(primaryTreatment)}
 						{@const totalQty = card.inventory.total_quantity}
@@ -231,6 +243,11 @@
 								</div>
 							</td>
 							<td>#{card.collector_number || '?'}</td>
+							<td>
+								<span class="badge badge-outline badge-xs uppercase">
+									{card.inventory.this_printing[0]?.language ?? 'en'}
+								</span>
+							</td>
 							<td>
 								<div class="flex flex-wrap gap-1">
 									{#each card.finishes as finish (finish)}

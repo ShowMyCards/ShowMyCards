@@ -1558,7 +1558,7 @@ func TestListAsCards_CardNotInCardsTable(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	// total_cards counts inventory items (2), but data only includes those with card records (1)
+	// total_cards counts stacks (2), but data only includes those with card records (1)
 	if len(result.Data) != 1 {
 		t.Errorf("expected 1 card in data (missing card skipped), got %d", len(result.Data))
 	}
@@ -1597,6 +1597,74 @@ func TestListAsCards_MultipleInventoryPerCard(t *testing.T) {
 	}
 	if len(card.Inventory.ThisPrinting) != 2 {
 		t.Errorf("expected 2 items in this_printing, got %d", len(card.Inventory.ThisPrinting))
+	}
+}
+
+// Regression: pagination must page over stacks, not inventory rows. Otherwise a
+// stack with multiple rows can be split across pages, producing duplicate stack
+// entries that crash the keyed {#each} on the frontend.
+func TestListAsCards_StackNotSplitAcrossPages(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	createTestCard(t, db, "card-a", "Card A", "tst", "common", "1.00")
+	createTestCard(t, db, "card-b", "Card B", "tst", "common", "1.00")
+
+	// Stack A has 3 rows (foil, nonfoil, etched), stack B has 1.
+	// With page_size=2 and the old row-based pagination, A's rows would have
+	// straddled the page boundary.
+	db.Create(&models.Inventory{ScryfallID: "card-a", OracleID: "oracle-a", Treatment: "nonfoil", Language: "en", Quantity: 1})
+	db.Create(&models.Inventory{ScryfallID: "card-a", OracleID: "oracle-a", Treatment: "foil", Language: "en", Quantity: 1})
+	db.Create(&models.Inventory{ScryfallID: "card-a", OracleID: "oracle-a", Treatment: "etched", Language: "en", Quantity: 1})
+	db.Create(&models.Inventory{ScryfallID: "card-b", OracleID: "oracle-b", Treatment: "nonfoil", Language: "en", Quantity: 1})
+
+	req := httptest.NewRequest(http.MethodGet, "/inventory/cards?page=1&page_size=2", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var page1 InventoryCardsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&page1); err != nil {
+		t.Fatalf("failed to decode page 1: %v", err)
+	}
+
+	if page1.TotalCards != 2 {
+		t.Errorf("expected total_cards 2 (one per stack), got %d", page1.TotalCards)
+	}
+	if page1.TotalPages != 1 {
+		t.Errorf("expected total_pages 1 (2 stacks fit in page_size 2), got %d", page1.TotalPages)
+	}
+	if len(page1.Data) != 2 {
+		t.Fatalf("expected 2 stacks on page 1, got %d", len(page1.Data))
+	}
+
+	// Each stack must be whole — no stack should appear in two responses with
+	// its rows split. Stack A must have all 3 rows in one entry.
+	for _, card := range page1.Data {
+		if card.ID == "card-a" {
+			if len(card.Inventory.ThisPrinting) != 3 {
+				t.Errorf("expected 3 rows in stack A, got %d", len(card.Inventory.ThisPrinting))
+			}
+			if card.Inventory.TotalQuantity != 3 {
+				t.Errorf("expected total_quantity 3 in stack A, got %d", card.Inventory.TotalQuantity)
+			}
+		}
+	}
+
+	// Concatenating all pages must not yield two entries with the same
+	// (scryfall_id, language) — the duplicate-key trigger on the frontend.
+	seen := map[string]bool{}
+	for _, card := range page1.Data {
+		lang := ""
+		if len(card.Inventory.ThisPrinting) > 0 {
+			lang = card.Inventory.ThisPrinting[0].Language
+		}
+		key := card.ID + ":" + lang
+		if seen[key] {
+			t.Errorf("duplicate stack key %q across pagination", key)
+		}
+		seen[key] = true
 	}
 }
 
@@ -1902,5 +1970,204 @@ func TestBatchDelete_DoesNotAffectOtherItems(t *testing.T) {
 	err = db.First(&deleted, item2.ID).Error
 	if err == nil {
 		t.Error("expected item2 to be deleted, but it still exists")
+	}
+}
+
+// Language tests
+
+func TestInventoryCreate_LanguageRoundTrip(t *testing.T) {
+	app, db := setupInventoryTestApp(t)
+
+	body := `{
+		"scryfall_id": "test-card",
+		"oracle_id": "test-oracle",
+		"language": "de",
+		"quantity": 1
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+
+	var result models.Inventory
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.Language != "de" {
+		t.Errorf("expected response Language 'de', got '%s'", result.Language)
+	}
+
+	var stored models.Inventory
+	if err := db.First(&stored, result.ID).Error; err != nil {
+		t.Fatalf("failed to load stored inventory: %v", err)
+	}
+	if stored.Language != "de" {
+		t.Errorf("expected stored Language 'de', got '%s'", stored.Language)
+	}
+}
+
+func TestInventoryCreate_LanguageDefaultsToEnglish(t *testing.T) {
+	app, _ := setupInventoryTestApp(t)
+
+	body := `{
+		"scryfall_id": "test-card",
+		"oracle_id": "test-oracle",
+		"quantity": 1
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result models.Inventory
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.Language != "en" {
+		t.Errorf("expected default Language 'en', got '%s'", result.Language)
+	}
+}
+
+func TestInventoryUpdate_Language(t *testing.T) {
+	app, db := setupInventoryTestApp(t)
+
+	item := createTestInventoryItem(t, db, "test-card", 1, nil)
+
+	body := `{"language": "de"}`
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/inventory/%d", item.ID), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result models.Inventory
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result.Language != "de" {
+		t.Errorf("expected Language 'de' after update, got '%s'", result.Language)
+	}
+}
+
+func TestListAsCards_SplitsByLanguage(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	createTestCard(t, db, "bolt-id", "Lightning Bolt", "lea", "common", "2.00")
+
+	// 3 English copies and 2 German copies of the same printing
+	en := models.Inventory{ScryfallID: "bolt-id", OracleID: "oracle-bolt-id", Treatment: "nonfoil", Language: "en", Quantity: 3}
+	if err := db.Create(&en).Error; err != nil {
+		t.Fatalf("failed to create EN inventory: %v", err)
+	}
+	de := models.Inventory{ScryfallID: "bolt-id", OracleID: "oracle-bolt-id", Treatment: "nonfoil", Language: "de", Quantity: 2}
+	if err := db.Create(&de).Error; err != nil {
+		t.Fatalf("failed to create DE inventory: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/inventory/cards", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result InventoryCardsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result.Data) != 2 {
+		t.Fatalf("expected 2 stacks (one per language), got %d", len(result.Data))
+	}
+
+	byLang := map[string]EnhancedCardResult{}
+	for _, card := range result.Data {
+		if len(card.Inventory.ThisPrinting) == 0 {
+			t.Fatalf("expected at least one inventory row in this_printing, got 0")
+		}
+		lang := card.Inventory.ThisPrinting[0].Language
+		for _, inv := range card.Inventory.ThisPrinting {
+			if inv.Language != lang {
+				t.Errorf("expected all rows in stack to share language '%s', got '%s'", lang, inv.Language)
+			}
+		}
+		byLang[lang] = card
+	}
+
+	enCard, ok := byLang["en"]
+	if !ok {
+		t.Fatal("expected an English stack")
+	}
+	if enCard.Inventory.TotalQuantity != 3 {
+		t.Errorf("expected EN total_quantity 3, got %d", enCard.Inventory.TotalQuantity)
+	}
+
+	deCard, ok := byLang["de"]
+	if !ok {
+		t.Fatal("expected a German stack")
+	}
+	if deCard.Inventory.TotalQuantity != 2 {
+		t.Errorf("expected DE total_quantity 2, got %d", deCard.Inventory.TotalQuantity)
+	}
+}
+
+func TestByOracle_IncludesLanguage(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	en := models.Inventory{ScryfallID: "bolt-id", OracleID: "oracle-bolt", Treatment: "nonfoil", Language: "en", Quantity: 3}
+	if err := db.Create(&en).Error; err != nil {
+		t.Fatalf("failed to create EN inventory: %v", err)
+	}
+	de := models.Inventory{ScryfallID: "bolt-id", OracleID: "oracle-bolt", Treatment: "nonfoil", Language: "de", Quantity: 2}
+	if err := db.Create(&de).Error; err != nil {
+		t.Fatalf("failed to create DE inventory: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/inventory/by-oracle/oracle-bolt", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result ByOracleResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result.Printings) != 2 {
+		t.Fatalf("expected 2 printings, got %d", len(result.Printings))
+	}
+
+	langs := map[string]int{}
+	for _, p := range result.Printings {
+		langs[p.Language] = p.Quantity
+	}
+	if langs["en"] != 3 {
+		t.Errorf("expected EN quantity 3, got %d", langs["en"])
+	}
+	if langs["de"] != 2 {
+		t.Errorf("expected DE quantity 2, got %d", langs["de"])
 	}
 }

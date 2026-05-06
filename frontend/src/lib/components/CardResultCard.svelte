@@ -2,6 +2,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '$lib';
 	import {
+		addLanguage,
 		getCardTreatmentName,
 		getActionError,
 		notifications,
@@ -62,6 +63,12 @@
 
 	// Get available treatments for this card
 	const availableTreatments = $derived(card.finishes.length > 0 ? card.finishes : ['nonfoil']);
+
+	// Distinct languages present in this card's inventory. Inventory views split by
+	// language so this is usually a single value; search view does not split, so a
+	// printing the user owns in both EN and DE will yield two badges. No inventory
+	// → no badges (avoids implying ownership of a language the user doesn't have).
+	const cardLanguages = $derived([...new Set(inventory.map((i) => i.language || 'en'))]);
 
 	// Check if there are existing printings in different locations
 	async function checkForExistingPrintings(treatment: string): Promise<boolean> {
@@ -124,12 +131,18 @@
 
 		adding = true;
 
+		// The toggle's current language wins for new inserts. We still update
+		// this stack's local state optimistically; if the new item belongs to a
+		// different language stack, the next data fetch will move it.
+		const language = addLanguage.current;
+
 		// Optimistically update the UI
 		const optimisticInv: Inventory = {
 			id: Date.now(), // Temporary ID
 			scryfall_id: card.id,
 			oracle_id: card.oracle_id,
 			treatment: treatment,
+			language: language,
 			quantity: 1,
 			storage_location_id: undefined,
 			storage_location: undefined,
@@ -146,6 +159,7 @@
 			formData.append('scryfall_id', card.id);
 			formData.append('oracle_id', card.oracle_id);
 			formData.append('treatment', treatment);
+			formData.append('language', language);
 			formData.append('quantity', '1');
 			formData.append('storage_location_id', selectedStorageLocation.toString());
 
@@ -338,7 +352,12 @@
 					class="card-title text-lg hover:text-primary transition-colors">
 					{card.name}
 				</a>
-				<div class="text-sm opacity-70">{card.set_name}</div>
+				<div class="text-sm opacity-70 flex items-center gap-2 flex-wrap">
+					<span>{card.set_name}</span>
+					{#each cardLanguages as lang (lang)}
+						<span class="badge badge-outline badge-xs uppercase">{lang}</span>
+					{/each}
+				</div>
 			</div>
 			{#if totalQuantity > 0}
 				<div class="badge badge-primary badge-lg font-semibold">

@@ -13,6 +13,8 @@ export type { CardActions, KeyboardShortcut } from './stores/keyboard.svelte';
 export { selection } from './stores/selection.svelte';
 export { currency } from './stores/currency.svelte';
 export type { Currency } from './stores/currency.svelte';
+export { addLanguage, MTG_LANGUAGES } from './stores/add-language.svelte';
+export type { AddLanguage, MtgLanguage } from './stores/add-language.svelte';
 
 // API Client
 export { apiClient, ApiError } from './api/client';
@@ -66,6 +68,7 @@ export { default as StorageLocationDropdown } from './components/StorageLocation
 export { default as KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp.svelte';
 export { default as BulkActionsBar } from './components/BulkActionsBar.svelte';
 export { default as InventoryBrowser } from './components/InventoryBrowser.svelte';
+export { default as AddLanguageToggle } from './components/AddLanguageToggle.svelte';
 export { default as ResortModal } from './components/ResortModal.svelte';
 export { default as PrintingConflictModal } from './components/PrintingConflictModal.svelte';
 export { default as CardImage } from './components/CardImage.svelte';

@@ -97,6 +97,7 @@ type CreateInventoryRequest struct {
 	ScryfallID        string `json:"scryfall_id"`
 	OracleID          string `json:"oracle_id"`
 	Treatment         string `json:"treatment,omitempty"`
+	Language          string `json:"language,omitempty"`
 	Quantity          int    `json:"quantity"`
 	StorageLocationID *uint  `json:"storage_location_id,omitempty"`
 }
@@ -149,6 +150,7 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 		ScryfallID:        req.ScryfallID,
 		OracleID:          req.OracleID,
 		Treatment:         req.Treatment,
+		Language:          req.Language,
 		Quantity:          req.Quantity,
 		StorageLocationID: req.StorageLocationID,
 	}
@@ -172,6 +174,7 @@ type UpdateInventoryRequest struct {
 	ScryfallID        *string `json:"scryfall_id,omitempty"`
 	OracleID          *string `json:"oracle_id,omitempty"`
 	Treatment         *string `json:"treatment,omitempty"`
+	Language          *string `json:"language,omitempty"`
 	Quantity          *int    `json:"quantity,omitempty"`
 	StorageLocationID *uint   `json:"storage_location_id,omitempty"`
 	ClearStorage      bool    `json:"clear_storage,omitempty"`
@@ -199,7 +202,7 @@ func (h *InventoryHandler) Update(c fiber.Ctx) error {
 	}
 
 	if req.ScryfallID == nil && req.OracleID == nil && req.Treatment == nil &&
-		req.Quantity == nil && req.StorageLocationID == nil && !req.ClearStorage {
+		req.Language == nil && req.Quantity == nil && req.StorageLocationID == nil && !req.ClearStorage {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "at least one field must be provided for update")
 	}
 
@@ -212,6 +215,9 @@ func (h *InventoryHandler) Update(c fiber.Ctx) error {
 	}
 	if req.Treatment != nil {
 		item.Treatment = *req.Treatment
+	}
+	if req.Language != nil {
+		item.Language = *req.Language
 	}
 	if req.Quantity != nil {
 		item.Quantity = *req.Quantity
@@ -296,76 +302,121 @@ func buildEnhancedCardResult(scryfallCard scryfall.Card, inventoryItems []models
 	}
 }
 
-// ListAsCards returns inventory items as enhanced card results (like search)
+// ListAsCards returns inventory items as enhanced card results (like search).
+//
+// Pagination is over stacks — unique (scryfall_id, language) combinations —
+// rather than individual inventory rows. A single stack can contain multiple
+// inventory rows (e.g. foil + nonfoil of the same printing in the same
+// location); paginating by rows would split a stack across pages.
 func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
-	// Parse query params (using smaller max page size for card results)
 	params := utils.ParsePaginationParams(c, utils.DefaultPageSize, DefaultCardsPageSize)
 
 	locationID := c.Query("storage_location_id")
 
-	// Build query
-	query := h.db.WithContext(c.RequestCtx()).Model(&models.Inventory{})
-	if locationID == "null" {
-		query = query.Where("storage_location_id IS NULL")
-	} else if locationID != "" {
+	db := h.db.WithContext(c.RequestCtx())
+	baseFilter := func() *gorm.DB {
+		q := db.Model(&models.Inventory{})
+		if locationID == "null" {
+			q = q.Where("storage_location_id IS NULL")
+		} else if locationID != "" {
+			q = q.Where("storage_location_id = ?", locationID)
+		}
+		return q
+	}
+
+	if locationID != "" && locationID != "null" {
 		if err := utils.ValidateNumericParam(locationID, "storage_location_id"); err != nil {
 			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
 		}
-		query = query.Where("storage_location_id = ?", locationID)
 	}
 
-	// Count total
+	// Count distinct stacks
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	stacksSubQuery := baseFilter().
+		Select("scryfall_id, language").
+		Group("scryfall_id, language")
+	if err := db.Table("(?) as stacks", stacksSubQuery).Count(&total).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to count inventory items", "count query failed", err)
+			"Failed to count inventory stacks", "count query failed", err)
 	}
 
-	// Get paginated inventory items
-	var inventoryItems []models.Inventory
+	// Fetch a page of stack keys, ordered by most-recently-added inventory row
+	// in the stack. Tiebreakers keep ordering deterministic across pages.
+	type stackKey struct {
+		ScryfallID string
+		Language   string
+	}
+	var stackKeys []stackKey
 	offset := utils.CalculateOffset(params.Page, params.PageSize)
-	if err := query.
-		Preload("StorageLocation").
-		Order("created_at DESC").
+	if err := baseFilter().
+		Select("scryfall_id, language, MAX(created_at) as last_added").
+		Group("scryfall_id, language").
+		Order("last_added DESC, scryfall_id ASC, language ASC").
 		Limit(params.PageSize).
 		Offset(offset).
+		Find(&stackKeys).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch inventory stacks", "stack query failed", err)
+	}
+
+	totalPages := utils.CalculateTotalPages(total, params.PageSize)
+	if len(stackKeys) == 0 {
+		return c.JSON(InventoryCardsResponse{
+			Data:       []EnhancedCardResult{},
+			Page:       params.Page,
+			PageSize:   params.PageSize,
+			TotalCards: int(total),
+			TotalPages: totalPages,
+		})
+	}
+
+	// Fetch all inventory rows for the stacks on this page in one query.
+	tuples := make([][]any, 0, len(stackKeys))
+	scryfallIDs := make([]string, 0, len(stackKeys))
+	seenScryfallID := make(map[string]bool)
+	for _, k := range stackKeys {
+		tuples = append(tuples, []any{k.ScryfallID, k.Language})
+		if !seenScryfallID[k.ScryfallID] {
+			seenScryfallID[k.ScryfallID] = true
+			scryfallIDs = append(scryfallIDs, k.ScryfallID)
+		}
+	}
+
+	var inventoryItems []models.Inventory
+	if err := baseFilter().
+		Preload("StorageLocation").
+		Where("(scryfall_id, language) IN ?", tuples).
+		Order("created_at DESC").
 		Find(&inventoryItems).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch inventory items", "database query failed", err)
 	}
 
-	// Group by Scryfall ID to fetch card data
-	scryfallIDs := make([]string, 0)
-	inventoryMap := make(map[string][]models.Inventory)
-
+	inventoryMap := make(map[stackKey][]models.Inventory, len(stackKeys))
 	for _, item := range inventoryItems {
-		if _, exists := inventoryMap[item.ScryfallID]; !exists {
-			scryfallIDs = append(scryfallIDs, item.ScryfallID)
-		}
-		inventoryMap[item.ScryfallID] = append(inventoryMap[item.ScryfallID], item)
+		k := stackKey{ScryfallID: item.ScryfallID, Language: item.Language}
+		inventoryMap[k] = append(inventoryMap[k], item)
 	}
 
-	// Fetch and parse card data
-	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(c.RequestCtx()), scryfallIDs)
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(db, scryfallIDs)
 	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch card data", "cards query failed", err)
 	}
 
-	// Build enhanced card results using card data
-	enhancedResults := make([]EnhancedCardResult, 0, len(scryfallIDs))
-	for _, scryfallID := range scryfallIDs {
-		scryfallCard, found := scryfallCardMap[scryfallID]
+	// Build results in the page's stack order so pagination is stable.
+	enhancedResults := make([]EnhancedCardResult, 0, len(stackKeys))
+	for _, k := range stackKeys {
+		scryfallCard, found := scryfallCardMap[k.ScryfallID]
 		if !found {
 			continue
 		}
-
-		enhancedCard := buildEnhancedCardResult(scryfallCard, inventoryMap[scryfallID])
-		enhancedResults = append(enhancedResults, enhancedCard)
+		items := inventoryMap[k]
+		if len(items) == 0 {
+			continue
+		}
+		enhancedResults = append(enhancedResults, buildEnhancedCardResult(scryfallCard, items))
 	}
-
-	// Calculate total pages
-	totalPages := utils.CalculateTotalPages(total, params.PageSize)
 
 	return c.JSON(InventoryCardsResponse{
 		Data:       enhancedResults,
@@ -381,6 +432,7 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 type ExistingPrintingInfo struct {
 	ScryfallID      string                  `json:"scryfall_id"`
 	Treatment       string                  `json:"treatment"`
+	Language        string                  `json:"language"`
 	Quantity        int                     `json:"quantity"`
 	StorageLocation *models.StorageLocation `json:"storage_location,omitempty"`
 }
@@ -416,6 +468,7 @@ func (h *InventoryHandler) ByOracle(c fiber.Ctx) error {
 		printings = append(printings, ExistingPrintingInfo{
 			ScryfallID:      item.ScryfallID,
 			Treatment:       item.Treatment,
+			Language:        item.Language,
 			Quantity:        item.Quantity,
 			StorageLocation: item.StorageLocation,
 		})

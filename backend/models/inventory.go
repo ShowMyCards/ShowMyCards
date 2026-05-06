@@ -13,6 +13,7 @@ type Inventory struct {
 	ScryfallID        string `gorm:"type:varchar(255);not null;index" json:"scryfall_id"`
 	OracleID          string `gorm:"type:varchar(255);not null;index;index:idx_oracle_storage" json:"oracle_id"`
 	Treatment         string `gorm:"type:varchar(100)" json:"treatment"`
+	Language          string `gorm:"type:varchar(10);not null;default:'en'" json:"language"`
 	Quantity          int    `gorm:"not null;default:1" json:"quantity"`
 	StorageLocationID *uint  `gorm:"index;index:idx_oracle_storage" json:"storage_location_id,omitempty"`
 
@@ -29,6 +30,9 @@ func (i *Inventory) ValidateInventory(tx *gorm.DB) error {
 	}
 	if i.Quantity < 0 {
 		return errors.New("quantity cannot be negative")
+	}
+	if i.Language == "" {
+		i.Language = "en"
 	}
 	return nil
 }

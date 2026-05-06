@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import type { ActionData, PageData } from './$types';
 	import {
+		AddLanguageToggle,
 		CardResultCard,
 		PageHeader,
 		StatsCard,
@@ -213,7 +214,10 @@
 					onSearchChange={handleSearchChange}
 					showStatusFilter={false}
 					placeholder="Filter results by name, set, or treatment..." />
-				<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+				<div class="flex items-center gap-2">
+					<AddLanguageToggle />
+					<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+				</div>
 			</div>
 			{#if filterText || totalFilteredPages > 1}
 				<div class="text-sm opacity-70">

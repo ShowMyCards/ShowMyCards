@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import {
+		AddLanguageToggle,
+		addLanguage,
 		PageHeader,
 		EmptyState,
 		StorageLocationDropdown,
@@ -160,6 +162,7 @@
 		formData.append('scryfall_id', card.id);
 		formData.append('oracle_id', card.oracle_id);
 		formData.append('treatment', treatment);
+		formData.append('language', addLanguage.current);
 		formData.append('quantity', quantity.toString());
 		formData.append('storage_location_id', selectedStorageLocation.toString());
 
@@ -300,16 +303,23 @@
 				</button>
 			</div>
 
-			<!-- Storage location override -->
-			{#if data.storageLocations.length > 0}
-				<div class="mt-4 pt-4 border-t border-base-300">
-					<p class="text-sm font-medium mb-2">Storage Location</p>
-					<StorageLocationDropdown
-						locations={data.storageLocations}
-						selected={selectedStorageLocation}
-						onchange={(v) => (selectedStorageLocation = v)} />
+			<!-- Import options -->
+			<div class="mt-4 pt-4 border-t border-base-300 space-y-4">
+				<div>
+					<p class="text-sm font-medium mb-2">Language</p>
+					<AddLanguageToggle />
 				</div>
-			{/if}
+
+				{#if data.storageLocations.length > 0}
+					<div>
+						<p class="text-sm font-medium mb-2">Storage Location</p>
+						<StorageLocationDropdown
+							locations={data.storageLocations}
+							selected={selectedStorageLocation}
+							onchange={(v) => (selectedStorageLocation = v)} />
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 
@@ -326,7 +336,7 @@
 					<div class="flex items-center gap-4">
 						{#if readyCount > 0}
 							<span class="text-sm text-base-content/70">
-								{readyCount} ready ({totalQuantity} cards)
+								{readyCount} ready ({totalQuantity} cards in {addLanguage.current.toUpperCase()})
 							</span>
 							<button
 								class="btn btn-primary btn-sm"

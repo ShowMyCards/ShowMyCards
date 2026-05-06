@@ -178,6 +178,7 @@ export interface CreateInventoryRequest {
 	scryfall_id: string;
 	oracle_id: string;
 	treatment?: string;
+	language?: string;
 	quantity: number /* int */;
 	storage_location_id?: number /* uint */;
 }
@@ -188,6 +189,7 @@ export interface UpdateInventoryRequest {
 	scryfall_id?: string;
 	oracle_id?: string;
 	treatment?: string;
+	language?: string;
 	quantity?: number /* int */;
 	storage_location_id?: number /* uint */;
 	clear_storage?: boolean;
@@ -210,6 +212,7 @@ export interface InventoryCardsResponse {
 export interface ExistingPrintingInfo {
 	scryfall_id: string;
 	treatment: string;
+	language: string;
 	quantity: number /* int */;
 	storage_location?: any /* models.StorageLocation */;
 }
