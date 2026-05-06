@@ -44,7 +44,7 @@ export function useExpressionValidation(options?: { debounce?: number }) {
 		isValidating = true;
 
 		try {
-			const response = await fetch('/api/validate-expression', {
+			const response = await fetch('/api/sorting-rules/validate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ expression: expr })
