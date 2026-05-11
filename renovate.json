@@ -1,0 +1,104 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(deps)",
+    ":dependencyDashboard",
+    "helpers:pinGitHubActionDigestsToSemver",
+    ":automergeDigest",
+    ":maintainLockFilesWeekly",
+    ":prHourlyLimit2",
+    ":prConcurrentLimit10"
+  ],
+  "timezone": "Australia/Sydney",
+  "schedule": ["before 5am on monday"],
+  "labels": ["dependencies"],
+  "prHeader": "Automated dependency update from Renovate. Merging is gated on CI passing (tests, lint, type checks, govulncheck, bun audit, CodeQL).",
+  "rebaseWhen": "behind-base-branch",
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["before 5am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "automerge": false,
+    "prCreation": "immediate"
+  },
+  "osvVulnerabilityAlerts": true,
+  "packageRules": [
+    {
+      "description": "Auto-merge patch and lockfile-only updates for any dependency. These almost never change behaviour and have the smallest blast radius.",
+      "matchUpdateTypes": ["patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge minor and patch updates for devDependencies. Dev tooling churn is low-risk because it never ships in the runtime artifact.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Hold minor updates for runtime dependencies for manual review. Behaviour changes are possible and we want eyes on them.",
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor"],
+      "automerge": false
+    },
+    {
+      "description": "All major updates require manual review and approval via the Dependency Dashboard. Holding majors prevents surprise breakage from a maintainer's weekend release.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "labels": ["dependencies", "major-update"]
+    },
+    {
+      "description": "Group all GitHub Actions updates into one PR per run. Cuts noise — actions are usually trivial bumps.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "description": "Group Go toolchain and golang.org/x updates. These move together and are noisy when split.",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["golang.org/x/**"],
+      "groupName": "golang.org/x"
+    },
+    {
+      "description": "Group Astro + Cloudflare tooling for the website. They evolve in lockstep.",
+      "matchFileNames": ["website/**"],
+      "matchPackageNames": ["astro", "@astrojs/**", "wrangler", "@cloudflare/**"],
+      "groupName": "astro + cloudflare"
+    },
+    {
+      "description": "Group Svelte ecosystem updates for the frontend.",
+      "matchFileNames": ["frontend/**"],
+      "matchPackageNames": ["svelte", "@sveltejs/**", "svelte-**"],
+      "groupName": "svelte"
+    },
+    {
+      "description": "Group Tailwind + DaisyUI updates. They are often released together and tested together.",
+      "matchPackageNames": ["tailwindcss", "@tailwindcss/**", "@tailwindplus/**", "daisyui"],
+      "groupName": "tailwind"
+    },
+    {
+      "description": "Group Vitest + testing library updates.",
+      "matchPackageNames": ["vitest", "vitest-**", "@vitest/**", "@vitest-browser/**"],
+      "groupName": "vitest",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Pin the Go runtime version explicitly — major Go bumps need manual review because they can change build flags and language features.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchUpdateTypes": ["major", "minor"],
+      "automerge": false,
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
