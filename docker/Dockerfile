@@ -71,6 +71,11 @@ EXPOSE 3000 3001
 ENV BACKEND_PORT=3000
 ENV FRONTEND_PORT=3001
 ENV ORIGIN=http://localhost:3001
+# Writable data lives at /app/data (the volume mount point); anchor with absolute
+# paths so the backend doesn't fall back to a cwd-relative ./data inside the
+# container layer when supervisord sets directory=/app/backend.
+ENV DATABASE_PATH=/app/data/database.db
+ENV DATA_DIR=/app/data
 
 # Run with supervisord
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
