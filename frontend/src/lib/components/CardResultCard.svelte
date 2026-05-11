@@ -338,7 +338,10 @@
 					class="card-title text-lg hover:text-primary transition-colors">
 					{card.name}
 				</a>
-				<div class="text-sm opacity-70">{card.set_name}</div>
+				<div class="text-sm opacity-70 flex items-center gap-2 flex-wrap">
+					<span>{card.set_name}</span>
+					<span class="badge badge-outline badge-xs uppercase">{card.language}</span>
+				</div>
 			</div>
 			{#if totalQuantity > 0}
 				<div class="badge badge-primary badge-lg font-semibold">

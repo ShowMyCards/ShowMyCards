@@ -190,6 +190,7 @@
 						<th>Card Name</th>
 						<th>Set</th>
 						<th>#</th>
+						<th>Language</th>
 						<th>Treatment(s)</th>
 						<th>Qty</th>
 					</tr>
@@ -231,6 +232,7 @@
 								</div>
 							</td>
 							<td>#{card.collector_number || '?'}</td>
+							<td class="text-sm uppercase">{card.language}</td>
 							<td>
 								<div class="flex flex-wrap gap-1">
 									{#each card.finishes as finish (finish)}
