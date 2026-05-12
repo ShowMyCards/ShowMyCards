@@ -44,9 +44,15 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: backend/go.mod
+          # Tag-triggered workflows must not use toolchain caches — a
+          # compromised tag-push could otherwise poison the cache for later
+          # runs. See zizmor's `cache-poisoning` rule.
+          cache: false
       - uses: snyk/actions/golang@9cf6ca713d71123d2d229cc3d7f145b96ea3c518 # master (snyk does not tag releases)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -68,6 +74,10 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      # Suppression for setup-bun's built-in cache documented in
+      # .github/zizmor.yml under `cache-poisoning`.
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
       - run: bun install --frozen-lockfile
         working-directory: frontend
@@ -92,6 +102,9 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      # Suppression documented in .github/zizmor.yml.
       - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
       - run: bun install --frozen-lockfile
         working-directory: website
