@@ -12,12 +12,6 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
-    # TODO: pre-existing test failure surfaced when ci.yml first ran in a way
-    # that visibly blocks merging — backend/api tests pass locally on Go 1.26.x
-    # but fail on CI's Go 1.25.4 (pinned in backend/go.mod). Tracked in a
-    # follow-up issue. Verbose output is enabled below to identify the failing
-    # test for that follow-up.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
@@ -28,7 +22,7 @@ jobs:
           go-version-file: backend/go.mod
 
       - name: Test
-        run: cd backend && go test -v ./...
+        run: cd backend && go test ./...
 
       - name: Vet
         run: cd backend && go vet ./...
