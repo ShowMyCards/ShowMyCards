@@ -5,21 +5,19 @@
 	"scripts": {
 		"dev": "astro dev",
 		"build": "astro build",
-		"preview": "astro build && wrangler dev",
+		"preview": "astro preview",
 		"astro": "astro",
-		"deploy": "astro build && wrangler deploy",
-		"cf-typegen": "wrangler types"
+		"deploy": "astro build && wrangler deploy"
 	},
 	"dependencies": {
-		"@astrojs/cloudflare": "^12.6.12",
-		"@tailwindcss/vite": "^4.1.18",
-		"@tailwindplus/elements": "^1.0.21",
-		"astro": "^5.16.6",
-		"tailwindcss": "^4.1.18"
+		"@tailwindcss/vite": "^4.3.0",
+		"@tailwindplus/elements": "^1.0.22",
+		"astro": "^6.3.1",
+		"tailwindcss": "^4.3.0"
 	},
 	"devDependencies": {
 		"@tailwindcss/typography": "^0.5.19",
-		"@types/node": "^25.0.3",
-		"wrangler": "^4.56.0"
+		"@types/node": "^25.7.0",
+		"wrangler": "^4.90.0"
 	}
 }

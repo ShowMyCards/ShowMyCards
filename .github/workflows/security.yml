@@ -40,10 +40,6 @@ jobs:
   bun-audit-frontend:
     name: bun audit (frontend)
     runs-on: ubuntu-latest
-    # TODO: pre-existing transitive dependency vulnerabilities. Renovate's
-    # first run will auto-merge the patch updates that resolve most findings;
-    # this job is non-blocking until then. Tracked in a follow-up issue.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
@@ -59,9 +55,6 @@ jobs:
   bun-audit-website:
     name: bun audit (website)
     runs-on: ubuntu-latest
-    # TODO: see bun-audit-frontend above. Non-blocking pending Renovate's
-    # first run.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
