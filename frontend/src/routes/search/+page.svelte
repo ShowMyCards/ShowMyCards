@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 	import { enhance, deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { ActionData, PageData } from './$types';
@@ -16,6 +17,7 @@
 		getCardTreatmentName,
 		notifications,
 		usePersistedViewMode,
+		SCRYFALL_LANGUAGES,
 		type EnhancedCardResult
 	} from '$lib';
 	import { Search, Lightbulb } from '@lucide/svelte';
@@ -28,6 +30,17 @@
 	let cards = $state<EnhancedCardResult[]>([]);
 	let suggestions = $state<string[]>([]);
 	let inputRef = $state<HTMLInputElement | null>(null);
+	// do NOT switch to $derived — selectedLang must survive
+	// form submissions, and queryText is driven by oninput. `untrack` makes
+	// the "capture, don't subscribe" intent explicit.
+	let selectedLang = $state(untrack(() => data.defaultLanguage));
+	let queryText = $state(untrack(() => form?.query || ''));
+
+	// Detect a typed `l:<code>` / `lang:<value>` clause (with optional `-`/`!`
+	// negation) so we can dim the dropdown and tell the user the typed clause
+	// wins. Mirrors the backend's hasLanguageClause regex.
+	const typedLangClause = $derived(queryText.match(/(?:^|\s)([-!]?(?:l|lang):\S+)/i)?.[1] ?? null);
+	const hasTypedLanguage = $derived(typedLangClause !== null);
 
 	// View mode state with localStorage persistence
 	const view = usePersistedViewMode('smc-search-view-mode', 'grid');
@@ -162,19 +175,32 @@
 				use:enhance={() => {
 					searching = true;
 					return async ({ update }) => {
-						await update();
+						await update({ reset: false });
 						searching = false;
 					};
 				}}>
-				<div class="flex gap-2">
+				<div class="flex flex-wrap gap-2">
 					<input
 						bind:this={inputRef}
 						type="text"
 						name="q"
 						value={form?.query || ''}
+						oninput={(e) => (queryText = e.currentTarget.value)}
 						placeholder="Search for cards..."
-						class="input input-bordered flex-1"
+						class="input input-bordered flex-1 min-w-[12rem]"
 						required />
+					<select
+						name="lang"
+						bind:value={selectedLang}
+						disabled={hasTypedLanguage}
+						aria-label="Search language"
+						title="Language filter — appended as l:<code> to the search"
+						class="select select-bordered"
+						class:opacity-50={hasTypedLanguage}>
+						{#each SCRYFALL_LANGUAGES as lang (lang.code)}
+							<option value={lang.code}>{lang.name}</option>
+						{/each}
+					</select>
 					<button type="submit" disabled={searching} class="btn btn-primary">
 						{#if searching}
 							<span class="loading loading-spinner loading-sm"></span>
@@ -185,6 +211,12 @@
 						{/if}
 					</button>
 				</div>
+				{#if hasTypedLanguage}
+					<p class="text-xs opacity-70 mt-2">
+						Language filter <code class="font-mono">{typedLangClause}</code> in your query overrides the
+						dropdown.
+					</p>
+				{/if}
 			</form>
 		</div>
 	</div>

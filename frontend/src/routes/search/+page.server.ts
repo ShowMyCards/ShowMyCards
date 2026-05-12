@@ -3,29 +3,47 @@ import { handleAddInventory, handleDeleteInventory } from '$lib/server/inventory
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 
-// Load storage locations for the dropdown
+// Load storage locations for the dropdown and the saved default language
 export const load: PageServerLoad = async ({ fetch }) => {
+	const [storageLocations, defaultLanguage] = await Promise.all([
+		loadStorageLocations(fetch),
+		loadDefaultLanguage(fetch)
+	]);
+	return { storageLocations, defaultLanguage };
+};
+
+async function loadStorageLocations(fetch: typeof globalThis.fetch): Promise<StorageLocation[]> {
 	try {
 		const response = await fetch(`${BACKEND_URL}/storage`);
 		if (response.ok) {
 			const data = await response.json();
-			return {
-				storageLocations: data.data as StorageLocation[]
-			};
+			return data.data as StorageLocation[];
 		}
 	} catch {
 		// Ignore errors, dropdown will just be empty
 	}
-	return {
-		storageLocations: [] as StorageLocation[]
-	};
-};
+	return [];
+}
+
+async function loadDefaultLanguage(fetch: typeof globalThis.fetch): Promise<string> {
+	try {
+		const response = await fetch(`${BACKEND_URL}/api/settings/scryfall_default_language`);
+		if (response.ok) {
+			const data = (await response.json()) as { value?: string };
+			if (data.value) return data.value;
+		}
+	} catch {
+		// Fall through to default
+	}
+	return 'en';
+}
 
 export const actions = {
 	// Search for cards
 	search: async ({ request, fetch }) => {
 		const formData = await request.formData();
 		const query = formData.get('q');
+		const lang = formData.get('lang');
 
 		if (!query || typeof query !== 'string') {
 			return fail(400, { error: 'Search query is required' });
@@ -34,6 +52,9 @@ export const actions = {
 		try {
 			const url = new URL(`${BACKEND_URL}/search`);
 			url.searchParams.set('q', query);
+			if (typeof lang === 'string' && lang.trim() !== '') {
+				url.searchParams.set('lang', lang.trim());
+			}
 
 			const response = await fetch(url.toString());
 

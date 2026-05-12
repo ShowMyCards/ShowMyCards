@@ -3,7 +3,8 @@
 export { BACKEND_URL } from './config';
 
 // Constants
-export { TIMEOUTS, PAGINATION, JOB_STATUS } from './constants';
+export { TIMEOUTS, PAGINATION, JOB_STATUS, SCRYFALL_LANGUAGES } from './constants';
+export type { ScryfallLanguage } from './constants';
 
 // Stores
 export { notifications } from './stores/notifications.svelte';

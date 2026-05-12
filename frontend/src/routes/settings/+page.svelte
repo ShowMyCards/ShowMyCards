@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { PageHeader, Lozenge, notifications, getActionError, dataApi } from '$lib';
+	import {
+		PageHeader,
+		Lozenge,
+		notifications,
+		getActionError,
+		dataApi,
+		SCRYFALL_LANGUAGES
+	} from '$lib';
 	import type { ExportData, ImportResponse } from '$lib';
 	import SettingRow from '$lib/components/SettingRow.svelte';
 	import SettingActions from '$lib/components/SettingActions.svelte';
@@ -155,6 +162,19 @@
 								<option value="cards">Cards - Remove duplicate cards (default)</option>
 								<option value="art">Art - Remove duplicate artworks</option>
 								<option value="prints">Prints - Show all printings</option>
+							</select>
+						</SettingRow>
+
+						<SettingRow
+							label="Default Language"
+							description="Card language used for searches. Can be overridden explicitly in the search.">
+							<select
+								id="scryfall_default_language"
+								bind:value={settings.scryfall_default_language}
+								class="select select-bordered w-full max-w-xs">
+								{#each SCRYFALL_LANGUAGES as lang (lang.code)}
+									<option value={lang.code}>{lang.name}</option>
+								{/each}
 							</select>
 						</SettingRow>
 					</div>

@@ -344,4 +344,79 @@ func TestSearch_CardWithoutImage(t *testing.T) {
 	}
 }
 
+func TestHasLanguageClause(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{"short form", "l:de", true},
+		{"long form", "lang:german", true},
+		{"uppercase", "L:EN", true},
+		{"mixed case lang", "LaNg:fr", true},
+		{"negated short", "-l:en", true},
+		{"negated long", "-lang:en", true},
+		{"bang negated", "!l:en", true},
+		{"with surrounding terms", "name:foo l:de set:lea", true},
+		{"trailing", "lightning bolt l:de", true},
+		{"leading whitespace", "  l:de", true},
+
+		{"empty", "", false},
+		{"plain text", "lightning bolt", false},
+		{"legal: not a language", "legal:standard", false},
+		{"loyalty: not a language", "loyalty:3", false},
+		{"layout: not a language", "layout:normal", false},
+		{"name with l in it", "name:lightning", false},
+		{"colon in text", "foo:bar", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasLanguageClause(tc.query); got != tc.want {
+				t.Errorf("hasLanguageClause(%q) = %v, want %v", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestApplyLanguage(t *testing.T) {
+	cases := []struct {
+		name         string
+		query        string
+		explicit     string
+		savedDefault string
+		want         string
+	}{
+		// Saved-default fallback (no explicit override)
+		{"no explicit, empty default is no-op", "lightning bolt", "", "", "lightning bolt"},
+		{"no explicit, english default is no-op", "lightning bolt", "", "en", "lightning bolt"},
+		{"no explicit, german default appended", "lightning bolt", "", "de", "lightning bolt l:de"},
+		{"no explicit, french default appended", "lightning bolt", "", "fr", "lightning bolt l:fr"},
+
+		// Explicit override (per-request dropdown choice)
+		{"explicit english is appended (no longer a no-op)", "lightning bolt", "en", "de", "lightning bolt l:en"},
+		{"explicit german wins over english default", "lightning bolt", "de", "en", "lightning bolt l:de"},
+		{"explicit french wins over german default", "lightning bolt", "fr", "de", "lightning bolt l:fr"},
+		{"explicit english appended even with empty default", "lightning bolt", "en", "", "lightning bolt l:en"},
+
+		// Typed clause in query always wins
+		{"existing l: clause beats explicit", "lightning bolt l:en", "de", "fr", "lightning bolt l:en"},
+		{"existing lang: clause beats explicit", "lightning bolt lang:german", "fr", "en", "lightning bolt lang:german"},
+		{"negated language clause beats explicit", "lightning bolt -l:en", "de", "fr", "lightning bolt -l:en"},
+
+		// Non-language clauses don't false-match
+		{"loyalty does not look like a language clause", "loyalty:3", "", "de", "loyalty:3 l:de"},
+		{"legal does not look like a language clause", "legal:standard", "fr", "", "legal:standard l:fr"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := applyLanguage(tc.query, tc.explicit, tc.savedDefault); got != tc.want {
+				t.Errorf("applyLanguage(%q, %q, %q) = %q, want %q",
+					tc.query, tc.explicit, tc.savedDefault, got, tc.want)
+			}
+		})
+	}
+}
+
 // fiber:context-methods migrated

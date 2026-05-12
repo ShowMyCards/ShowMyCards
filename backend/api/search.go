@@ -6,12 +6,15 @@ import (
 	"backend/services"
 	"backend/utils"
 	"log/slog"
+	"regexp"
 	"strings"
 
 	goscryfall "github.com/BlueMonday/go-scryfall"
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
 )
+
+var languageClauseRegExp = regexp.MustCompile(`(?i)(^|\s)[-!]?(l|lang):`)
 
 // SearchHandler handles card search endpoints
 type SearchHandler struct {
@@ -109,10 +112,20 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 		uniqueModeStr = "cards"
 	}
 
+	defaultLang, err := h.settingsService.Get(c.RequestCtx(), "scryfall_default_language")
+	if err != nil {
+		slog.Warn("failed to get scryfall_default_language setting", "component", "search", "error", err)
+		defaultLang = ""
+	}
+
+	explicitLang := strings.TrimSpace(c.Query("lang"))
+
 	// Append default search string to query
 	if defaultSearch != "" {
 		query = query + " " + defaultSearch
 	}
+
+	query = applyLanguage(query, explicitLang, defaultLang)
 
 	// Map unique mode string to scryfall.UniqueMode
 	var uniqueMode goscryfall.UniqueMode
@@ -269,6 +282,32 @@ func (h *SearchHandler) Autocomplete(c fiber.Ctx) error {
 	}
 
 	return c.JSON(AutocompleteResponse{Suggestions: suggestions})
+}
+
+func hasLanguageClause(query string) bool {
+	return languageClauseRegExp.MatchString(query)
+}
+
+// applyLanguage decides which (if any) language clause to append to query.
+//   - A typed `l:`/`lang:` clause in the query always wins (no injection).
+//   - Otherwise, if explicit is non-empty (per-request override from the
+//     query-param), it is appended verbatim — even when "en".
+//   - Otherwise the saved default is used, with "en" / empty treated as no-op
+//     (Scryfall's own default is English).
+func applyLanguage(query, explicit, savedDefault string) string {
+	if hasLanguageClause(query) {
+		return query
+	}
+
+	if explicit != "" {
+		return query + " l:" + explicit
+	}
+
+	if savedDefault == "" || savedDefault == "en" {
+		return query
+	}
+
+	return query + " l:" + savedDefault
 }
 
 // fiber:context-methods migrated
