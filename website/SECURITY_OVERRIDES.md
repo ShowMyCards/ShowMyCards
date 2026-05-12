@@ -2,23 +2,33 @@
 
 The `overrides` block in `package.json` force-resolves transitive dependencies
 to patched versions where the parent dependency still pins a vulnerable range.
-Each entry exists because `bun audit` flagged a finding that could not be
-resolved by `bun update` alone.
 
 This file is the source of truth for **why** each override exists and **when**
-it can be removed. Renovate will propose version bumps for these entries as new
-releases come out — when reviewing those PRs, check this file to understand
-whether the bump is required or just a follow-along.
+it can be removed.
 
 ## Active overrides
 
-| Package     | Pinned    | Advisory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Severity | Parent (why we need it)                                                                       | Remove when                                                              |
-| ----------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `picomatch` | `^4.0.4`  | [GHSA-c2c7-rcm5-vvqj](https://github.com/advisories/GHSA-c2c7-rcm5-vvqj) + [GHSA-3v7f-55p6-f55p](https://github.com/advisories/GHSA-3v7f-55p6-f55p) — ReDoS + method injection                                                                                                                                                                                                                                                                                                                                                                                      | high     | `astro › @rollup/pluginutils`, `@astrojs/cloudflare › vite › tinyglobby › fdir`, `@tailwindcss/vite › vite › tinyglobby › fdir` | upstream `@rollup/pluginutils` / `tinyglobby` bump `picomatch` to `>=4.0.4` |
-| `postcss`   | `^8.5.10` | [GHSA-qx2v-qp2m-jg93](https://github.com/advisories/GHSA-qx2v-qp2m-jg93) — XSS via unescaped `</style>`                                                                                                                                                                                                                                                                                                                                                                                                                                                              | moderate | `astro › vite`, `@astrojs/cloudflare › vite`, `@tailwindcss/vite › vite`                       | vite consumers bump `postcss` to `>=8.5.10`                              |
-| `rollup`    | `^4.59.0` | [GHSA-mw96-cpmx-2vgc](https://github.com/advisories/GHSA-mw96-cpmx-2vgc) — arbitrary file write via path traversal                                                                                                                                                                                                                                                                                                                                                                                                                                                  | high     | `vite › rollup` (all three vite chains)                                                       | `vite` bumps `rollup` to `>=4.59.0`                                       |
-| `svgo`      | `^4.0.1`  | [GHSA-xpqw-6gx7-v673](https://github.com/advisories/GHSA-xpqw-6gx7-v673) — DoS via DOCTYPE entity expansion (Billion Laughs)                                                                                                                                                                                                                                                                                                                                                                                                                                          | high     | `astro › svgo`                                                                                | `astro` bumps `svgo` to `>=4.0.1`                                         |
-| `undici`    | `^7.18.2` | [GHSA-g9mf-h72j-4rw9](https://github.com/advisories/GHSA-g9mf-h72j-4rw9), [GHSA-f269-vfmq-vjvj](https://github.com/advisories/GHSA-f269-vfmq-vjvj), [GHSA-2mjp-6q6p-2qxm](https://github.com/advisories/GHSA-2mjp-6q6p-2qxm), [GHSA-vrm6-8vpv-qv8q](https://github.com/advisories/GHSA-vrm6-8vpv-qv8q), [GHSA-v9p9-hfj2-hcw8](https://github.com/advisories/GHSA-v9p9-hfj2-hcw8), [GHSA-4992-7rv2-5pvq](https://github.com/advisories/GHSA-4992-7rv2-5pvq) — WebSocket overflow, decompression exhaustion, request smuggling, CRLF injection, etc. | high     | `wrangler › miniflare › undici`                                                               | `wrangler`/`miniflare` bumps `undici` to `>=7.18.2`                       |
+**None.** `bun audit --prod` is clean with no overrides applied. If a future
+`bun audit` finding can't be resolved by `bun update` alone, add an entry below
+and pin the override in `package.json`.
+
+## When to add an override
+
+If `bun audit --prod` reports a finding in a transitive dep, first try:
+
+```bash
+bun update
+bun audit --prod
+```
+
+If the finding remains because a parent dep pins a vulnerable range, add an
+entry to `overrides` in `package.json` pinning the package to a patched
+version, then document it in a table here with these columns:
+
+| Package | Pinned | Advisory | Severity | Parent (why we need it) | Remove when |
+
+The **Remove when** column should describe the upstream condition that makes
+the override unnecessary — typically "parent dep bumps its pin to `>=fix`".
 
 ## How to check if an override is still required
 
@@ -36,13 +46,12 @@ Do this for one override at a time so you know which one was load-bearing.
 
 ## When Renovate proposes a major bump for an entry here
 
-Renovate sees `overrides` entries as normal deps and will propose bumps (e.g.
-`undici 7.x → 8.x`, `picomatch 4.x → 5.x`). Before approving:
+Renovate sees `overrides` entries as normal deps and will propose bumps.
+Before approving a major bump:
 
 1. Check whether the consumers in the **Parent** column also moved to that
    major. If they did, the override is probably unnecessary now — remove it
    instead of bumping it.
 2. If the consumers still pin the older major, the override bump only helps if
    the new major's API is compatible with what the consumer uses. Verify by
-   running `bun run build` and the deploy dry-run (`bunx wrangler deploy
-   --dry-run`) with the bump.
+   running `bun run build` with the bump.
