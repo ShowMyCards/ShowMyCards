@@ -1,0 +1,15 @@
+# zizmor configuration — https://docs.zizmor.sh/configuration/
+#
+# Each entry below is a deliberate exception. Don't add anything here without
+# a documented rationale; suppression is meant to be the exception.
+
+rules:
+  cache-poisoning:
+    ignore:
+      # snyk-release.yml is gated to tag pushes, and oven-sh/setup-bun has no
+      # opt-out for its built-in binary cache. The risk is bounded because a
+      # tag can only exist after release-please's PR has been approved by
+      # CODEOWNERS, so cache-poisoning would require first compromising a
+      # maintainer's review. We accept this risk and rely on the broader
+      # release-please review flow for protection.
+      - snyk-release.yml

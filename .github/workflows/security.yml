@@ -1,0 +1,110 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly catch-all so vulnerabilities discovered in unchanged deps still
+    # surface. Monday 04:00 UTC = quiet window globally.
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck (backend)
+    runs-on: ubuntu-latest
+    # TODO: pre-existing Go stdlib vulnerabilities in the toolchain version
+    # pinned in backend/go.mod. Tracked in a follow-up issue; this job is
+    # non-blocking until the Go bump lands, so the gate is informational only.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: govulncheck ./...
+        working-directory: backend
+
+  bun-audit-frontend:
+    name: bun audit (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: frontend
+      - name: Audit
+        run: bun audit --prod
+        working-directory: frontend
+
+  bun-audit-website:
+    name: bun audit (website)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: website
+      - name: Audit
+        run: bun audit --prod
+        working-directory: website
+
+  actionlint:
+    name: actionlint (workflows)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      # Install via `go install` so we get Go module proxy + sumdb
+      # verification automatically, and match the pattern used by the
+      # govulncheck job above. Wrapper actions for actionlint have a history
+      # of breaking due to transitive Node.js compatibility issues, and
+      # piping the upstream install script into bash is avoidable here.
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: backend/go.mod
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+      - name: Run actionlint
+        run: actionlint -color
+
+  zizmor:
+    name: zizmor (workflow security)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Run zizmor
+        run: uvx zizmor --format sarif . > zizmor.sarif
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor

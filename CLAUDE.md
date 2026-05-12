@@ -113,7 +113,12 @@ These apply to both codebases:
 
 3. **Explicit dependencies.** All dependencies are declared in `go.mod`
    (backend) or `package.json` (frontend). No implicit reliance on globally
-   installed tools.
+   installed tools. Transitive vulnerability fixes that can't be resolved
+   by `bun update` are pinned via the `overrides` field in each frontend
+   `package.json` — see `frontend/SECURITY_OVERRIDES.md` and
+   `website/SECURITY_OVERRIDES.md` for the rationale and removal criteria
+   for each entry. Consult those files before changing or removing an
+   override entry, and update them when adding or removing an override.
 
 4. **Consistent error handling.** Both codebases handle errors explicitly.
    The backend wraps errors with context. The frontend handles loading, error,
@@ -173,7 +178,10 @@ When modifying API endpoints:
   services, managed databases, or SaaS dependencies unless explicitly asked.
 - There is no authentication or authorisation by design. Do not add it or
   suggest adding it.
-- There is no rate limiting by design. Do not add it or suggest adding it.
+- There is no **inbound** rate limiting on the backend API by design. Do not
+  add it or suggest adding it. **Outbound** rate limiting toward third-party
+  APIs (such as Scryfall) is in scope and expected — respecting upstream
+  limits is a hard requirement, not optional.
 - The backend and frontend are separate concerns. Do not mix Go and Svelte
   guidance. Use the appropriate directory-level CLAUDE.md for each.
 - The frontend uses **Bun**, not npm. Use `bun` / `bunx` for all frontend
