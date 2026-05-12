@@ -1,0 +1,121 @@
+name: Snyk (release gate)
+
+# Only runs on release tag pushes so we stay well under the Snyk free-tier
+# scan quota. Per-PR scanning is handled by `security.yml` (govulncheck +
+# bun audit) and `codeql.yml`. This workflow is purely a final gate before a
+# version goes out, so a high-severity issue here should block the release
+# rather than just inform.
+#
+# Requires the `SNYK_TOKEN` repository secret. If it is missing, the workflow
+# skips silently rather than failing the release.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "website-v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  check-secret:
+    runs-on: ubuntu-latest
+    outputs:
+      has-token: ${{ steps.check.outputs.has-token }}
+    steps:
+      - id: check
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "$SNYK_TOKEN" ]; then
+            echo "has-token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SNYK_TOKEN not set — skipping Snyk release scan."
+          fi
+
+  snyk-backend:
+    needs: check-secret
+    if: needs.check-secret.outputs.has-token == 'true' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: backend/go.mod
+          # Tag-triggered workflows must not use toolchain caches — a
+          # compromised tag-push could otherwise poison the cache for later
+          # runs. See zizmor's `cache-poisoning` rule.
+          cache: false
+      - uses: snyk/actions/golang@9cf6ca713d71123d2d229cc3d7f145b96ea3c518 # master (snyk does not tag releases)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: --severity-threshold=high --sarif-file-output=snyk.sarif backend/...
+      - uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-backend
+
+  snyk-frontend:
+    needs: check-secret
+    if: needs.check-secret.outputs.has-token == 'true' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      # Suppression for setup-bun's built-in cache documented in
+      # .github/zizmor.yml under `cache-poisoning`.
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - uses: snyk/actions/node@9cf6ca713d71123d2d229cc3d7f145b96ea3c518 # master (snyk does not tag releases)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: --severity-threshold=high --file=frontend/package.json --sarif-file-output=snyk.sarif
+      - uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-frontend
+
+  snyk-website:
+    needs: check-secret
+    if: needs.check-secret.outputs.has-token == 'true' && startsWith(github.ref, 'refs/tags/website-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      # Suppression documented in .github/zizmor.yml.
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+      - run: bun install --frozen-lockfile
+        working-directory: website
+      - uses: snyk/actions/node@9cf6ca713d71123d2d229cc3d7f145b96ea3c518 # master (snyk does not tag releases)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: --severity-threshold=high --file=website/package.json --sarif-file-output=snyk.sarif
+      - uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-website

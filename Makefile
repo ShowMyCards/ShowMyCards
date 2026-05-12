@@ -1,4 +1,4 @@
-.PHONY: all build build-backend build-frontend dev dev-backend dev-frontend test test-backend test-frontend types clean docker docker-build docker-up docker-down install release
+.PHONY: all build build-backend build-frontend dev dev-backend dev-frontend test test-backend test-frontend types clean docker docker-build docker-up docker-down install manual-release repo-settings
 
 VERSION ?= dev
 
@@ -73,18 +73,33 @@ docker-up:
 docker-down:
 	docker compose down
 
-# Release: tag and push a version
-release:
-	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=1.2.3" && exit 1)
+# Manual release: tag and push a version directly, bypassing release-please.
+#
+# This is the escape hatch for cases release-please can't handle — typically
+# a hotfix tagged from a non-default branch, or a re-tag after a botched
+# release. For normal releases, merge the open "chore: release X.Y.Z" PR on
+# main and let release-please cut the tag.
+manual-release:
+	@test -n "$(VERSION)" || (echo "Usage: make manual-release VERSION=1.2.3" && exit 1)
 	@test "$(VERSION)" != "dev" || (echo "VERSION must be a semver, not 'dev'" && exit 1)
-	@echo "Switching to main and pulling latest..."
-	git checkout main
-	git pull origin main
+	@echo "WARNING: This bypasses release-please and will not update CHANGELOG.md."
+	@echo "         Only use for hotfixes or out-of-band releases. For normal"
+	@echo "         releases, merge the open 'chore: release' PR on main instead."
+	@echo ""
 	@if [ -n "$$(git status --porcelain)" ]; then echo "Error: working directory is not clean" && exit 1; fi
 	@if git rev-parse "v$(VERSION)" >/dev/null 2>&1; then echo "Error: tag v$(VERSION) already exists" && exit 1; fi
 	git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
 	git push origin "v$(VERSION)"
 	@echo "Released v$(VERSION)"
+
+# Apply repository settings and branch protection to GitHub.
+# The shell script is the canonical record — any change to repo settings
+# should be made there, not in the GitHub UI, so this file stays in sync
+# with reality.
+repo-settings:
+	@command -v gh >/dev/null || (echo "Error: gh CLI is required" && exit 1)
+	@gh auth status >/dev/null 2>&1 || (echo "Error: run 'gh auth login' first" && exit 1)
+	./scripts/apply-repo-settings.sh
 
 # Help
 help:
@@ -114,4 +129,10 @@ help:
 	@echo "  docker-down      Stop container"
 	@echo ""
 	@echo "Release:"
-	@echo "  release          Tag and push a release (VERSION=x.y.z required)"
+	@echo "  Normal releases are driven by release-please — merge the open"
+	@echo "  'chore: release X.Y.Z' PR on main and the tag is cut automatically."
+	@echo "  manual-release   Tag and push a release out-of-band, bypassing"
+	@echo "                   release-please (VERSION=x.y.z required)."
+	@echo ""
+	@echo "Repo administration (maintainers only):"
+	@echo "  repo-settings    Apply GitHub repo settings + branch protection"

@@ -173,7 +173,10 @@ When modifying API endpoints:
   services, managed databases, or SaaS dependencies unless explicitly asked.
 - There is no authentication or authorisation by design. Do not add it or
   suggest adding it.
-- There is no rate limiting by design. Do not add it or suggest adding it.
+- There is no **inbound** rate limiting on the backend API by design. Do not
+  add it or suggest adding it. **Outbound** rate limiting toward third-party
+  APIs (such as Scryfall) is in scope and expected — respecting upstream
+  limits is a hard requirement, not optional.
 - The backend and frontend are separate concerns. Do not mix Go and Svelte
   guidance. Use the appropriate directory-level CLAUDE.md for each.
 - The frontend uses **Bun**, not npm. Use `bun` / `bunx` for all frontend
