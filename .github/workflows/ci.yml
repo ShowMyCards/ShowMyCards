@@ -6,13 +6,18 @@ on:
     paths-ignore:
       - "website/**"
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: backend/go.mod
 
@@ -25,12 +30,14 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
       - name: Install dependencies
-        run: cd frontend && bun install
+        run: cd frontend && bun install --frozen-lockfile
 
       - name: Type check
         run: cd frontend && bun run check

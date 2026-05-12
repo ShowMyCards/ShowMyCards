@@ -17,10 +17,20 @@ import (
 func setupBulkDataTestApp(t *testing.T) (*fiber.App, *services.BulkDataService, *services.JobService, *gorm.DB) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
+
+	// The async import goroutine and the test goroutine both touch this db.
+	// Pinning the pool to a single connection serialises them on the same
+	// in-memory database — matching backend/database/client.go — and avoids
+	// the SQLITE_LOCKED contention that cache=shared exposed on Linux CI.
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get database instance: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 
 	if err := db.AutoMigrate(&models.Job{}, &models.Setting{}, &models.Card{}); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)

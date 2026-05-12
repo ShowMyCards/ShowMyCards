@@ -1,0 +1,13 @@
+# Global fallback — the maintainer reviews everything not matched by a more
+# specific rule below.
+*                       @EvilChookie
+
+# Workflow, release, and dependency configuration changes have the largest
+# blast radius, so call them out explicitly. Any change here needs a review
+# from the maintainer, even if other rules would also match.
+/.github/                @EvilChookie
+/renovate.json           @EvilChookie
+/release-please-config.json     @EvilChookie
+/.release-please-manifest.json  @EvilChookie
+/docker/                 @EvilChookie
+/Makefile                @EvilChookie

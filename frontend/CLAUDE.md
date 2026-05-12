@@ -60,6 +60,10 @@ ShowMyCards/
 
 All code reviews must follow FRONTEND_REVIEW_STANDARDS.md. Do not flag items listed in the Won't Fix section. Stop the review when only CONSIDER-level findings remain.
 
+## Dependency Security Overrides
+
+The `overrides` block in `package.json` pins transitive dependencies to patched versions where the parent dep still resolves a vulnerable range. **Before changing or removing an entry, read [SECURITY_OVERRIDES.md](./SECURITY_OVERRIDES.md)** — it documents the advisory, the parent dep, and the condition that makes each override safe to delete. Update that file when adding or removing an override.
+
 ## Key Patterns
 
 - **File-based routing**: Pages and layouts defined by file structure in `src/routes/`
