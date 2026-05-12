@@ -43,9 +43,15 @@ echo "==> 3. Require approval for outside contributor workflow runs"
 gh api -X PUT "repos/$REPO/actions/permissions/access" \
   -F access_level=organization > /dev/null || true
 
+# `can_approve_pull_request_reviews` is a misleadingly-named field: it
+# controls both PR *creation* and PR approval by Actions, not just approval.
+# It MUST be true here so release-please can open the "chore: release" PR
+# that drives our entire release flow. Branch protection's
+# `require_code_owner_reviews: true` is what actually prevents Actions from
+# self-approving, since the bot is not in CODEOWNERS.
 gh api -X PUT "repos/$REPO/actions/permissions/workflow" \
   -F default_workflow_permissions=read \
-  -F can_approve_pull_request_reviews=false > /dev/null
+  -F can_approve_pull_request_reviews=true > /dev/null
 
 echo "==> 4. Branch protection on main"
 # Required status checks must match the job names GitHub has actually seen.
