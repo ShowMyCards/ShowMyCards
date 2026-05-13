@@ -28,6 +28,7 @@ func BuildCardResult(card scryfall.Card) CardResult {
 		SetCode:         card.Set,
 		SetName:         card.SetName,
 		CollectorNumber: card.CollectorNumber,
+		Language:        string(card.Lang),
 		ColorIdentity:   utils.ConvertEnumSliceToStrings(card.ColorIdentity),
 		Finishes:        utils.ConvertEnumSliceToStrings(card.Finishes),
 		FrameEffects:    utils.ConvertEnumSliceToStrings(card.FrameEffects),

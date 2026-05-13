@@ -8,7 +8,7 @@ This is part of the ShowMyCards monorepo. For development setup, Docker deployme
 
 - **Framework**: Fiber v3 (FastHTTP-based web framework)
 - **Database**: SQLite with GORM ORM
-- **Language**: Go 1.25+
+- **Language**: Go 1.26+
 - **Type Generation**: Tygo (Go structs → TypeScript)
 
 ## Directory Structure
