@@ -8,7 +8,7 @@ import type { RequestHandler } from './$types';
  * The browser cannot reach BACKEND_URL directly (it points at a host that's
  * only routable from inside the SvelteKit server — e.g. a Docker network
  * address). This handler strips the `/api` prefix and forwards every method
- * to the corresponding backend path, streaming the body and preserving the
+ * to the corresponding backend path, buffering the body and preserving the
  * headers that callers care about (downloads, caching, content-type).
  *
  * Server-side code (+page.server.ts, etc.) should keep calling BACKEND_URL
