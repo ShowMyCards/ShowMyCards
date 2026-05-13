@@ -83,49 +83,29 @@ describe('catch-all proxy: method forwarding', () => {
 });
 
 describe('catch-all proxy: request headers', () => {
-	it('forwards content-type', async () => {
+	it.each([
+		['content-type', 'application/json'],
+		['accept', 'application/json']
+	])('forwards %s', async (header, value) => {
 		const fetchMock = mockFetch();
-		await call(
-			'POST',
-			makeEvent(
-				{ path: 'jobs', method: 'POST', headers: { 'content-type': 'application/json' } },
-				fetchMock
-			)
-		);
+		await call('GET', makeEvent({ path: 'jobs', headers: { [header]: value } }, fetchMock));
 		const sent = new Headers(fetchInit(fetchMock).headers);
-		expect(sent.get('content-type')).toBe('application/json');
+		expect(sent.get(header)).toBe(value);
 	});
 
-	it('forwards accept', async () => {
+	it.each(['authorization', 'cookie', 'x-internal'])('drops %s', async (header) => {
 		const fetchMock = mockFetch();
-		await call(
-			'GET',
-			makeEvent({ path: 'jobs', headers: { accept: 'application/json' } }, fetchMock)
-		);
+		await call('GET', makeEvent({ path: 'jobs', headers: { [header]: 'leak' } }, fetchMock));
 		const sent = new Headers(fetchInit(fetchMock).headers);
-		expect(sent.get('accept')).toBe('application/json');
+		expect(sent.has(header)).toBe(false);
 	});
 
-	it('drops headers other than content-type and accept', async () => {
+	it('does not invent allow-listed headers when caller omits them', async () => {
 		const fetchMock = mockFetch();
-		await call(
-			'GET',
-			makeEvent(
-				{
-					path: 'jobs',
-					headers: {
-						authorization: 'Bearer secret',
-						cookie: 'session=abc',
-						'x-internal': 'leak'
-					}
-				},
-				fetchMock
-			)
-		);
+		await call('GET', makeEvent({ path: 'jobs' }, fetchMock));
 		const sent = new Headers(fetchInit(fetchMock).headers);
-		expect(sent.has('authorization')).toBe(false);
-		expect(sent.has('cookie')).toBe(false);
-		expect(sent.has('x-internal')).toBe(false);
+		expect(sent.has('content-type')).toBe(false);
+		expect(sent.has('accept')).toBe(false);
 	});
 });
 
@@ -189,40 +169,22 @@ describe('catch-all proxy: response status', () => {
 });
 
 describe('catch-all proxy: response headers', () => {
-	it('forwards every header on the allow-list', async () => {
-		const fetchMock = mockFetch(
-			new Response(null, {
-				headers: {
-					'content-type': 'application/json',
-					'content-disposition': 'attachment; filename="export.json"',
-					'cache-control': 'no-store',
-					etag: '"abc123"',
-					'last-modified': 'Wed, 21 Oct 2026 07:28:00 GMT'
-				}
-			})
-		);
-		const response = await call('GET', makeEvent({ path: 'data/export' }, fetchMock));
-		expect(response.headers.get('content-type')).toBe('application/json');
-		expect(response.headers.get('content-disposition')).toBe('attachment; filename="export.json"');
-		expect(response.headers.get('cache-control')).toBe('no-store');
-		expect(response.headers.get('etag')).toBe('"abc123"');
-		expect(response.headers.get('last-modified')).toBe('Wed, 21 Oct 2026 07:28:00 GMT');
+	it.each([
+		['content-type', 'application/json'],
+		['content-disposition', 'attachment; filename="export.json"'],
+		['cache-control', 'no-store'],
+		['etag', '"abc123"'],
+		['last-modified', 'Wed, 21 Oct 2026 07:28:00 GMT']
+	])('forwards %s', async (header, value) => {
+		const fetchMock = mockFetch(new Response(null, { headers: { [header]: value } }));
+		const response = await call('GET', makeEvent({ path: 'jobs' }, fetchMock));
+		expect(response.headers.get(header)).toBe(value);
 	});
 
-	it('drops headers that are not on the allow-list', async () => {
-		const fetchMock = mockFetch(
-			new Response(null, {
-				headers: {
-					'set-cookie': 'session=abc',
-					'x-internal-debug': 'leak',
-					server: 'fiber'
-				}
-			})
-		);
+	it.each(['set-cookie', 'x-internal-debug', 'server'])('drops %s', async (header) => {
+		const fetchMock = mockFetch(new Response(null, { headers: { [header]: 'leak' } }));
 		const response = await call('GET', makeEvent({ path: 'jobs' }, fetchMock));
-		expect(response.headers.has('set-cookie')).toBe(false);
-		expect(response.headers.has('x-internal-debug')).toBe(false);
-		expect(response.headers.has('server')).toBe(false);
+		expect(response.headers.has(header)).toBe(false);
 	});
 
 	it('does not invent allow-listed headers when upstream omits them', async () => {

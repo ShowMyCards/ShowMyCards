@@ -22,34 +22,41 @@ const RESPONSE_HEADERS_TO_FORWARD = [
 	'last-modified'
 ];
 
+const REQUEST_HEADERS_TO_FORWARD = [
+	'content-type',
+	'accept',
+	'accept-encoding',
+	'if-none-match',
+	'if-modified-since'
+];
+
 const proxy: RequestHandler = async ({ params, request, url, fetch }) => {
 	const path = params.path ?? '';
 	const target = `${BACKEND_URL}${resolveBackendPath(path)}${url.search}`;
 
-	const init: RequestInit = { method: request.method };
-	const forwardedRequestHeaders = new Headers();
-	const contentType = request.headers.get('content-type');
-	if (contentType) forwardedRequestHeaders.set('content-type', contentType);
-	const accept = request.headers.get('accept');
-	if (accept) forwardedRequestHeaders.set('accept', accept);
-	init.headers = forwardedRequestHeaders;
+	const requestHeaders = new Headers();
+	for (const name of REQUEST_HEADERS_TO_FORWARD) {
+		const value = request.headers.get(name);
+		if (value) requestHeaders.set(name, value);
+	}
 
+	const init: RequestInit = { method: request.method, headers: requestHeaders };
 	if (request.method !== 'GET' && request.method !== 'HEAD') {
 		init.body = await request.arrayBuffer();
 	}
 
 	const upstream = await fetch(target, init);
 
-	const headers = new Headers();
+	const responseHeaders = new Headers();
 	for (const name of RESPONSE_HEADERS_TO_FORWARD) {
 		const value = upstream.headers.get(name);
-		if (value) headers.set(name, value);
+		if (value) responseHeaders.set(name, value);
 	}
 
 	return new Response(upstream.body, {
 		status: upstream.status,
 		statusText: upstream.statusText,
-		headers
+		headers: responseHeaders
 	});
 };
 
