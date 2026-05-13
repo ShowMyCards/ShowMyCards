@@ -7,7 +7,7 @@
  * consistent regardless of which side of the prefix split they fall on.
  */
 
-const BACKEND_API_SEGMENTS = new Set([
+export const BACKEND_API_SEGMENTS = new Set([
 	'bulk-data',
 	'dashboard',
 	'data',
