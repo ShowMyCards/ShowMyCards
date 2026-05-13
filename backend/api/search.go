@@ -58,6 +58,7 @@ type CardResult struct {
 	SetCode         string     `json:"set_code,omitempty"`
 	SetName         string     `json:"set_name,omitempty"`
 	CollectorNumber string     `json:"collector_number,omitempty"`
+	Language        string     `json:"language"`
 	ImageURI        *string    `json:"image_uri,omitempty"`
 	ColorIdentity   []string   `json:"color_identity"`
 	Finishes        []string   `json:"finishes"`

@@ -456,6 +456,7 @@ export interface CardResult {
 	set_code?: string;
 	set_name?: string;
 	collector_number?: string;
+	language: string;
 	image_uri?: string;
 	color_identity: string[];
 	finishes: string[];
