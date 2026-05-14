@@ -47,6 +47,7 @@
 
 	// Client-side filtering state
 	let filterText = $state('');
+	let collectionFilter = $state<'all' | 'collection' | 'not-in-collection'>('all');
 	const PAGE_SIZE = 24;
 	let currentPage = $state(1);
 
@@ -118,6 +119,12 @@
 	 */
 	function filterCards(cardsList: EnhancedCardResult[]): EnhancedCardResult[] {
 		let filtered = cardsList.filter((c) => !removedCardIds.has(c.id));
+
+		if (collectionFilter === 'collection') {
+			filtered = filtered.filter((card) => card.inventory.total_quantity > 0);
+		} else if (collectionFilter === 'not-in-collection') {
+			filtered = filtered.filter((card) => card.inventory.total_quantity === 0);
+		}
 
 		if (filterText.trim()) {
 			const search = filterText.toLowerCase().trim();
@@ -240,11 +247,45 @@
 		<!-- Filter bar -->
 		<div class="flex flex-col gap-4 mb-4">
 			<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-				<CardFilter
-					searchText={filterText}
-					onSearchChange={handleSearchChange}
-					showStatusFilter={false}
-					placeholder="Filter results by name, set, or treatment..." />
+				<div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+					<CardFilter
+						searchText={filterText}
+						onSearchChange={handleSearchChange}
+						showStatusFilter={false}
+						placeholder="Filter results by name, set, or treatment..." />
+					<div class="join">
+						<button
+							class="btn btn-sm join-item {collectionFilter === 'all'
+								? 'btn-neutral'
+								: 'btn-ghost'}"
+							onclick={() => {
+								collectionFilter = 'all';
+								currentPage = 1;
+							}}>
+							All results
+						</button>
+						<button
+							class="btn btn-sm join-item {collectionFilter === 'collection'
+								? 'btn-neutral'
+								: 'btn-ghost'}"
+							onclick={() => {
+								collectionFilter = 'collection';
+								currentPage = 1;
+							}}>
+							In collection
+						</button>
+						<button
+							class="btn btn-sm join-item {collectionFilter === 'not-in-collection'
+								? 'btn-neutral'
+								: 'btn-ghost'}"
+							onclick={() => {
+								collectionFilter = 'not-in-collection';
+								currentPage = 1;
+							}}>
+							Not in collection
+						</button>
+					</div>
+				</div>
 				<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
 			</div>
 			{#if filterText || totalFilteredPages > 1}
