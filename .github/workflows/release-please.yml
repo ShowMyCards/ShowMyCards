@@ -16,9 +16,20 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # Mint a GitHub App installation token so that PRs and pushes made by
+      # this workflow trigger downstream `pull_request` / `push` workflows
+      # (CI, CodeQL, Security). The default GITHUB_TOKEN is deliberately
+      # excluded from triggering nested workflows, which leaves required
+      # checks unreported and blocks release PRs. See #80.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
