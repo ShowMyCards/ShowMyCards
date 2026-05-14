@@ -43,6 +43,7 @@ func TestSettingsService_InitializeDefaults(t *testing.T) {
 		"set_data_last_update_status":     "",
 		"scryfall_default_search":         "game:paper",
 		"scryfall_unique_mode":            "cards",
+		"scryfall_default_language":       "en",
 		"job_cleanup_last_run":            "",
 		"scheduler_catchup_enabled":       "true",
 		"scheduler_catchup_delay_seconds": "60",

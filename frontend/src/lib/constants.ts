@@ -38,3 +38,19 @@ export const JOB_STATUS = {
 	FAILED: 'failed',
 	CANCELLED: 'cancelled'
 } as const;
+
+export type ScryfallLanguage = { code: string; name: string };
+
+export const SCRYFALL_LANGUAGES: readonly ScryfallLanguage[] = [
+	{ code: 'en', name: 'English' },
+	{ code: 'de', name: 'German' },
+	{ code: 'es', name: 'Spanish' },
+	{ code: 'fr', name: 'French' },
+	{ code: 'it', name: 'Italian' },
+	{ code: 'ja', name: 'Japanese' },
+	{ code: 'ko', name: 'Korean' },
+	{ code: 'pt', name: 'Portuguese' },
+	{ code: 'ru', name: 'Russian' },
+	{ code: 'zhs', name: 'Chinese (Simplified)' },
+	{ code: 'zht', name: 'Chinese (Traditional)' }
+] as const;
