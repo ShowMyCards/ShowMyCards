@@ -1,4 +1,6 @@
+import { browser } from '$app/environment';
 import { BACKEND_URL } from '../config';
+import { resolveBackendPath } from './path-resolver';
 
 /**
  * Custom error class for API errors
@@ -22,12 +24,25 @@ export class ApiError extends Error {
  *
  * @example
  * ```ts
- * const client = new ApiClient('http://localhost:3000');
- * const data = await client.get<StorageLocation[]>('/storage');
+ * const data = await apiClient.get<StorageLocation[]>('/storage');
  * ```
  */
 export class ApiClient {
-	constructor(private baseUrl: string) {}
+	/**
+	 * Builds the URL for a given API path.
+	 *
+	 * In the browser, requests go through SvelteKit's `/api/*` catch-all
+	 * proxy, which resolves the backend's prefix shape internally — so the
+	 * client just prepends `/api`. Server-side, we resolve the prefix here
+	 * and hit the backend directly.
+	 */
+	private buildUrl(path: string): string {
+		const normalized = path.startsWith('/') ? path : `/${path}`;
+		if (browser) {
+			return `/api${normalized}`;
+		}
+		return `${BACKEND_URL}${resolveBackendPath(normalized)}`;
+	}
 
 	/**
 	 * Make a request to the API
@@ -38,7 +53,7 @@ export class ApiClient {
 	 * @throws {ApiError} If the request fails
 	 */
 	private async request<T>(path: string, options?: RequestInit): Promise<T> {
-		const url = `${this.baseUrl}${path}`;
+		const url = this.buildUrl(path);
 
 		try {
 			const response = await fetch(url, {
@@ -135,6 +150,11 @@ export class ApiClient {
 }
 
 /**
- * Global API client instance
+ * Global API client instance.
+ *
+ * Browser-side requests go through SvelteKit's catch-all proxy at /api/* so
+ * the backend host (only routable from inside the server) is never exposed
+ * to the user agent. Server-side calls (e.g. from +page.server.ts) hit the
+ * backend directly.
  */
-export const apiClient = new ApiClient(BACKEND_URL);
+export const apiClient = new ApiClient();
