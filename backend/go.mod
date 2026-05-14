@@ -7,6 +7,7 @@ require (
 	github.com/TwiN/gocache/v2 v2.4.0
 	github.com/expr-lang/expr v1.17.8
 	github.com/gofiber/fiber/v3 v3.1.0
+	go.uber.org/ratelimit v0.3.1
 	gorm.io/gorm v1.31.1
 )
 
@@ -21,7 +22,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/tinylib/msgp v1.6.3 // indirect
-	go.uber.org/ratelimit v0.3.1 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/text v0.34.0 // indirect

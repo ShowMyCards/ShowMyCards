@@ -7,6 +7,7 @@ import (
 
 	"github.com/BlueMonday/go-scryfall"
 	"github.com/TwiN/gocache/v2"
+	"go.uber.org/ratelimit"
 )
 
 const (
@@ -15,6 +16,16 @@ const (
 
 	// DefaultAPITimeout is the default timeout for Scryfall API calls
 	DefaultAPITimeout = 30 * time.Second
+
+	// ScryfallRPS bounds the Scryfall request rate.
+	// The search endpoint is rate limited to 2 req/s
+	// (even if the error message when hitting the rate limiter
+	// claims a limit of 10 req/s).
+	// See https://scryfall.com/docs/api/rate-limits for actual
+	// rate limits.
+	// Setting the limit to 2 req/s still results in 429 on bulk imports
+	// so we are very conservative here.
+	ScryfallRPS = 1
 )
 
 // ScryfallAPI defines the interface for Scryfall API operations
@@ -33,7 +44,8 @@ type Client struct {
 
 // NewClient creates a new Scryfall client with caching
 func NewClient() (*Client, error) {
-	api, err := scryfall.NewClient()
+	limiter := ratelimit.New(ScryfallRPS, ratelimit.WithoutSlack)
+	api, err := scryfall.NewClient(scryfall.WithLimiter(limiter))
 	if err != nil {
 		return nil, err
 	}
