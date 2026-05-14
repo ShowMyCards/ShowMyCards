@@ -1,4 +1,5 @@
 import { TIMEOUTS } from '../constants';
+import { rulesApi, ApiError } from '$lib/api';
 
 /**
  * Reusable debounced expression validation
@@ -44,21 +45,15 @@ export function useExpressionValidation(options?: { debounce?: number }) {
 		isValidating = true;
 
 		try {
-			const response = await fetch('/api/validate-expression', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ expression: expr })
-			});
-
-			const data = await response.json();
+			const data = await rulesApi.validate({ expression: expr });
 			validationResult = {
 				isValid: data.valid,
 				error: data.error
 			};
-		} catch {
+		} catch (error) {
 			validationResult = {
 				isValid: false,
-				error: 'Validation request failed'
+				error: error instanceof ApiError ? error.message : 'Validation request failed'
 			};
 		} finally {
 			isValidating = false;

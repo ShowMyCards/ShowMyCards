@@ -5,7 +5,7 @@ import type { ExportData, ImportResponse } from '$lib/types/api';
  */
 export const dataApi = {
 	/**
-	 * Get the URL for the export endpoint (proxied through SvelteKit)
+	 * Get the URL for the export endpoint (proxied through SvelteKit).
 	 */
 	exportUrl: () => '/api/data/export',
 
