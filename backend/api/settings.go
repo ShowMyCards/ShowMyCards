@@ -4,6 +4,7 @@ import (
 	"backend/services"
 	"backend/utils"
 	"fmt"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -86,12 +87,13 @@ func (h *SettingsHandler) UpdateBulk(c fiber.Ctx) error {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	// Validate keys against whitelist
+	// Drop keys outside the whitelist (e.g. system-managed keys like app_version)
+	// rather than rejecting the whole request.
 	validKeys := services.ValidSettingKeys()
 	for key := range req {
 		if !validKeys[key] {
-			return utils.ReturnError(c, fiber.StatusBadRequest,
-				fmt.Sprintf("invalid setting key: %s", key))
+			slog.Warn("dropping unknown setting key from bulk update", "component", "settings", "key", key)
+			delete(req, key)
 		}
 	}
 

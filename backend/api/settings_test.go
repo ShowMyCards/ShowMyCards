@@ -251,8 +251,8 @@ func TestSettingsUpdateBulk_Success(t *testing.T) {
 	}
 }
 
-func TestSettingsUpdateBulk_InvalidKey(t *testing.T) {
-	app, _ := setupSettingsTestApp(t)
+func TestSettingsUpdateBulk_UnknownKeyIsDropped(t *testing.T) {
+	app, service := setupSettingsTestApp(t)
 
 	updateReq := map[string]string{
 		"bulk_data_auto_update": "false",
@@ -268,8 +268,59 @@ func TestSettingsUpdateBulk_InvalidKey(t *testing.T) {
 		t.Fatalf("failed to make request: %v", err)
 	}
 
-	if resp.StatusCode != fiber.StatusBadRequest {
-		t.Errorf("expected status %d, got %d", fiber.StatusBadRequest, resp.StatusCode)
+	// Unknown keys are silently dropped; the request still succeeds
+	if resp.StatusCode != fiber.StatusOK {
+		t.Errorf("expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
+	}
+
+	// Valid key was updated
+	value, _ := service.Get(context.Background(), "bulk_data_auto_update")
+	if value != "false" {
+		t.Errorf("expected bulk_data_auto_update='false', got '%s'", value)
+	}
+
+	// Unknown key was not stored
+	unknown, err := service.Get(context.Background(), "invalid_key")
+	if err == nil && unknown != "" {
+		t.Errorf("expected invalid_key to not be stored, got '%s'", unknown)
+	}
+}
+
+func TestSettingsUpdateBulk_AppVersionIsDropped(t *testing.T) {
+	app, service := setupSettingsTestApp(t)
+
+	// Seed app_version as the version system would
+	if err := service.Set(context.Background(), "app_version", "0.1.0"); err != nil {
+		t.Fatalf("failed to seed app_version: %v", err)
+	}
+
+	// Simulate the frontend round-tripping all settings including app_version
+	updateReq := map[string]string{
+		"bulk_data_auto_update": "false",
+		"app_version":           "0.0.0", // should be ignored
+	}
+	reqBody, _ := json.Marshal(updateReq)
+
+	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("failed to make request: %v", err)
+	}
+
+	if resp.StatusCode != fiber.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected status %d, got %d. Body: %s", fiber.StatusOK, resp.StatusCode, string(body))
+	}
+
+	// app_version must not have been overwritten
+	version, err := service.Get(context.Background(), "app_version")
+	if err != nil {
+		t.Fatalf("failed to get app_version: %v", err)
+	}
+	if version != "0.1.0" {
+		t.Errorf("expected app_version='0.1.0' (unchanged), got '%s'", version)
 	}
 }
 
