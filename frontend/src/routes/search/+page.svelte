@@ -20,12 +20,14 @@
 		SCRYFALL_LANGUAGES,
 		type EnhancedCardResult
 	} from '$lib';
-	import { Search, Lightbulb } from '@lucide/svelte';
+	import { Search, Lightbulb, SlidersHorizontal } from '@lucide/svelte';
+	import SearchBuilderModal from '$lib/components/SearchBuilderModal.svelte';
 	import SetIcon from '$lib/components/SetIcon.svelte';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
 	let searching = $state(false);
+	let showSearchBuilder = $state(false);
 	let removedCardIds = $state(new Set<string>());
 	let cards = $state<EnhancedCardResult[]>([]);
 	let suggestions = $state<string[]>([]);
@@ -216,6 +218,14 @@
 							<Search class="w-4 h-4" />
 							Search
 						{/if}
+					</button>
+					<button
+						type="button"
+						class="btn btn-outline"
+						title="Advanced"
+						onclick={() => (showSearchBuilder = true)}>
+						<SlidersHorizontal class="w-4 h-4" />
+						Advanced
 					</button>
 				</div>
 				{#if hasTypedLanguage}
@@ -409,3 +419,14 @@
 		{/if}
 	{/if}
 </div>
+
+<SearchBuilderModal
+	open={showSearchBuilder}
+	onClose={() => (showSearchBuilder = false)}
+	onSearch={(q) => {
+		if (inputRef) {
+			inputRef.value = q;
+			queryText = q;
+			inputRef.form?.requestSubmit();
+		}
+	}} />
