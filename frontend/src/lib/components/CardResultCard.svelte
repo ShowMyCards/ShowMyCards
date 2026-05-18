@@ -206,24 +206,33 @@
 	}
 
 	async function handleDecrement(treatment: string) {
-		// Find the inventory item for this treatment
 		const inv = inventory.find((i) => i.treatment === treatment);
 		if (!inv) return;
 
 		try {
-			// Delete inventory item via form action
 			const formData = new FormData();
 			formData.append('inventory_id', inv.id.toString());
 
-			const response = await fetch('?/deleteInventory', {
-				method: 'POST',
-				body: formData
-			});
+			let result;
+			if (inv.quantity > 1) {
+				formData.append('quantity', (inv.quantity - 1).toString());
+				const response = await fetch('?/updateInventory', { method: 'POST', body: formData });
+				result = deserialize(await response.text());
+				if (result.type === 'success') {
+					inventory = inventory.map((i) =>
+						i.id === inv.id ? { ...i, quantity: inv.quantity - 1 } : i
+					);
+					totalQuantity -= 1;
+				}
+			} else {
+				const response = await fetch('?/deleteInventory', { method: 'POST', body: formData });
+				result = deserialize(await response.text());
+				if (result.type === 'success') {
+					inventory = inventory.filter((i) => i.id !== inv.id);
+					totalQuantity -= 1;
+				}
+			}
 
-			// Deserialize the form action response properly
-			const result = deserialize(await response.text());
-
-			// Handle different result types
 			if (result.type === 'error' || result.type === 'redirect') {
 				throw new Error('Unexpected response type');
 			}
@@ -232,11 +241,6 @@
 				throw new Error(getActionError(result.data, 'Failed to remove card from inventory'));
 			}
 
-			// Update local state
-			inventory = inventory.filter((i) => i.id !== inv.id);
-			totalQuantity -= inv.quantity;
-
-			// Show success notification
 			const treatmentName = getCardTreatmentName(
 				card.finishes,
 				card.frame_effects || [],
@@ -245,7 +249,6 @@
 			);
 			notifications.success(`Removed ${card.name} (${treatmentName}) from inventory`);
 
-			// If no inventory left, signal parent to remove this card from view
 			if (totalQuantity === 0 && onremove) {
 				onremove(card.id);
 			}
