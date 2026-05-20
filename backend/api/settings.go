@@ -26,7 +26,13 @@ func (h *SettingsHandler) GetAll(c fiber.Ctx) error {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to retrieve settings", "settings query failed", err)
 	}
-
+	validKeys := services.ValidSettingKeys()
+	filtered := make(map[string]string, len(settings))
+	for key, value := range settings {
+		if validKeys[key] {
+			filtered[key] = value
+		}
+	}
 	return c.JSON(settings)
 }
 
