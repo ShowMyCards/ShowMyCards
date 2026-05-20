@@ -26,6 +26,10 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          # Scope the token to only what release-please needs, rather than
+          # inheriting every permission the App installation holds.
+          permission-contents: write
+          permission-pull-requests: write
 
       - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
         id: release

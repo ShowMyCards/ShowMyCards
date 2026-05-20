@@ -8,9 +8,9 @@ it can be removed.
 
 ## Active overrides
 
-**None.** `bun audit --prod` is clean with no overrides applied. If a future
-`bun audit` finding can't be resolved by `bun update` alone, add an entry below
-and pin the override in `package.json`.
+| Package | Pinned | Advisory | Severity | Parent (why we need it) | Remove when |
+| --- | --- | --- | --- | --- | --- |
+| `devalue` | `^5.8.1` | [GHSA-77vg-94rm-hx3p](https://github.com/advisories/GHSA-77vg-94rm-hx3p) — DoS via sparse array deserialization | High | `astro` declares `devalue: "^5.6.3"`, but `bun update` leaves the transitive dep locked at `devalue@5.8.0`, inside the `>=5.6.3 <=5.8.0` vulnerable range. The override forces resolution to the patched `5.8.1`. | A fresh `bun install` with this entry removed resolves `devalue >= 5.8.1` — typically once Astro ships a release that locks devalue past the vulnerable range. Verify per "How to check if an override is still required" below. |
 
 ## When to add an override
 
