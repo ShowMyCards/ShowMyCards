@@ -8,7 +8,7 @@ import {
 	ListTodo,
 	Grid2x2,
 	Activity,
-	Upload
+	Download
 } from '@lucide/svelte';
 
 export const menuItems: MenuItem[] = [
@@ -25,7 +25,7 @@ export const menuItems: MenuItem[] = [
 	{
 		name: 'Import',
 		href: '/import',
-		icon: Upload
+		icon: Download
 	},
 	{
 		name: 'Inventory',
