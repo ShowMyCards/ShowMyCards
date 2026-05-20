@@ -56,8 +56,11 @@ function toTitleCase(str: string): string {
 		.replace('extendedart', 'extended art')
 		.replace('shatteredglass', 'shattered glass');
 
-	// Regex only for *foil variants (surgefoil, galaxyfoil, halofoil, etc.)
-	withSpaces = withSpaces.replace(/(\w+)foil$/, '$1 foil');
+	// Regex only for *foil variants (surgefoil, galaxyfoil, halofoil, etc.).
+	// Anchored at both ends: an unanchored \w+ overlaps the "foil" suffix and
+	// can start at every position, which is a polynomial-ReDoS risk on long
+	// inputs. The ^ anchor restricts matching to a single position (linear).
+	withSpaces = withSpaces.replace(/^(\w+)foil$/, '$1 foil');
 
 	// Capitalize first letter of each word
 	return withSpaces
