@@ -3,7 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Navigation from '$lib/components/Navigation.svelte';
-	import { NotificationContainer, KeyboardShortcutsHelp, keyboard, audio } from '$lib';
+	import { NotificationContainer, KeyboardShortcutsHelp, Banners, keyboard, audio } from '$lib';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
@@ -32,6 +32,9 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<!-- Sits above all app chrome so banners are visible on every route, including the dashboard. -->
+<Banners />
 
 <div class="drawer lg:drawer-open">
 	<input id="drawer" type="checkbox" class="drawer-toggle" />

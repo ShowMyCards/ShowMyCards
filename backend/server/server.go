@@ -116,6 +116,7 @@ func (s *Server) setupRoutes() {
 	SearchRoutes(s.app, s.scryfall, s.db.DB, s.settingsService)
 	SettingsRoutes(s.app, s.settingsService)
 	JobsRoutes(s.app, s.jobService)
+	BannerRoutes(s.app, s.jobService)
 	DataRoutes(s.app, s.db.DB)
 	BulkDataRoutes(s.app, s.bulkDataService, s.appCtx)
 	SetRoutes(s.app, s.db.DB, s.setDataService, s.dataDir, s.appCtx)

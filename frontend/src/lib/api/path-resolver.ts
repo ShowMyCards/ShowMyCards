@@ -8,6 +8,7 @@
  */
 
 export const BACKEND_API_SEGMENTS = new Set([
+	'banners',
 	'bulk-data',
 	'dashboard',
 	'data',

@@ -238,6 +238,12 @@ Go types are mapped to TypeScript as follows:
   - Query params: `status` (filter by job status)
 - `GET /jobs/:id` - Get single job details
 
+### Banners
+
+- `GET /banners` - List the UI banners that should currently be displayed.
+  Derived on demand from job state (in-progress and failed Scryfall syncs);
+  not persisted. See `services.BannerService`.
+
 ### Scheduler
 
 - `GET /scheduler/tasks` - List all scheduled tasks

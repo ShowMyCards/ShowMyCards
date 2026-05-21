@@ -24,6 +24,7 @@ export { inventoryApi } from './api/resources/inventory';
 export { listsApi } from './api/resources/lists';
 export { rulesApi } from './api/resources/rules';
 export { jobsApi } from './api/resources/jobs';
+export { bannersApi } from './api/resources/banners';
 export { settingsApi } from './api/resources/settings';
 export { searchApi } from './api/resources/search';
 export { dataApi } from './api/resources/data';
@@ -72,6 +73,10 @@ export { default as PrintingConflictModal } from './components/PrintingConflictM
 export { default as CardImage } from './components/CardImage.svelte';
 export { default as CardPreview } from './components/CardPreview.svelte';
 export { default as TreatmentBadge } from './components/TreatmentBadge.svelte';
+// Banners is the layout-level banner host. The presentational Banner.svelte is
+// not re-exported: its name would collide with the Banner type below, and only
+// Banners (and a future component preview) need it.
+export { default as Banners } from './components/Banners.svelte';
 
 // Card Collection (unified multi-view component)
 export {
@@ -99,7 +104,7 @@ export type {
 } from './components/card-collection';
 
 // Re-export generated types from Go backend models
-export type { BaseModel, StorageType, JobType, JobStatus, Card } from './types/models';
+export type { BaseModel, StorageType, JobType, JobStatus, Card, Banner } from './types/models';
 
 export {
 	Box,
