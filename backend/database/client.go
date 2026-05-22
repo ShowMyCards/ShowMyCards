@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"backend/models"
@@ -21,6 +22,13 @@ type Client struct {
 	DB *gorm.DB
 }
 
+// sqliteParams are appended to the database DSN. WAL journaling makes hot
+// backups safe — a copy of the main file can't capture a torn write — and is
+// persistent once set; the mattn driver also lowers synchronous to NORMAL when
+// WAL is requested. busy_timeout makes a writer wait briefly for a lock (e.g.
+// during an external `sqlite3 .backup`) instead of failing with SQLITE_BUSY.
+const sqliteParams = "?_journal_mode=WAL&_busy_timeout=5000"
+
 // NewClient creates a new database client
 func NewClient(dbPath string) (*Client, error) {
 	// Ensure directory exists
@@ -30,7 +38,7 @@ func NewClient(dbPath string) (*Client, error) {
 	}
 
 	// Connect to database with silent logger (only logs errors)
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath+sqliteParams), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Error),
 	})
 	if err != nil {
@@ -48,13 +56,24 @@ func NewClient(dbPath string) (*Client, error) {
 	sqlDB.SetMaxIdleConns(1)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
+	// Verify WAL mode took effect; warn loudly if not (e.g. on NFS volumes,
+	// where SQLite silently falls back to a rollback journal).
+	var journalMode string
+	if err := db.Raw("PRAGMA journal_mode").Scan(&journalMode).Error; err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to read journal mode: %w", err)
+	}
+	if !strings.EqualFold(journalMode, "wal") {
+		slog.Warn("SQLite is not in WAL mode; hot backups may capture a torn write", "journal_mode", journalMode)
+	}
+
 	// Run migrations
 	if err := migrate(db); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	slog.Info("connected to database", "path", dbPath)
+	slog.Info("connected to database", "path", dbPath, "journal_mode", journalMode)
 	return &Client{DB: db}, nil
 }
 
@@ -161,4 +180,3 @@ func customMigrations(db *gorm.DB) error {
 
 	return nil
 }
-
