@@ -15,6 +15,7 @@
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import { deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import type { ActionResult } from '@sveltejs/kit';
 	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
 
 	let {
@@ -43,6 +44,7 @@
 	let totalQuantity = $state(card.inventory.total_quantity);
 
 	let adding = $state(false);
+	let removing = $state(false);
 
 	// Printing conflict modal state
 	let showConflictModal = $state(false);
@@ -206,32 +208,32 @@
 	}
 
 	async function handleDecrement(treatment: string) {
+		// Guard against concurrent mutations: rapid clicks would otherwise read
+		// stale state and issue duplicate requests, desyncing totalQuantity.
+		if (adding || removing) return;
+
 		const inv = inventory.find((i) => i.treatment === treatment);
 		if (!inv) return;
 
+		removing = true;
+
 		try {
+			// Reduce by one copy: decrement the quantity when more than one copy
+			// remains, otherwise delete the row entirely.
+			const isDecrement = inv.quantity > 1;
+			const newQuantity = inv.quantity - 1;
+
 			const formData = new FormData();
 			formData.append('inventory_id', inv.id.toString());
-
-			let result;
-			if (inv.quantity > 1) {
-				formData.append('quantity', (inv.quantity - 1).toString());
-				const response = await fetch('?/updateInventory', { method: 'POST', body: formData });
-				result = deserialize(await response.text());
-				if (result.type === 'success') {
-					inventory = inventory.map((i) =>
-						i.id === inv.id ? { ...i, quantity: inv.quantity - 1 } : i
-					);
-					totalQuantity -= 1;
-				}
-			} else {
-				const response = await fetch('?/deleteInventory', { method: 'POST', body: formData });
-				result = deserialize(await response.text());
-				if (result.type === 'success') {
-					inventory = inventory.filter((i) => i.id !== inv.id);
-					totalQuantity -= 1;
-				}
+			if (isDecrement) {
+				formData.append('quantity', newQuantity.toString());
 			}
+
+			const response = await fetch(isDecrement ? '?/updateInventory' : '?/deleteInventory', {
+				method: 'POST',
+				body: formData
+			});
+			const result: ActionResult = deserialize(await response.text());
 
 			if (result.type === 'error' || result.type === 'redirect') {
 				throw new Error('Unexpected response type');
@@ -241,20 +243,35 @@
 				throw new Error(getActionError(result.data, 'Failed to remove card from inventory'));
 			}
 
+			// Update local state only once the action has succeeded
+			if (isDecrement) {
+				inventory = inventory.map((i) => (i.id === inv.id ? { ...i, quantity: newQuantity } : i));
+			} else {
+				inventory = inventory.filter((i) => i.id !== inv.id);
+			}
+			totalQuantity -= 1;
+
 			const treatmentName = getCardTreatmentName(
 				card.finishes,
 				card.frame_effects || [],
 				treatment,
 				card.promo_types || []
 			);
-			notifications.success(`Removed ${card.name} (${treatmentName}) from inventory`);
+			notifications.success(
+				isDecrement
+					? `Reduced ${card.name} (${treatmentName}) to ${newQuantity} in inventory`
+					: `Removed ${card.name} (${treatmentName}) from inventory`
+			);
 
+			// If no inventory left, signal parent to remove this card from view
 			if (totalQuantity === 0 && onremove) {
 				onremove(card.id);
 			}
 		} catch (e) {
 			const errorMessage = e instanceof Error ? e.message : 'Failed to remove card';
 			notifications.error(errorMessage);
+		} finally {
+			removing = false;
 		}
 	}
 
@@ -393,13 +410,13 @@
 					<div class="flex items-center gap-1">
 						<button
 							onclick={() => handleDecrement(treatment)}
-							disabled={quantity === 0}
+							disabled={quantity === 0 || adding || removing}
 							class="btn btn-sm btn-square bg-base-100">
 							−
 						</button>
 						<button
 							onclick={() => handleIncrement(treatment)}
-							disabled={adding}
+							disabled={adding || removing}
 							class="btn btn-sm btn-square bg-base-100">
 							+
 						</button>
