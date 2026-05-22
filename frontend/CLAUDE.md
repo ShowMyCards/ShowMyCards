@@ -13,7 +13,7 @@ This is part of the ShowMyCards monorepo. For development setup, Docker deployme
 - **Icons**: Lucide Svelte (SVG icon library)
 - **Language**: TypeScript 5.9+
 - **Build Tool**: Vite 7.3+ (fast dev server and bundler)
-- **Testing**: Vitest 4.0+ (unit tests), Playwright 1.58+ (E2E tests)
+- **Testing**: Vitest 4.0+ (unit tests; component tests run in-browser via the Playwright provider)
 - **Package Manager**: Bun (lockfile present)
 
 ## Directory Structure
@@ -44,11 +44,9 @@ ShowMyCards/
 │   │   │   └── index.ts            # Library exports
 │   │   ├── app.html                # HTML template
 │   │   └── app.d.ts                # TypeScript definitions
-│   ├── e2e/                        # End-to-end tests
 │   ├── static/                     # Static assets (served as-is)
 │   ├── svelte.config.js            # SvelteKit configuration
 │   ├── vite.config.ts              # Vite + Vitest configuration
-│   ├── playwright.config.ts        # Playwright E2E test config
 │   └── package.json                # Dependencies and scripts
 ├── website/                        # Astro marketing site
 ├── docker/                         # Docker configurations
@@ -69,7 +67,6 @@ The `overrides` block in `package.json` pins transitive dependencies to patched 
 - **File-based routing**: Pages and layouts defined by file structure in `src/routes/`
 - **Svelte 5 runes**: Modern reactivity with `$props()`, `$state()`, `$derived()`, etc.
 - **Tailwind CSS 4**: Vite plugin integration for styling
-- **Dual testing**: Vitest browser mode for component tests, Playwright for E2E
 - **Test projects**: Separate client (browser) and server (node) test environments
 
 ## Commands
@@ -94,9 +91,8 @@ bun run preview       # Preview production build (port 4173)
 bun run check         # Type-check with svelte-check
 bun run format        # Format code with Prettier
 bun run lint          # Check code formatting
-bun test              # Run all tests (E2E + unit)
-bun run test:unit     # Run Vitest component tests
-bun run test:e2e      # Run Playwright E2E tests
+bun run test          # Run all tests once (server + client projects)
+bun run test:unit     # Run Vitest in watch mode
 ```
 
 **Note:** Always use `bun` rather than `npm`.

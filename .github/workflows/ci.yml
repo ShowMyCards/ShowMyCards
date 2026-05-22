@@ -43,5 +43,8 @@ jobs:
       - name: Lint
         run: cd frontend && bun run lint
 
-      - name: Unit tests
-        run: cd frontend && bunx vitest --run --project server
+      - name: Install Playwright browser
+        run: cd frontend && bunx playwright install --with-deps chromium
+
+      - name: Tests
+        run: cd frontend && bunx vitest --run

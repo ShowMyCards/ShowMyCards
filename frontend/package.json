@@ -12,14 +12,12 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
 		"lint": "eslint . && prettier --check .",
-		"test:e2e": "playwright test",
-		"test": "npm run test:e2e && npm run test:unit -- --run",
+		"test": "vitest --run",
 		"test:unit": "vitest",
 		"types:generate": "cd ../backend && go run github.com/gzuidhof/tygo@latest generate && cd ../frontend && prettier --write src/lib/types/models.ts src/lib/types/api.ts && echo 'TypeScript types generated from Go models'"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
-		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.60.1",
