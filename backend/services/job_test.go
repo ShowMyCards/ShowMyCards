@@ -514,3 +514,48 @@ func TestJobService_GetLastJobByType_NotFound(t *testing.T) {
 		t.Error("expected nil job when none exist")
 	}
 }
+
+// ListActive tests
+
+func TestJobService_ListActive_Empty(t *testing.T) {
+	service, _ := setupJobServiceTest(t)
+
+	jobs, err := service.ListActive(context.Background())
+	if err != nil {
+		t.Fatalf("ListActive failed: %v", err)
+	}
+
+	if len(jobs) != 0 {
+		t.Errorf("expected 0 active jobs, got %d", len(jobs))
+	}
+}
+
+func TestJobService_ListActive_ReturnsOnlyPendingAndInProgress(t *testing.T) {
+	service, db := setupJobServiceTest(t)
+
+	// One job of each status; only pending and in_progress are "active".
+	for _, status := range []models.JobStatus{
+		models.JobStatusPending,
+		models.JobStatusInProgress,
+		models.JobStatusCompleted,
+		models.JobStatusFailed,
+		models.JobStatusCancelled,
+	} {
+		db.Create(&models.Job{Type: models.JobTypeBulkDataImport, Status: status, Metadata: "{}"})
+	}
+
+	jobs, err := service.ListActive(context.Background())
+	if err != nil {
+		t.Fatalf("ListActive failed: %v", err)
+	}
+
+	if len(jobs) != 2 {
+		t.Fatalf("expected 2 active jobs, got %d", len(jobs))
+	}
+
+	for _, job := range jobs {
+		if job.Status != models.JobStatusPending && job.Status != models.JobStatusInProgress {
+			t.Errorf("unexpected non-active status: %s", job.Status)
+		}
+	}
+}

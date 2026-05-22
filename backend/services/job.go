@@ -73,6 +73,21 @@ func (s *JobService) List(ctx context.Context, page, pageSize int, jobType *mode
 	return jobs, total, nil
 }
 
+// ListActive retrieves all jobs that are currently pending or in progress,
+// ordered newest first. Used by the UI to surface in-flight Scryfall syncs.
+func (s *JobService) ListActive(ctx context.Context) ([]models.Job, error) {
+	var jobs []models.Job
+	if err := s.db.WithContext(ctx).
+		Where("status IN ?", []models.JobStatus{models.JobStatusPending, models.JobStatusInProgress}).
+		// id breaks created_at ties so ordering is deterministic when two jobs
+		// share a timestamp.
+		Order("created_at DESC, id DESC").
+		Find(&jobs).Error; err != nil {
+		return nil, fmt.Errorf("listing active jobs: %w", err)
+	}
+	return jobs, nil
+}
+
 // UpdateStatus updates a job's status
 func (s *JobService) UpdateStatus(ctx context.Context, id uint, status models.JobStatus) error {
 	if err := s.db.WithContext(ctx).Model(&models.Job{}).Where("id = ?", id).Update("status", status).Error; err != nil {
@@ -163,7 +178,9 @@ func (s *JobService) GetLastJobByType(ctx context.Context, jobType models.JobTyp
 	var job models.Job
 
 	err := s.db.WithContext(ctx).Where("type = ?", jobType).
-		Order("created_at DESC").
+		// id breaks created_at ties so "last" is deterministic when two jobs
+		// share a timestamp.
+		Order("created_at DESC, id DESC").
 		First(&job).Error
 
 	if err != nil {

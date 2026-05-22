@@ -11,6 +11,14 @@
  */
 
 //////////
+// source: banner.go
+
+/**
+ * BannerHandler handles banner-related HTTP requests.
+ */
+export interface BannerHandler {}
+
+//////////
 // source: bulk_data.go
 
 /**

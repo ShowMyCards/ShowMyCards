@@ -6,6 +6,9 @@ packages:
       gorm.DeletedAt: "string | null"
     output_path: "../frontend/src/lib/types/models.ts"
     flatten_embed_structs: true
+    # Match the repo's Prettier config (useTabs); keeps generated diffs minimal
+    # across tygo versions. `make types` also runs Prettier as a backstop.
+    indent: "\t"
     frontmatter: |
       /**
        * AUTO-GENERATED TypeScript types from Go models
@@ -24,6 +27,9 @@ packages:
       models.Inventory: "import(\"./models\").Inventory"
     output_path: "../frontend/src/lib/types/api.ts"
     flatten_embed_structs: true
+    # Match the repo's Prettier config (useTabs); keeps generated diffs minimal
+    # across tygo versions. `make types` also runs Prettier as a backstop.
+    indent: "\t"
     frontmatter: |
       /**
        * AUTO-GENERATED TypeScript types from Go API

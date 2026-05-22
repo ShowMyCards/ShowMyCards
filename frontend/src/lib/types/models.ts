@@ -11,6 +11,57 @@
  */
 
 //////////
+// source: banner.go
+
+/**
+ * BannerSeverity controls how a Banner is styled in the UI.
+ * tygo:export
+ */
+export type BannerSeverity = string;
+export const BannerSeverityInfo: BannerSeverity = 'info';
+export const BannerSeverityWarning: BannerSeverity = 'warning';
+export const BannerSeverityError: BannerSeverity = 'error';
+/**
+ * Banner is a transient, server-derived message surfaced in the UI.
+ * Banners are computed on demand (see services.BannerService) and never
+ * persisted: a banner exists exactly while its underlying condition is true.
+ * tygo:export
+ */
+export interface Banner {
+	/**
+	 * ID is stable for the lifetime of the underlying condition, so the
+	 * frontend can key list rendering and remember per-banner dismissals.
+	 */
+	id: string;
+	/**
+	 * Severity controls styling.
+	 */
+	severity: BannerSeverity;
+	/**
+	 * Message is the full, display-ready text. The backend authors it so a new
+	 * banner needs no frontend change.
+	 */
+	message: string;
+	/**
+	 * Dismissible reports whether the user may hide the banner. Dismissal state
+	 * is held client-side; the backend stays stateless.
+	 */
+	dismissible: boolean;
+	/**
+	 * Link is an optional call to action.
+	 */
+	link?: BannerLink;
+}
+/**
+ * BannerLink is an optional call-to-action rendered alongside a Banner.
+ * tygo:export
+ */
+export interface BannerLink {
+	label: string;
+	href: string;
+}
+
+//////////
 // source: base.go
 /*
 Package models defines the domain models for ShowMyCards.
