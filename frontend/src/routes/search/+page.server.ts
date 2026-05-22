@@ -1,5 +1,9 @@
 import { BACKEND_URL, type SearchResponse, type StorageLocation } from '$lib';
-import { handleAddInventory, handleDeleteInventory } from '$lib/server/inventory-actions';
+import {
+	handleAddInventory,
+	handleDeleteInventory,
+	handleUpdateInventory
+} from '$lib/server/inventory-actions';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 
@@ -82,6 +86,7 @@ export const actions = {
 
 	addInventory: async ({ request, fetch }) => handleAddInventory(request, fetch),
 	deleteInventory: async ({ request, fetch }) => handleDeleteInventory(request, fetch),
+	updateInventory: async ({ request, fetch }) => handleUpdateInventory(request, fetch),
 
 	// Get autocomplete suggestions via backend proxy
 	autocomplete: async ({ request, fetch }) => {

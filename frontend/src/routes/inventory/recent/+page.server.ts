@@ -1,5 +1,9 @@
 import { BACKEND_URL, type InventoryCardsResponse, type StorageLocation } from '$lib';
-import { handleAddInventory, handleDeleteInventory } from '$lib/server/inventory-actions';
+import {
+	handleAddInventory,
+	handleDeleteInventory,
+	handleUpdateInventory
+} from '$lib/server/inventory-actions';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ fetch }) => {
@@ -44,5 +48,6 @@ export const load: PageServerLoad = async ({ fetch }) => {
 
 export const actions = {
 	addInventory: async ({ request, fetch }) => handleAddInventory(request, fetch),
-	deleteInventory: async ({ request, fetch }) => handleDeleteInventory(request, fetch)
+	deleteInventory: async ({ request, fetch }) => handleDeleteInventory(request, fetch),
+	updateInventory: async ({ request, fetch }) => handleUpdateInventory(request, fetch)
 } satisfies Actions;
