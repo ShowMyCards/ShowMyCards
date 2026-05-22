@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -114,6 +115,27 @@ func TestNewClient_ConnectionPoolSettings(t *testing.T) {
 	stats := sqlDB.Stats()
 	if stats.MaxOpenConnections != 1 {
 		t.Errorf("expected MaxOpenConnections to be 1, got %d", stats.MaxOpenConnections)
+	}
+}
+
+func TestNewClient_WALMode(t *testing.T) {
+	// WAL must be verified against a file-backed database; an in-memory
+	// SQLite database only supports the MEMORY or OFF journal modes.
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	client, err := NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	defer client.Close()
+
+	var journalMode string
+	if err := client.DB.Raw("PRAGMA journal_mode").Scan(&journalMode).Error; err != nil {
+		t.Fatalf("failed to read journal mode: %v", err)
+	}
+	if !strings.EqualFold(journalMode, "wal") {
+		t.Errorf("expected journal_mode 'wal', got '%s'", journalMode)
 	}
 }
 
