@@ -18,9 +18,9 @@
  * tygo:export
  */
 export type BannerSeverity = string;
-export const BannerSeverityInfo: BannerSeverity = "info";
-export const BannerSeverityWarning: BannerSeverity = "warning";
-export const BannerSeverityError: BannerSeverity = "error";
+export const BannerSeverityInfo: BannerSeverity = 'info';
+export const BannerSeverityWarning: BannerSeverity = 'warning';
+export const BannerSeverityError: BannerSeverity = 'error';
 /**
  * Banner is a transient, server-derived message surfaced in the UI.
  * Banners are computed on demand (see services.BannerService) and never
@@ -28,37 +28,37 @@ export const BannerSeverityError: BannerSeverity = "error";
  * tygo:export
  */
 export interface Banner {
-  /**
-   * ID is stable for the lifetime of the underlying condition, so the
-   * frontend can key list rendering and remember per-banner dismissals.
-   */
-  id: string;
-  /**
-   * Severity controls styling.
-   */
-  severity: BannerSeverity;
-  /**
-   * Message is the full, display-ready text. The backend authors it so a new
-   * banner needs no frontend change.
-   */
-  message: string;
-  /**
-   * Dismissible reports whether the user may hide the banner. Dismissal state
-   * is held client-side; the backend stays stateless.
-   */
-  dismissible: boolean;
-  /**
-   * Link is an optional call to action.
-   */
-  link?: BannerLink;
+	/**
+	 * ID is stable for the lifetime of the underlying condition, so the
+	 * frontend can key list rendering and remember per-banner dismissals.
+	 */
+	id: string;
+	/**
+	 * Severity controls styling.
+	 */
+	severity: BannerSeverity;
+	/**
+	 * Message is the full, display-ready text. The backend authors it so a new
+	 * banner needs no frontend change.
+	 */
+	message: string;
+	/**
+	 * Dismissible reports whether the user may hide the banner. Dismissal state
+	 * is held client-side; the backend stays stateless.
+	 */
+	dismissible: boolean;
+	/**
+	 * Link is an optional call to action.
+	 */
+	link?: BannerLink;
 }
 /**
  * BannerLink is an optional call-to-action rendered alongside a Banner.
  * tygo:export
  */
 export interface BannerLink {
-  label: string;
-  href: string;
+	label: string;
+	href: string;
 }
 
 //////////
@@ -73,9 +73,9 @@ These models represent the database schema and are the single source of truth fo
  * tygo:export
  */
 export interface BaseModel {
-  id: number /* uint */;
-  created_at: string;
-  updated_at: string;
+	id: number /* uint */;
+	created_at: string;
+	updated_at: string;
 }
 
 //////////
@@ -87,15 +87,15 @@ export interface BaseModel {
  * tygo:export
  */
 export interface Card {
-  scryfall_id: string;
-  oracle_id: string; // Can be empty for tokens/emblems
-  /**
-   * Generated columns (created via migration, not by GORM)
-   * These are read-only and populated by SQLite from RawJSON
-   * Use "-" tag to exclude from AutoMigrate entirely
-   */
-  name: string;
-  set_code: string;
+	scryfall_id: string;
+	oracle_id: string; // Can be empty for tokens/emblems
+	/**
+	 * Generated columns (created via migration, not by GORM)
+	 * These are read-only and populated by SQLite from RawJSON
+	 * Use "-" tag to exclude from AutoMigrate entirely
+	 */
+	name: string;
+	set_code: string;
 }
 
 //////////
@@ -106,16 +106,16 @@ export interface Card {
  * tygo:export
  */
 export interface Inventory {
-  BaseModel: BaseModel;
-  scryfall_id: string;
-  oracle_id: string;
-  treatment: string;
-  quantity: number /* int */;
-  storage_location_id?: number /* uint */;
-  /**
-   * Relationship
-   */
-  storage_location?: StorageLocation;
+	BaseModel: BaseModel;
+	scryfall_id: string;
+	oracle_id: string;
+	treatment: string;
+	quantity: number /* int */;
+	storage_location_id?: number /* uint */;
+	/**
+	 * Relationship
+	 */
+	storage_location?: StorageLocation;
 }
 
 //////////
@@ -126,30 +126,30 @@ export interface Inventory {
  * tygo:export
  */
 export type JobType = string;
-export const JobTypeBulkDataImport: JobType = "bulk_data_import";
-export const JobTypeSetDataImport: JobType = "set_data_import";
+export const JobTypeBulkDataImport: JobType = 'bulk_data_import';
+export const JobTypeSetDataImport: JobType = 'set_data_import';
 /**
  * JobStatus represents the status of a job
  * tygo:export
  */
 export type JobStatus = string;
-export const JobStatusPending: JobStatus = "pending";
-export const JobStatusInProgress: JobStatus = "in_progress";
-export const JobStatusCompleted: JobStatus = "completed";
-export const JobStatusFailed: JobStatus = "failed";
-export const JobStatusCancelled: JobStatus = "cancelled";
+export const JobStatusPending: JobStatus = 'pending';
+export const JobStatusInProgress: JobStatus = 'in_progress';
+export const JobStatusCompleted: JobStatus = 'completed';
+export const JobStatusFailed: JobStatus = 'failed';
+export const JobStatusCancelled: JobStatus = 'cancelled';
 /**
  * Job represents a long-running background job
  * tygo:export
  */
 export interface Job {
-  BaseModel: BaseModel;
-  type: JobType;
-  status: JobStatus;
-  started_at?: string;
-  completed_at?: string;
-  error?: string;
-  metadata?: string; // JSON stored as string
+	BaseModel: BaseModel;
+	type: JobType;
+	status: JobStatus;
+	started_at?: string;
+	completed_at?: string;
+	error?: string;
+	metadata?: string; // JSON stored as string
 }
 
 //////////
@@ -160,13 +160,13 @@ export interface Job {
  * tygo:export
  */
 export interface List {
-  BaseModel: BaseModel;
-  name: string;
-  description?: string;
-  /**
-   * Relationship - items in this list
-   */
-  items?: ListItem[];
+	BaseModel: BaseModel;
+	name: string;
+	description?: string;
+	/**
+	 * Relationship - items in this list
+	 */
+	items?: ListItem[];
 }
 
 //////////
@@ -177,17 +177,17 @@ export interface List {
  * tygo:export
  */
 export interface ListItem {
-  BaseModel: BaseModel;
-  list_id: number /* uint */;
-  scryfall_id: string;
-  oracle_id: string;
-  treatment: string;
-  desired_quantity: number /* int */;
-  collected_quantity: number /* int */;
-  /**
-   * Relationship
-   */
-  list?: List;
+	BaseModel: BaseModel;
+	list_id: number /* uint */;
+	scryfall_id: string;
+	oracle_id: string;
+	treatment: string;
+	desired_quantity: number /* int */;
+	collected_quantity: number /* int */;
+	/**
+	 * Relationship
+	 */
+	list?: List;
 }
 
 //////////
@@ -197,15 +197,15 @@ export interface ListItem {
  * tygo:export
  */
 export interface Set {
-  scryfall_id: string;
-  code: string;
-  name: string;
-  set_type: string;
-  released_at?: string;
-  card_count: number /* int */;
-  digital: boolean;
-  icon_filename: string;
-  parent_set_code: string;
+	scryfall_id: string;
+	code: string;
+	name: string;
+	set_type: string;
+	released_at?: string;
+	card_count: number /* int */;
+	digital: boolean;
+	icon_filename: string;
+	parent_set_code: string;
 }
 
 //////////
@@ -215,9 +215,9 @@ export interface Set {
  * tygo:export
  */
 export interface Setting {
-  BaseModel: BaseModel;
-  key: string;
-  value: string;
+	BaseModel: BaseModel;
+	key: string;
+	value: string;
 }
 
 //////////
@@ -228,16 +228,16 @@ export interface Setting {
  * tygo:export
  */
 export interface SortingRule {
-  BaseModel: BaseModel;
-  name: string;
-  priority: number /* int */;
-  expression: string;
-  storage_location_id: number /* uint */;
-  enabled: boolean;
-  /**
-   * Relationship
-   */
-  storage_location?: StorageLocation;
+	BaseModel: BaseModel;
+	name: string;
+	priority: number /* int */;
+	expression: string;
+	storage_location_id: number /* uint */;
+	enabled: boolean;
+	/**
+	 * Relationship
+	 */
+	storage_location?: StorageLocation;
 }
 
 //////////
@@ -248,13 +248,13 @@ export interface SortingRule {
  * tygo:export
  */
 export type StorageType = string;
-export const Box: StorageType = "Box";
-export const Binder: StorageType = "Binder";
+export const Box: StorageType = 'Box';
+export const Binder: StorageType = 'Binder';
 /**
  * tygo:export
  */
 export interface StorageLocation {
-  BaseModel: BaseModel;
-  name: string;
-  storage_type: StorageType;
+	BaseModel: BaseModel;
+	name: string;
+	storage_type: StorageType;
 }

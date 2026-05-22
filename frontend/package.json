@@ -15,7 +15,7 @@
 		"test:e2e": "playwright test",
 		"test": "npm run test:e2e && npm run test:unit -- --run",
 		"test:unit": "vitest",
-		"types:generate": "cd ../backend && go run github.com/gzuidhof/tygo@latest generate && echo 'TypeScript types generated from Go models'"
+		"types:generate": "cd ../backend && go run github.com/gzuidhof/tygo@latest generate && cd ../frontend && prettier --write src/lib/types/models.ts src/lib/types/api.ts && echo 'TypeScript types generated from Go models'"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

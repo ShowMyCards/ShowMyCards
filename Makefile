@@ -12,8 +12,11 @@ install:
 	cd website && bun install
 
 # Generate TypeScript types from Go models
+# Prettier normalises tygo's output to the repo's formatting, so generated
+# diffs stay minimal even when tygo@latest changes its output style.
 types:
 	cd backend && go run github.com/gzuidhof/tygo@latest generate
+	cd frontend && bunx prettier --write src/lib/types/models.ts src/lib/types/api.ts
 
 # Build targets
 build: build-backend build-frontend
