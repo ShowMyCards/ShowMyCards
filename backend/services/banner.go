@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"context"
 	"fmt"
+	"slices"
 )
 
 // jobsHref is the in-app path every job-derived banner links to.
@@ -69,7 +70,28 @@ func (s *BannerService) GetActive(ctx context.Context) ([]models.Banner, error) 
 		}
 	}
 
+	// Order by ascending severity (info, warning, error) so the layout renders
+	// banners predictably regardless of the order conditions were discovered
+	// above. The sort is stable, so each severity keeps its discovery order:
+	// in-progress banners by job recency, failed banners by the fixed type list.
+	slices.SortStableFunc(banners, func(a, b models.Banner) int {
+		return severityRank(a.Severity) - severityRank(b.Severity)
+	})
+
 	return banners, nil
+}
+
+// severityRank orders banner severities from least to most severe so a mixed
+// slice of banners can be sorted into a predictable display order.
+func severityRank(s models.BannerSeverity) int {
+	switch s {
+	case models.BannerSeverityWarning:
+		return 1
+	case models.BannerSeverityError:
+		return 2
+	default: // BannerSeverityInfo, and any unrecognised value
+		return 0
+	}
 }
 
 // inProgressBanner builds the banner for an in-progress sync of the given type.

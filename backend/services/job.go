@@ -79,7 +79,9 @@ func (s *JobService) ListActive(ctx context.Context) ([]models.Job, error) {
 	var jobs []models.Job
 	if err := s.db.WithContext(ctx).
 		Where("status IN ?", []models.JobStatus{models.JobStatusPending, models.JobStatusInProgress}).
-		Order("created_at DESC").
+		// id breaks created_at ties so ordering is deterministic when two jobs
+		// share a timestamp.
+		Order("created_at DESC, id DESC").
 		Find(&jobs).Error; err != nil {
 		return nil, fmt.Errorf("listing active jobs: %w", err)
 	}
@@ -176,7 +178,9 @@ func (s *JobService) GetLastJobByType(ctx context.Context, jobType models.JobTyp
 	var job models.Job
 
 	err := s.db.WithContext(ctx).Where("type = ?", jobType).
-		Order("created_at DESC").
+		// id breaks created_at ties so "last" is deterministic when two jobs
+		// share a timestamp.
+		Order("created_at DESC, id DESC").
 		First(&job).Error
 
 	if err != nil {

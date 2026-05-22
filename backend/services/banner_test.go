@@ -121,7 +121,6 @@ func TestBannerService_GetActive_FailedLastJob(t *testing.T) {
 func TestBannerService_GetActive_FailedThenSucceeded(t *testing.T) {
 	service, db := setupBannerServiceTest(t)
 	createBannerTestJob(t, db, models.JobTypeBulkDataImport, models.JobStatusFailed)
-	time.Sleep(10 * time.Millisecond)
 	createBannerTestJob(t, db, models.JobTypeBulkDataImport, models.JobStatusCompleted)
 
 	banners, err := service.GetActive(context.Background())
@@ -131,6 +130,34 @@ func TestBannerService_GetActive_FailedThenSucceeded(t *testing.T) {
 
 	if len(banners) != 0 {
 		t.Errorf("expected 0 banners once a later run succeeded, got %d", len(banners))
+	}
+}
+
+func TestBannerService_GetActive_FailedClearedWhenNewerJobSharesTimestamp(t *testing.T) {
+	service, db := setupBannerServiceTest(t)
+
+	// Two jobs with an identical created_at: only the id tie-breaker decides
+	// which one is "last". The newer (higher-id) success must win, clearing
+	// the failed banner.
+	ts := time.Now()
+	failed := &models.Job{Type: models.JobTypeBulkDataImport, Status: models.JobStatusFailed, Metadata: "{}"}
+	failed.CreatedAt = ts
+	if err := db.Create(failed).Error; err != nil {
+		t.Fatalf("failed to create failed job: %v", err)
+	}
+	succeeded := &models.Job{Type: models.JobTypeBulkDataImport, Status: models.JobStatusCompleted, Metadata: "{}"}
+	succeeded.CreatedAt = ts
+	if err := db.Create(succeeded).Error; err != nil {
+		t.Fatalf("failed to create succeeded job: %v", err)
+	}
+
+	banners, err := service.GetActive(context.Background())
+	if err != nil {
+		t.Fatalf("GetActive failed: %v", err)
+	}
+
+	if len(banners) != 0 {
+		t.Errorf("expected 0 banners when the newer same-timestamp job succeeded, got %d", len(banners))
 	}
 }
 
