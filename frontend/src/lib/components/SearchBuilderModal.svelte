@@ -3,6 +3,7 @@
 	import SetCombobox from './SetCombobox.svelte';
 	import { buildSearchQuery } from '$lib/utils/search-builder';
 	import type { Set as CardSet } from '$lib/types/models';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	interface Props {
 		open: boolean;
@@ -47,7 +48,7 @@
 	];
 
 	function toggleColor(value: string) {
-		const next = new Set(colors);
+		const next = new SvelteSet(colors);
 		if (next.has(value)) {
 			next.delete(value);
 		} else if (value === 'c') {
