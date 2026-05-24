@@ -50,7 +50,11 @@
 		const next = new Set(colors);
 		if (next.has(value)) {
 			next.delete(value);
+		} else if (value === 'c') {
+			next.clear();
+			next.add('c');
 		} else {
+			next.delete('c');
 			next.add(value);
 		}
 		colors = next;
