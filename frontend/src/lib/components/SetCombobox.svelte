@@ -101,7 +101,11 @@
 		<input
 			{id}
 			type="text"
-			placeholder={setsLoadFailed ? 'Set search unavailable' : setsLoading ? 'Loading sets...' : 'Search by name or code...'}
+			placeholder={setsLoadFailed
+				? 'Set search unavailable'
+				: setsLoading
+					? 'Loading sets...'
+					: 'Search by name or code...'}
 			bind:value={inputText}
 			onfocus={handleFocus}
 			class="select select-bordered w-full" />
