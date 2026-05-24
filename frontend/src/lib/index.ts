@@ -71,6 +71,7 @@ export { default as InventoryBrowser } from './components/InventoryBrowser.svelt
 export { default as ResortModal } from './components/ResortModal.svelte';
 export { default as PrintingConflictModal } from './components/PrintingConflictModal.svelte';
 export { default as SearchBuilderModal } from './components/SearchBuilderModal.svelte';
+export { default as SetCombobox } from './components/SetCombobox.svelte';
 export { default as CardImage } from './components/CardImage.svelte';
 export { default as CardPreview } from './components/CardPreview.svelte';
 export { default as TreatmentBadge } from './components/TreatmentBadge.svelte';
