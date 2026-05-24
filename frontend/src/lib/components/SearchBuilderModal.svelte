@@ -9,6 +9,11 @@
 		onSearch: (query: string) => void;
 	}
 
+	type CardSetResponse = {
+		data: Pick<CardSet, 'code' | 'name'>[];
+		total_pages: number;
+	};
+
 	let { open, onClose, onSearch }: Props = $props();
 
 	let cardName = $state('');
@@ -60,15 +65,15 @@
 		try {
 			const first = await fetch('/api/sets?page_size=100&page=1');
 			if (!first.ok) return;
-			const data = await first.json();
-			const accumulated: Pick<CardSet, 'code' | 'name'>[] = data.data ?? [];
-			const totalPages: number = data.total_pages ?? 1;
+			const response = (await first.json()) as CardSetResponse;
+			const accumulated: Pick<CardSet, 'code' | 'name'>[] = response.data ?? [];
+			const totalPages: number = response.total_pages ?? 1;
 
 			if (totalPages > 1) {
 				const pages = Array.from({ length: totalPages - 1 }, (_, i) =>
 					fetch(`/api/sets?page_size=100&page=${i + 2}`)
 						.then((r) => r.json())
-						.then((d) => (d.data ?? []) as Pick<CardSet, 'code' | 'name'>[])
+						.then((d) => (d as CardSetResponse).data ?? [])
 				);
 				const rest = await Promise.all(pages);
 				for (const page of rest) accumulated.push(...page);
