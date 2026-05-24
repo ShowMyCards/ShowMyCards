@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Modal from './Modal.svelte';
 	import { buildSearchQuery } from '$lib/utils/search-builder';
-	import type { Set } from '$lib/types/models';
+	import type { Set as CardSet } from '$lib/types/models';
 
 	interface Props {
 		open: boolean;
@@ -16,10 +16,10 @@
 	let colors = $state(new Set<string>());
 	let colorMode = $state<'all' | 'any' | 'exactly'>('all');
 
-	let sets = $state<Pick<Set, 'code' | 'name'>[]>([]);
+	let sets = $state<Pick<CardSet, 'code' | 'name'>[]>([]);
 	let setsLoaded = $state(false);
 	let setFilter = $state('');
-	let selectedSet = $state<Pick<Set, 'code' | 'name'> | null>(null);
+	let selectedSet = $state<Pick<CardSet, 'code' | 'name'> | null>(null);
 	let setDropdownOpen = $state(false);
 
 	const NUMERIC_FIELDS = [
@@ -52,6 +52,7 @@
 	$effect(() => {
 		if (open && !setsLoaded) {
 			loadSets();
+			loadSets();
 		}
 	});
 
@@ -60,14 +61,14 @@
 			const first = await fetch('/api/sets?page_size=100&page=1');
 			if (!first.ok) return;
 			const data = await first.json();
-			const accumulated: Pick<Set, 'code' | 'name'>[] = data.data ?? [];
+			const accumulated: Pick<CardSet, 'code' | 'name'>[] = data.data ?? [];
 			const totalPages: number = data.total_pages ?? 1;
 
 			if (totalPages > 1) {
 				const pages = Array.from({ length: totalPages - 1 }, (_, i) =>
 					fetch(`/api/sets?page_size=100&page=${i + 2}`)
 						.then((r) => r.json())
-						.then((d) => (d.data ?? []) as Pick<Set, 'code' | 'name'>[])
+						.then((d) => (d.data ?? []) as Pick<CardSet, 'code' | 'name'>[])
 				);
 				const rest = await Promise.all(pages);
 				for (const page of rest) accumulated.push(...page);
@@ -90,7 +91,7 @@
 			: sets
 	);
 
-	function selectSet(s: Pick<Set, 'code' | 'name'>) {
+	function selectSet(s: Pick<CardSet, 'code' | 'name'>) {
 		selectedSet = s;
 		setFilter = '';
 		setDropdownOpen = false;
