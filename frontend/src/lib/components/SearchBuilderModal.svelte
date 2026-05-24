@@ -204,7 +204,7 @@
 									<button
 										type="button"
 										class="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-base-200 text-sm"
-										onmousedown={() => selectSet(s)}>
+										onclick={() => selectSet(s)}>
 										<img
 											src="/api/sets/code/{s.code}/icon"
 											class="set-icon-img w-4 h-4 shrink-0"
