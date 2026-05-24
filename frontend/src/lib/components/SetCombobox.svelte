@@ -19,6 +19,7 @@
 	let setsLoading = $state(false);
 	let setsLoadFailed = $state(false);
 	let setDropdownOpen = $state(false);
+	let wrapperEl: HTMLDivElement | undefined = $state();
 
 	async function loadSets() {
 		setsLoading = true;
@@ -74,12 +75,10 @@
 		setDropdownOpen = true;
 	}
 
-	function handleBlur() {
-		// Delay so that click on a list item registers before the list disappears
-		setTimeout(() => {
-			setDropdownOpen = false;
-			if (!selected) inputText = '';
-		}, 150);
+	function handleFocusOut(e: FocusEvent) {
+		if (e.relatedTarget && wrapperEl?.contains(e.relatedTarget as Node)) return;
+		setDropdownOpen = false;
+		if (!selected) inputText = '';
 	}
 </script>
 
@@ -98,14 +97,13 @@
 			onclick={clearSet}>✕</button>
 	</div>
 {:else}
-	<div class="relative">
+	<div class="relative" bind:this={wrapperEl} onfocusout={handleFocusOut}>
 		<input
 			{id}
 			type="text"
 			placeholder={setsLoadFailed ? 'Set search unavailable' : setsLoading ? 'Loading sets...' : 'Search by name or code...'}
 			bind:value={inputText}
 			onfocus={handleFocus}
-			onblur={handleBlur}
 			class="select select-bordered w-full" />
 		{#if setDropdownOpen && filteredSets.length > 0}
 			<ul
