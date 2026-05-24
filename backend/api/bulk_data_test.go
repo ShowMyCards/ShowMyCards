@@ -44,7 +44,7 @@ func setupBulkDataTestApp(t *testing.T) (*fiber.App, *services.BulkDataService, 
 	appCtx := context.Background()
 
 	app := fiber.New()
-	app.Post("/bulk-data/import", func(c fiber.Ctx) error {
+	app.Post("/api/bulk-data/import", func(c fiber.Ctx) error {
 		return handler.TriggerImport(c, appCtx)
 	})
 
@@ -56,7 +56,7 @@ func setupBulkDataTestApp(t *testing.T) (*fiber.App, *services.BulkDataService, 
 func TestBulkDataTriggerImport_Success(t *testing.T) {
 	app, _, jobService, _ := setupBulkDataTestApp(t)
 
-	req := httptest.NewRequest("POST", "/bulk-data/import", nil)
+	req := httptest.NewRequest("POST", "/api/bulk-data/import", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)

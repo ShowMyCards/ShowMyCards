@@ -12,14 +12,14 @@ export const load: PageServerLoad = async ({ fetch, depends, setHeaders }) => {
 
 	try {
 		// Fetch storage locations with card counts
-		const locationsResponse = await fetch(`${BACKEND_URL}/storage/with-counts`);
+		const locationsResponse = await fetch(`${BACKEND_URL}/api/storage/with-counts`);
 		if (!locationsResponse.ok) {
 			throw new Error('Failed to fetch storage locations');
 		}
 		const locations: StorageLocationWithCount[] = await locationsResponse.json();
 
 		// Fetch unassigned count
-		const unassignedResponse = await fetch(`${BACKEND_URL}/inventory/unassigned/count`);
+		const unassignedResponse = await fetch(`${BACKEND_URL}/api/inventory/unassigned/count`);
 		if (!unassignedResponse.ok) {
 			throw new Error('Failed to fetch unassigned count');
 		}

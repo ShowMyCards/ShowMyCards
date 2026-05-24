@@ -26,7 +26,7 @@ func setupDashboardTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 
 	app := fiber.New()
 	handler := NewDashboardHandler(db)
-	app.Get("/dashboard", handler.GetStats)
+	app.Get("/api/dashboard", handler.GetStats)
 
 	return app, db
 }
@@ -36,7 +36,7 @@ func setupDashboardTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 func TestDashboard_EmptyDatabase(t *testing.T) {
 	app, _ := setupDashboardTestApp(t)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -133,7 +133,7 @@ func TestDashboard_WithInventoryOnly(t *testing.T) {
 	}
 	db.Create(inv2)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -219,7 +219,7 @@ func TestDashboard_WithWishlistsOnly(t *testing.T) {
 	}
 	db.Create(item)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -322,7 +322,7 @@ func TestDashboard_WithBothInventoryAndWishlists(t *testing.T) {
 	}
 	db.Create(item)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -450,7 +450,7 @@ func TestDashboard_WithNilPrices(t *testing.T) {
 	}
 	db.Create(inv3)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -551,7 +551,7 @@ func TestDashboard_MixedData(t *testing.T) {
 	}
 	db.Create(item)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -616,7 +616,7 @@ func TestDashboard_MultipleStorageLocations(t *testing.T) {
 	db.Create(storage2)
 	db.Create(storage3)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -646,7 +646,7 @@ func TestDashboard_MultipleLists(t *testing.T) {
 	db.Create(list2)
 	db.Create(list3)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -704,7 +704,7 @@ func TestDashboard_UnassignedCardsCount(t *testing.T) {
 	}
 	db.Create(inv3)
 
-	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req := httptest.NewRequest("GET", "/api/dashboard", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)

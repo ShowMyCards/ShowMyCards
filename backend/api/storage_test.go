@@ -31,11 +31,11 @@ func setupTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app := fiber.New()
 	handler := NewStorageHandler(db)
 
-	app.Get("/storage", handler.List)
-	app.Get("/storage/:id", handler.Get)
-	app.Post("/storage", handler.Create)
-	app.Put("/storage/:id", handler.Update)
-	app.Delete("/storage/:id", handler.Delete)
+	app.Get("/api/storage", handler.List)
+	app.Get("/api/storage/:id", handler.Get)
+	app.Post("/api/storage", handler.Create)
+	app.Put("/api/storage/:id", handler.Update)
+	app.Delete("/api/storage/:id", handler.Delete)
 
 	return app, db
 }
@@ -57,7 +57,7 @@ func createTestLocation(t *testing.T, db *gorm.DB, storageType models.StorageTyp
 func TestList_Empty(t *testing.T) {
 	app, _ := setupTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/storage", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/storage", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -87,7 +87,7 @@ func TestList_WithItems(t *testing.T) {
 	createTestLocation(t, db, models.Box)
 	createTestLocation(t, db, models.Binder)
 
-	req := httptest.NewRequest(http.MethodGet, "/storage", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/storage", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -116,7 +116,7 @@ func TestList_Pagination(t *testing.T) {
 		createTestLocation(t, db, models.Box)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/storage?page=2&page_size=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/storage?page=2&page_size=2", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -145,7 +145,7 @@ func TestList_Pagination(t *testing.T) {
 func TestList_PageSizeLimit(t *testing.T) {
 	app, _ := setupTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/storage?page_size=200", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/storage?page_size=200", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -169,7 +169,7 @@ func TestGet_Success(t *testing.T) {
 
 	location := createTestLocation(t, db, models.Box)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/storage/%d", location.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/storage/%d", location.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -196,7 +196,7 @@ func TestGet_Success(t *testing.T) {
 func TestGet_NotFound(t *testing.T) {
 	app, _ := setupTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/storage/999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/storage/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -211,7 +211,7 @@ func TestGet_NotFound(t *testing.T) {
 func TestGet_InvalidID(t *testing.T) {
 	app, _ := setupTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/storage/invalid", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/storage/invalid", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -229,7 +229,7 @@ func TestCreate_Success(t *testing.T) {
 	app, _ := setupTestApp(t)
 
 	body := `{"name": "Main Storage Box", "storage_type": "Box"}`
-	req := httptest.NewRequest(http.MethodPost, "/storage", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/storage", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -262,7 +262,7 @@ func TestCreate_Binder(t *testing.T) {
 	app, _ := setupTestApp(t)
 
 	body := `{"name": "Foil Binder", "storage_type": "Binder"}`
-	req := httptest.NewRequest(http.MethodPost, "/storage", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/storage", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -289,7 +289,7 @@ func TestCreate_InvalidType(t *testing.T) {
 	app, _ := setupTestApp(t)
 
 	body := `{"name": "Invalid Storage", "storage_type": "Drawer"}`
-	req := httptest.NewRequest(http.MethodPost, "/storage", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/storage", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -307,7 +307,7 @@ func TestCreate_InvalidJSON(t *testing.T) {
 	app, _ := setupTestApp(t)
 
 	body := `{invalid json}`
-	req := httptest.NewRequest(http.MethodPost, "/storage", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/storage", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -329,7 +329,7 @@ func TestUpdate_Success(t *testing.T) {
 	location := createTestLocation(t, db, models.Box)
 
 	body := `{"storage_type": "Binder"}`
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/storage/%d", location.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/storage/%d", location.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -356,7 +356,7 @@ func TestUpdate_NotFound(t *testing.T) {
 	app, _ := setupTestApp(t)
 
 	body := `{"storage_type": "Binder"}`
-	req := httptest.NewRequest(http.MethodPut, "/storage/999", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/storage/999", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -376,7 +376,7 @@ func TestUpdate_InvalidType(t *testing.T) {
 	location := createTestLocation(t, db, models.Box)
 
 	body := `{"storage_type": "Drawer"}`
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/storage/%d", location.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/storage/%d", location.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -397,7 +397,7 @@ func TestDelete_Success(t *testing.T) {
 
 	location := createTestLocation(t, db, models.Box)
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/storage/%d", location.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/storage/%d", location.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -419,7 +419,7 @@ func TestDelete_Success(t *testing.T) {
 func TestDelete_NotFound(t *testing.T) {
 	app, _ := setupTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/storage/999", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/storage/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -434,7 +434,7 @@ func TestDelete_NotFound(t *testing.T) {
 func TestDelete_InvalidID(t *testing.T) {
 	app, _ := setupTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/storage/invalid", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/storage/invalid", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -465,7 +465,7 @@ func TestDelete_WithInventoryReferences(t *testing.T) {
 	}
 
 	// Attempt to delete the storage location
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/storage/%d", location.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/storage/%d", location.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -504,7 +504,7 @@ func TestDelete_WithSortingRuleReferences(t *testing.T) {
 	}
 
 	// Attempt to delete the storage location
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/storage/%d", location.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/storage/%d", location.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -555,7 +555,7 @@ func TestDelete_WithBothReferences(t *testing.T) {
 	}
 
 	// Attempt to delete the storage location
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/storage/%d", location.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/storage/%d", location.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

@@ -11,7 +11,7 @@ import (
 func ListRoutes(app *fiber.App, db *gorm.DB) {
 	handler := api.NewListHandler(db)
 
-	lists := app.Group("/lists")
+	lists := app.Group("/api/lists")
 	lists.Get("/", handler.List)
 	lists.Get("/:id", handler.Get)
 	lists.Post("/", handler.Create)

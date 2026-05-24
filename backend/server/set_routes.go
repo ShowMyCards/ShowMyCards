@@ -13,7 +13,7 @@ import (
 func SetRoutes(app *fiber.App, db *gorm.DB, setDataService *services.SetDataService, dataDir string, appCtx context.Context) {
 	handler := api.NewSetHandler(db, setDataService, dataDir)
 
-	sets := app.Group("/sets")
+	sets := app.Group("/api/sets")
 	sets.Get("/", handler.List)
 	sets.Get("/id/:id", handler.GetByID)
 	sets.Get("/code/:code", handler.GetByCode)

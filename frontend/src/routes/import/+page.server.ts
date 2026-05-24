@@ -5,7 +5,7 @@ import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ fetch }) => {
 	try {
-		const response = await fetch(`${BACKEND_URL}/storage`);
+		const response = await fetch(`${BACKEND_URL}/api/storage`);
 		if (response.ok) {
 			const data = await response.json();
 			return {
@@ -31,7 +31,7 @@ export const actions = {
 		}
 
 		try {
-			const url = new URL(`${BACKEND_URL}/search`);
+			const url = new URL(`${BACKEND_URL}/api/search`);
 			url.searchParams.set('q', query);
 
 			const response = await fetch(url.toString());

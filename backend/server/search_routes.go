@@ -13,7 +13,7 @@ import (
 func SearchRoutes(app *fiber.App, client *scryfall.Client, db *gorm.DB, settingsService *services.SettingsService) {
 	handler := api.NewSearchHandler(client, db, settingsService)
 
-	app.Get("/search", handler.Search)
-	app.Get("/search/autocomplete", handler.Autocomplete)
-	app.Get("/cards/:id", handler.GetCard)
+	app.Get("/api/search", handler.Search)
+	app.Get("/api/search/autocomplete", handler.Autocomplete)
+	app.Get("/api/cards/:id", handler.GetCard)
 }
