@@ -9,10 +9,6 @@ vi.mock('$lib/api/resources/banners', () => ({
 	bannersApi: { list: listMock }
 }));
 
-// SvelteKit's dynamic public env isn't wired up in the component test
-// environment; stub it so the module graph imports cleanly.
-vi.mock('$env/dynamic/public', () => ({ env: {} }));
-
 import Banners from './Banners.svelte';
 
 function makeBanner(overrides: Partial<Banner> = {}): Banner {
