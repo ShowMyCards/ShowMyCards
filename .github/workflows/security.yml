@@ -26,8 +26,17 @@ jobs:
         with:
           go-version-file: backend/go.mod
 
+      # Defence-in-depth: re-check downloaded modules against go.sum hashes.
+      # The Go module proxy + sumdb already verify on download; this catches
+      # local cache tampering and any future drift.
+      - name: Verify module integrity
+        run: go mod verify
+        working-directory: backend
+
+      # Pinned version (renovate: datasource=go depName=golang.org/x/vuln).
+      # Using @latest would silently pull a hijacked release between scans.
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
 
       - name: Run govulncheck
         run: govulncheck ./...
@@ -78,8 +87,10 @@ jobs:
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: backend/go.mod
+      # Pinned version (renovate: datasource=go depName=github.com/rhysd/actionlint).
+      # Using @latest would silently pull a hijacked release between runs.
       - name: Install actionlint
-        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - name: Run actionlint
         run: actionlint -color
 
