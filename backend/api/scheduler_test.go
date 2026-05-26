@@ -32,7 +32,7 @@ func setupSchedulerTestApp(t *testing.T) (*fiber.App, *services.SettingsService,
 	handler := NewSchedulerHandler(settingsService, jobService)
 
 	app := fiber.New()
-	app.Get("/scheduler/tasks", handler.GetScheduledTasks)
+	app.Get("/api/scheduler/tasks", handler.GetScheduledTasks)
 
 	return app, settingsService, jobService, db
 }
@@ -42,7 +42,7 @@ func setupSchedulerTestApp(t *testing.T) (*fiber.App, *services.SettingsService,
 func TestScheduler_GetScheduledTasks_Success(t *testing.T) {
 	app, _, _, _ := setupSchedulerTestApp(t)
 
-	req := httptest.NewRequest("GET", "/scheduler/tasks", nil)
+	req := httptest.NewRequest("GET", "/api/scheduler/tasks", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -105,7 +105,7 @@ func TestScheduler_GetScheduledTasks_WithBulkDataDisabled(t *testing.T) {
 	// Disable bulk data auto-update
 	settingsService.Set(context.Background(),"bulk_data_auto_update", "false")
 
-	req := httptest.NewRequest("GET", "/scheduler/tasks", nil)
+	req := httptest.NewRequest("GET", "/api/scheduler/tasks", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -127,7 +127,7 @@ func TestScheduler_GetScheduledTasks_WithCustomSchedule(t *testing.T) {
 	// Set custom update time
 	settingsService.Set(context.Background(),"bulk_data_update_time", "05:30")
 
-	req := httptest.NewRequest("GET", "/scheduler/tasks", nil)
+	req := httptest.NewRequest("GET", "/api/scheduler/tasks", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -152,7 +152,7 @@ func TestScheduler_GetScheduledTasks_WithLastJob(t *testing.T) {
 	jobService.Start(ctx, job.ID)
 	jobService.Complete(ctx, job.ID)
 
-	req := httptest.NewRequest("GET", "/scheduler/tasks", nil)
+	req := httptest.NewRequest("GET", "/api/scheduler/tasks", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -187,7 +187,7 @@ func TestScheduler_GetScheduledTasks_WithLastJob(t *testing.T) {
 func TestScheduler_GetScheduledTasks_NextRunCalculation(t *testing.T) {
 	app, _, _, _ := setupSchedulerTestApp(t)
 
-	req := httptest.NewRequest("GET", "/scheduler/tasks", nil)
+	req := httptest.NewRequest("GET", "/api/scheduler/tasks", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)

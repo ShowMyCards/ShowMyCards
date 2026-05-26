@@ -29,9 +29,9 @@ func TestHealth_Success(t *testing.T) {
 	handler := NewHealthHandler(db, "test")
 
 	app := fiber.New()
-	app.Get("/health", handler.Check)
+	app.Get("/api/health", handler.Check)
 
-	req := httptest.NewRequest("GET", "/health", nil)
+	req := httptest.NewRequest("GET", "/api/health", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)

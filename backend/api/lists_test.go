@@ -33,11 +33,11 @@ func setupListTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app := fiber.New()
 	handler := NewListHandler(db)
 
-	app.Get("/lists", handler.List)
-	app.Get("/lists/:id", handler.Get)
-	app.Post("/lists", handler.Create)
-	app.Put("/lists/:id", handler.Update)
-	app.Delete("/lists/:id", handler.Delete)
+	app.Get("/api/lists", handler.List)
+	app.Get("/api/lists/:id", handler.Get)
+	app.Post("/api/lists", handler.Create)
+	app.Put("/api/lists/:id", handler.Update)
+	app.Delete("/api/lists/:id", handler.Delete)
 
 	return app, db
 }
@@ -60,7 +60,7 @@ func createTestList(t *testing.T, db *gorm.DB, name string) models.List {
 func TestListList_Empty(t *testing.T) {
 	app, _ := setupListTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/lists", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/lists", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -87,7 +87,7 @@ func TestListList_WithLists(t *testing.T) {
 	createTestList(t, db, "List 1")
 	createTestList(t, db, "List 2")
 
-	req := httptest.NewRequest(http.MethodGet, "/lists", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/lists", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -115,7 +115,7 @@ func TestListGet_Success(t *testing.T) {
 
 	list := createTestList(t, db, "Test List")
 
-	req := httptest.NewRequest(http.MethodGet, "/lists/1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/lists/1", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -139,7 +139,7 @@ func TestListGet_Success(t *testing.T) {
 func TestListGet_NotFound(t *testing.T) {
 	app, _ := setupListTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/lists/999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/lists/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -162,7 +162,7 @@ func TestListCreate_Success(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/lists", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/lists", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -193,7 +193,7 @@ func TestListCreate_MissingName(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/lists", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/lists", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -219,7 +219,7 @@ func TestListUpdate_Success(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPut, "/lists/1", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/lists/1", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -253,7 +253,7 @@ func TestListDelete_Success(t *testing.T) {
 
 	createTestList(t, db, "Test List")
 
-	req := httptest.NewRequest(http.MethodDelete, "/lists/1", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/lists/1", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -275,7 +275,7 @@ func TestListDelete_Success(t *testing.T) {
 func TestListDelete_NotFound(t *testing.T) {
 	app, _ := setupListTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/lists/999", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/lists/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -306,12 +306,12 @@ func setupListTestAppWithCards(t *testing.T) (*fiber.App, *gorm.DB) {
 	app := fiber.New()
 	handler := NewListHandler(db)
 
-	app.Get("/lists", handler.List)
-	app.Get("/lists/:id", handler.Get)
-	app.Post("/lists", handler.Create)
-	app.Put("/lists/:id", handler.Update)
-	app.Delete("/lists/:id", handler.Delete)
-	app.Get("/lists/:id/items", handler.ListItems)
+	app.Get("/api/lists", handler.List)
+	app.Get("/api/lists/:id", handler.Get)
+	app.Post("/api/lists", handler.Create)
+	app.Put("/api/lists/:id", handler.Update)
+	app.Delete("/api/lists/:id", handler.Delete)
+	app.Get("/api/lists/:id/items", handler.ListItems)
 
 	return app, db
 }
@@ -364,7 +364,7 @@ func TestListItems_ValueCalculation_BasicPrices(t *testing.T) {
 	createTestListItem(t, db, list.ID, "bolt-id", "oracle-bolt-id", "nonfoil", 4, 2)
 	createTestListItem(t, db, list.ID, "counterspell-id", "oracle-counterspell-id", "nonfoil", 2, 1)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -400,7 +400,7 @@ func TestListItems_ValueCalculation_CardMissingFromDB(t *testing.T) {
 	// Item references a card that doesn't exist in the cards table
 	createTestListItem(t, db, list.ID, "nonexistent-card", "oracle-none", "nonfoil", 4, 2)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -432,7 +432,7 @@ func TestListItems_ValueCalculation_FullyCollected(t *testing.T) {
 	list := createTestList(t, db, "Complete Deck")
 	createTestListItem(t, db, list.ID, "bolt-id", "oracle-bolt-id", "nonfoil", 2, 2)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -462,7 +462,7 @@ func TestListItems_ValueCalculation_FoilTreatment(t *testing.T) {
 	list := createTestList(t, db, "Foil Deck")
 	createTestListItem(t, db, list.ID, "bolt-id", "oracle-bolt-id", "foil", 1, 1)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -487,7 +487,7 @@ func TestListItems_CompletionPercentage(t *testing.T) {
 	createTestListItem(t, db, list.ID, "card-a", "oracle-a", "nonfoil", 4, 1)
 	createTestListItem(t, db, list.ID, "card-b", "oracle-b", "nonfoil", 6, 2)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -518,7 +518,7 @@ func TestListItems_CompletionPercentage_EmptyList(t *testing.T) {
 	list := createTestList(t, db, "Empty Deck")
 	// No items added
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -553,7 +553,7 @@ func TestListItems_ValueCalculation_MixedCompletion(t *testing.T) {
 	// Counterspell: partially collected (remaining = 2)
 	createTestListItem(t, db, list.ID, "counter-id", "oracle-counter-id", "nonfoil", 3, 1)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/lists/%d/items", list.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

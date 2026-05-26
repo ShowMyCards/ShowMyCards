@@ -46,22 +46,22 @@ function fetchUrl(fetchMock: Mock): string {
 }
 
 describe('catch-all proxy: upstream URL', () => {
-	it('prefixes /api/ for API-segment paths', async () => {
+	it('prefixes /api/ for a single-segment path', async () => {
 		const fetchMock = mockFetch();
 		await call('GET', makeEvent({ path: 'jobs' }, fetchMock));
 		expect(fetchUrl(fetchMock)).toBe(`${BACKEND_URL}/api/jobs`);
 	});
 
-	it('leaves root-hosted paths at the root', async () => {
+	it('prefixes /api/ for a nested path', async () => {
 		const fetchMock = mockFetch();
 		await call('POST', makeEvent({ path: 'inventory/batch/move', method: 'POST' }, fetchMock));
-		expect(fetchUrl(fetchMock)).toBe(`${BACKEND_URL}/inventory/batch/move`);
+		expect(fetchUrl(fetchMock)).toBe(`${BACKEND_URL}/api/inventory/batch/move`);
 	});
 
 	it('appends the query string verbatim', async () => {
 		const fetchMock = mockFetch();
 		await call('GET', makeEvent({ path: 'search', search: '?q=foo&page=2' }, fetchMock));
-		expect(fetchUrl(fetchMock)).toBe(`${BACKEND_URL}/search?q=foo&page=2`);
+		expect(fetchUrl(fetchMock)).toBe(`${BACKEND_URL}/api/search?q=foo&page=2`);
 	});
 
 	it('falls back to "/" when params.path is undefined', async () => {

@@ -31,11 +31,11 @@ func setupSortingRulesTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app := fiber.New()
 	handler := NewSortingRulesHandler(db)
 
-	app.Get("/sorting-rules", handler.List)
-	app.Get("/sorting-rules/:id", handler.Get)
-	app.Post("/sorting-rules", handler.Create)
-	app.Put("/sorting-rules/:id", handler.Update)
-	app.Delete("/sorting-rules/:id", handler.Delete)
+	app.Get("/api/sorting-rules", handler.List)
+	app.Get("/api/sorting-rules/:id", handler.Get)
+	app.Post("/api/sorting-rules", handler.Create)
+	app.Put("/api/sorting-rules/:id", handler.Update)
+	app.Delete("/api/sorting-rules/:id", handler.Delete)
 
 	return app, db
 }
@@ -72,7 +72,7 @@ func createTestRule(t *testing.T, db *gorm.DB, name string, priority int, expres
 func TestSortingRulesList_Empty(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -100,7 +100,7 @@ func TestSortingRulesList_WithItems(t *testing.T) {
 	createTestRule(t, db, "Rule 1", 1, "prices.usd < 5.0", location.ID)
 	createTestRule(t, db, "Rule 2", 2, "rarity == 'mythic'", location.ID)
 
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -130,7 +130,7 @@ func TestSortingRulesList_OrderByPriority(t *testing.T) {
 	createTestRule(t, db, "Rule Low", 1, "test1", location.ID)
 	createTestRule(t, db, "Rule Mid", 2, "test2", location.ID)
 
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -167,7 +167,7 @@ func TestSortingRulesList_FilterEnabled(t *testing.T) {
 	db.Save(&rule2)
 
 	// Test enabled=true filter
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules?enabled=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules?enabled=true", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -184,7 +184,7 @@ func TestSortingRulesList_FilterEnabled(t *testing.T) {
 	}
 
 	// Test enabled=false filter
-	req2 := httptest.NewRequest(http.MethodGet, "/sorting-rules?enabled=false", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/sorting-rules?enabled=false", nil)
 	resp2, err := app.Test(req2)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -209,7 +209,7 @@ func TestSortingRulesList_Pagination(t *testing.T) {
 		createTestRule(t, db, fmt.Sprintf("Rule %d", i), i, "test", location.ID)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules?page=2&page_size=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules?page=2&page_size=2", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -240,7 +240,7 @@ func TestSortingRulesGet_Success(t *testing.T) {
 	location := createTestStorageLocation(t, db)
 	rule := createTestRule(t, db, "Test Rule", 1, "prices.usd < 10.0", location.ID)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/sorting-rules/%d", rule.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -270,7 +270,7 @@ func TestSortingRulesGet_Success(t *testing.T) {
 func TestSortingRulesGet_NotFound(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules/999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -285,7 +285,7 @@ func TestSortingRulesGet_NotFound(t *testing.T) {
 func TestSortingRulesGet_InvalidID(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sorting-rules/invalid", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sorting-rules/invalid", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -312,7 +312,7 @@ func TestSortingRulesCreate_Success(t *testing.T) {
 		"enabled": true
 	}`, location.ID)
 
-	req := httptest.NewRequest(http.MethodPost, "/sorting-rules", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/sorting-rules", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -359,7 +359,7 @@ func TestSortingRulesCreate_DefaultEnabled(t *testing.T) {
 		"storage_location_id": %d
 	}`, location.ID)
 
-	req := httptest.NewRequest(http.MethodPost, "/sorting-rules", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/sorting-rules", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -392,7 +392,7 @@ func TestSortingRulesCreate_InvalidStorageLocation(t *testing.T) {
 		"storage_location_id": 999
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/sorting-rules", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/sorting-rules", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -418,7 +418,7 @@ func TestSortingRulesCreate_EmptyName(t *testing.T) {
 		"storage_location_id": %d
 	}`, location.ID)
 
-	req := httptest.NewRequest(http.MethodPost, "/sorting-rules", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/sorting-rules", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -444,7 +444,7 @@ func TestSortingRulesCreate_EmptyExpression(t *testing.T) {
 		"storage_location_id": %d
 	}`, location.ID)
 
-	req := httptest.NewRequest(http.MethodPost, "/sorting-rules", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/sorting-rules", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -462,7 +462,7 @@ func TestSortingRulesCreate_InvalidJSON(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
 	body := `{invalid json}`
-	req := httptest.NewRequest(http.MethodPost, "/sorting-rules", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/sorting-rules", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -490,7 +490,7 @@ func TestSortingRulesUpdate_Success(t *testing.T) {
 		"expression": "updated"
 	}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -527,7 +527,7 @@ func TestSortingRulesUpdate_PartialUpdate(t *testing.T) {
 
 	body := `{"name": "New Name"}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -560,7 +560,7 @@ func TestSortingRulesUpdate_DisableRule(t *testing.T) {
 
 	body := `{"enabled": false}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -588,7 +588,7 @@ func TestSortingRulesUpdate_ChangeStorageLocation(t *testing.T) {
 
 	body := fmt.Sprintf(`{"storage_location_id": %d}`, location2.ID)
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -615,7 +615,7 @@ func TestSortingRulesUpdate_InvalidStorageLocation(t *testing.T) {
 
 	body := `{"storage_location_id": 999}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -633,7 +633,7 @@ func TestSortingRulesUpdate_NotFound(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
 	body := `{"name": "Test"}`
-	req := httptest.NewRequest(http.MethodPut, "/sorting-rules/999", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/sorting-rules/999", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -655,7 +655,7 @@ func TestSortingRulesDelete_Success(t *testing.T) {
 	location := createTestStorageLocation(t, db)
 	rule := createTestRule(t, db, "Test", 1, "test", location.ID)
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/sorting-rules/%d", rule.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -677,7 +677,7 @@ func TestSortingRulesDelete_Success(t *testing.T) {
 func TestSortingRulesDelete_NotFound(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/sorting-rules/999", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/sorting-rules/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -692,7 +692,7 @@ func TestSortingRulesDelete_NotFound(t *testing.T) {
 func TestSortingRulesDelete_InvalidID(t *testing.T) {
 	app, _ := setupSortingRulesTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/sorting-rules/invalid", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/sorting-rules/invalid", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -710,7 +710,7 @@ func TestSortingRulesDelete_DoesNotDeleteStorageLocation(t *testing.T) {
 	location := createTestStorageLocation(t, db)
 	rule := createTestRule(t, db, "Test", 1, "test", location.ID)
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/sorting-rules/%d", rule.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/sorting-rules/%d", rule.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

@@ -16,8 +16,8 @@ export const load: PageServerLoad = async ({ fetch }) => {
 		// Fetch ALL unassigned cards and all locations in parallel
 		// First, get page 1 to know total pages
 		const [firstPageResponse, locationsResponse] = await Promise.all([
-			fetch(`${BACKEND_URL}/inventory/cards?storage_location_id=null&page=1&page_size=100`),
-			fetch(`${BACKEND_URL}/storage`)
+			fetch(`${BACKEND_URL}/api/inventory/cards?storage_location_id=null&page=1&page_size=100`),
+			fetch(`${BACKEND_URL}/api/storage`)
 		]);
 
 		if (!firstPageResponse.ok) {
@@ -33,7 +33,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 			for (let page = 2; page <= totalPages; page++) {
 				pagePromises.push(
 					fetch(
-						`${BACKEND_URL}/inventory/cards?storage_location_id=null&page=${page}&page_size=100`
+						`${BACKEND_URL}/api/inventory/cards?storage_location_id=null&page=${page}&page_size=100`
 					).then((res) => (res.ok ? res.json() : { data: [] }))
 				);
 			}

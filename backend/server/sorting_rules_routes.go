@@ -11,7 +11,7 @@ import (
 func SortingRulesRoutes(app *fiber.App, db *gorm.DB) {
 	handler := api.NewSortingRulesHandler(db)
 
-	rules := app.Group("/sorting-rules")
+	rules := app.Group("/api/sorting-rules")
 	rules.Get("/", handler.List)
 	rules.Get("/:id", handler.Get)
 	rules.Post("/", handler.Create)

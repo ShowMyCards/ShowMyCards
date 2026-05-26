@@ -34,7 +34,7 @@ export async function handleAddInventory(request: Request, fetch: typeof globalT
 			body.storage_location_id = parseInt(storageLocationId.toString());
 		}
 
-		const response = await fetch(`${BACKEND_URL}/inventory`, {
+		const response = await fetch(`${BACKEND_URL}/api/inventory`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)
@@ -66,7 +66,7 @@ export async function handleDeleteInventory(request: Request, fetch: typeof glob
 	}
 
 	try {
-		const response = await fetch(`${BACKEND_URL}/inventory/${inventoryId}`, {
+		const response = await fetch(`${BACKEND_URL}/api/inventory/${inventoryId}`, {
 			method: 'DELETE'
 		});
 
@@ -93,7 +93,7 @@ export async function handleUpdateInventory(request: Request, fetch: typeof glob
 	}
 
 	try {
-		const response = await fetch(`${BACKEND_URL}/inventory/${inventoryId}`, {
+		const response = await fetch(`${BACKEND_URL}/api/inventory/${inventoryId}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ quantity: parseInt(quantity.toString()) })

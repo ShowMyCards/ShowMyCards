@@ -18,8 +18,8 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 	try {
 		// Fetch storage location info and all locations in parallel
 		const [locationResponse, allLocationsResponse] = await Promise.all([
-			fetch(`${BACKEND_URL}/storage/${id}`),
-			fetch(`${BACKEND_URL}/storage`)
+			fetch(`${BACKEND_URL}/api/storage/${id}`),
+			fetch(`${BACKEND_URL}/api/storage`)
 		]);
 
 		if (!locationResponse.ok) {
@@ -40,7 +40,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 		// Fetch ALL cards for this location (for client-side filtering)
 		// First, get page 1 to know total pages
 		const firstPageResponse = await fetch(
-			`${BACKEND_URL}/inventory/cards?storage_location_id=${id}&page=1&page_size=100`
+			`${BACKEND_URL}/api/inventory/cards?storage_location_id=${id}&page=1&page_size=100`
 		);
 		if (!firstPageResponse.ok) {
 			throw new Error('Failed to fetch cards');
@@ -55,7 +55,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			for (let page = 2; page <= totalPages; page++) {
 				pagePromises.push(
 					fetch(
-						`${BACKEND_URL}/inventory/cards?storage_location_id=${id}&page=${page}&page_size=100`
+						`${BACKEND_URL}/api/inventory/cards?storage_location_id=${id}&page=${page}&page_size=100`
 					).then((res) => (res.ok ? res.json() : { data: [] }))
 				);
 			}

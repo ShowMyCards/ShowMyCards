@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 	try {
 		// Fetch the card details from the backend
-		const cardResponse = await fetch(`${BACKEND_URL}/cards/${id}`);
+		const cardResponse = await fetch(`${BACKEND_URL}/api/cards/${id}`);
 
 		if (!cardResponse.ok) {
 			if (cardResponse.status === 404) {
@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 		if (card.oracle_id) {
 			try {
 				const searchResponse = await fetch(
-					`${BACKEND_URL}/search?q=oracle_id:${card.oracle_id}&unique=prints`
+					`${BACKEND_URL}/api/search?q=oracle_id:${card.oracle_id}&unique=prints`
 				);
 				if (searchResponse.ok) {
 					const searchData = await searchResponse.json();
