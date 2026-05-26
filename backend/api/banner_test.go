@@ -28,7 +28,7 @@ func setupBannerTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewBannerHandler(service)
 
 	app := fiber.New()
-	app.Get("/banners", handler.GetAll)
+	app.Get("/api/banners", handler.GetAll)
 
 	return app, db
 }
@@ -36,7 +36,7 @@ func setupBannerTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 func TestBannersGetAll_Empty(t *testing.T) {
 	app, _ := setupBannerTestApp(t)
 
-	req := httptest.NewRequest("GET", "/banners", nil)
+	req := httptest.NewRequest("GET", "/api/banners", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -63,7 +63,7 @@ func TestBannersGetAll_WithBanner(t *testing.T) {
 		Metadata: "{}",
 	})
 
-	req := httptest.NewRequest("GET", "/banners", nil)
+	req := httptest.NewRequest("GET", "/api/banners", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)

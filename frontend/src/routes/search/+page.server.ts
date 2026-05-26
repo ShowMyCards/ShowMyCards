@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 
 async function loadStorageLocations(fetch: typeof globalThis.fetch): Promise<StorageLocation[]> {
 	try {
-		const response = await fetch(`${BACKEND_URL}/storage`);
+		const response = await fetch(`${BACKEND_URL}/api/storage`);
 		if (response.ok) {
 			const data = await response.json();
 			return data.data as StorageLocation[];
@@ -54,7 +54,7 @@ export const actions = {
 		}
 
 		try {
-			const url = new URL(`${BACKEND_URL}/search`);
+			const url = new URL(`${BACKEND_URL}/api/search`);
 			url.searchParams.set('q', query);
 			if (typeof lang === 'string' && lang.trim() !== '') {
 				url.searchParams.set('lang', lang.trim());
@@ -98,7 +98,7 @@ export const actions = {
 		}
 
 		try {
-			const url = new URL(`${BACKEND_URL}/search/autocomplete`);
+			const url = new URL(`${BACKEND_URL}/api/search/autocomplete`);
 			url.searchParams.set('q', query);
 
 			const response = await fetch(url.toString());

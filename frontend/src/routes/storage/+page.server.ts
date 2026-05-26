@@ -5,7 +5,7 @@ import type { StorageLocation } from '$lib';
 
 export const load: PageServerLoad = async ({ fetch }) => {
 	try {
-		const response = await fetch(`${BACKEND_URL}/storage`);
+		const response = await fetch(`${BACKEND_URL}/api/storage`);
 
 		if (!response.ok) {
 			return {
@@ -43,7 +43,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/storage`, {
+			const response = await fetch(`${BACKEND_URL}/api/storage`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -88,7 +88,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/storage/${id}`, {
+			const response = await fetch(`${BACKEND_URL}/api/storage/${id}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -123,7 +123,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/storage/${id}`, {
+			const response = await fetch(`${BACKEND_URL}/api/storage/${id}`, {
 				method: 'DELETE'
 			});
 

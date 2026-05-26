@@ -32,9 +32,8 @@ export class ApiClient {
 	 * Builds the URL for a given API path.
 	 *
 	 * In the browser, requests go through SvelteKit's `/api/*` catch-all
-	 * proxy, which resolves the backend's prefix shape internally — so the
-	 * client just prepends `/api`. Server-side, we resolve the prefix here
-	 * and hit the backend directly.
+	 * proxy. Server-side, we hit the backend directly. Either way the
+	 * canonical backend prefix is `/api/`.
 	 */
 	private buildUrl(path: string): string {
 		const normalized = path.startsWith('/') ? path : `/${path}`;

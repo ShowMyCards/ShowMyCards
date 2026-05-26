@@ -10,8 +10,8 @@ export const load: PageServerLoad = async ({ fetch }) => {
 	try {
 		// Fetch recently added cards (the API already orders by created_at DESC)
 		const [cardsResponse, storageResponse] = await Promise.all([
-			fetch(`${BACKEND_URL}/inventory/cards?page_size=20`),
-			fetch(`${BACKEND_URL}/storage`)
+			fetch(`${BACKEND_URL}/api/inventory/cards?page_size=20`),
+			fetch(`${BACKEND_URL}/api/storage`)
 		]);
 
 		let cards: InventoryCardsResponse = {

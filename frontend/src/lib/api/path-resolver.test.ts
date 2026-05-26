@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { resolveBackendPath, BACKEND_API_SEGMENTS } from './path-resolver';
+import { resolveBackendPath } from './path-resolver';
 
 describe('resolveBackendPath', () => {
-	describe('segments hosted under /api/ on the backend', () => {
+	describe('canonical paths', () => {
 		it('prefixes a single-segment path', () => {
 			expect(resolveBackendPath('/jobs')).toBe('/api/jobs');
 		});
@@ -15,30 +15,12 @@ describe('resolveBackendPath', () => {
 			expect(resolveBackendPath('/jobs?status=pending')).toBe('/api/jobs?status=pending');
 		});
 
-		it.each([...BACKEND_API_SEGMENTS])(
-			'prefixes every advertised /api/ segment (%s)',
-			(segment) => {
-				expect(resolveBackendPath(`/${segment}`)).toBe(`/api/${segment}`);
-			}
-		);
-	});
-
-	describe('root-hosted segments', () => {
-		it('leaves /inventory at the root', () => {
-			expect(resolveBackendPath('/inventory')).toBe('/inventory');
+		it('prefixes hyphenated segments', () => {
+			expect(resolveBackendPath('/sorting-rules/validate')).toBe('/api/sorting-rules/validate');
 		});
 
-		it('leaves a nested path under a root segment', () => {
-			expect(resolveBackendPath('/inventory/batch/move')).toBe('/inventory/batch/move');
-		});
-
-		it('leaves hyphenated root segments alone', () => {
-			expect(resolveBackendPath('/sorting-rules/validate')).toBe('/sorting-rules/validate');
-		});
-
-		it('matches segments exactly, not by prefix', () => {
-			// guard against someone "helpfully" changing `.has()` to a startsWith check
-			expect(resolveBackendPath('/jobsmith')).toBe('/jobsmith');
+		it('prefixes nested batch paths', () => {
+			expect(resolveBackendPath('/inventory/batch/move')).toBe('/api/inventory/batch/move');
 		});
 	});
 
@@ -62,9 +44,17 @@ describe('resolveBackendPath', () => {
 
 	describe('already-prefixed paths', () => {
 		it('passes /api/... through without doubling the prefix', () => {
-			// apiClient's server branch and dataApi.import both pass /api/data/import
-			// in literally — the resolver should treat the leading /api/ as already-done
+			// apiClient's server branch may receive paths that already include the
+			// /api/ prefix — the resolver should treat the leading /api/ as already-done
 			expect(resolveBackendPath('/api/data/import')).toBe('/api/data/import');
+		});
+
+		it('handles a bare /api', () => {
+			expect(resolveBackendPath('/api')).toBe('/api');
+		});
+
+		it('does not double-prefix a segment that merely starts with "api"', () => {
+			expect(resolveBackendPath('/apiary')).toBe('/api/apiary');
 		});
 	});
 });

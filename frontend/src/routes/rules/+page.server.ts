@@ -14,14 +14,14 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 		}
 
 		// Fetch sorting rules
-		const rulesResponse = await fetch(`${BACKEND_URL}/sorting-rules${queryParams}`);
+		const rulesResponse = await fetch(`${BACKEND_URL}/api/sorting-rules${queryParams}`);
 		if (!rulesResponse.ok) {
 			throw new Error('Failed to load sorting rules');
 		}
 		const rulesData = await rulesResponse.json();
 
 		// Fetch storage locations for dropdown
-		const locationsResponse = await fetch(`${BACKEND_URL}/storage?page_size=100`);
+		const locationsResponse = await fetch(`${BACKEND_URL}/api/storage?page_size=100`);
 		const locationsData = locationsResponse.ok ? await locationsResponse.json() : { data: [] };
 
 		return {
@@ -57,7 +57,7 @@ export const actions: Actions = {
 		try {
 			const ruleData = JSON.parse(ruleJson);
 
-			const response = await fetch(`${BACKEND_URL}/sorting-rules`, {
+			const response = await fetch(`${BACKEND_URL}/api/sorting-rules`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -89,7 +89,7 @@ export const actions: Actions = {
 		try {
 			const ruleData = JSON.parse(ruleJson);
 
-			const response = await fetch(`${BACKEND_URL}/sorting-rules/${id}`, {
+			const response = await fetch(`${BACKEND_URL}/api/sorting-rules/${id}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -118,7 +118,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/sorting-rules/${id}`, {
+			const response = await fetch(`${BACKEND_URL}/api/sorting-rules/${id}`, {
 				method: 'DELETE'
 			});
 
@@ -143,7 +143,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/sorting-rules/${id}`, {
+			const response = await fetch(`${BACKEND_URL}/api/sorting-rules/${id}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -178,7 +178,7 @@ export const actions: Actions = {
 		try {
 			const updates = JSON.parse(updatesJson);
 
-			const response = await fetch(`${BACKEND_URL}/sorting-rules/batch/priorities`, {
+			const response = await fetch(`${BACKEND_URL}/api/sorting-rules/batch/priorities`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

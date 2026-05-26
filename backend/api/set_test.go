@@ -50,7 +50,7 @@ func setupSetTestApp(t *testing.T) (*fiber.App, *gorm.DB, string) {
 	handler := NewSetHandler(db, setDataService, dataDir)
 
 	app := fiber.New()
-	sets := app.Group("/sets")
+	sets := app.Group("/api/sets")
 	sets.Get("/", handler.List)
 	sets.Get("/id/:id", handler.GetByID)
 	sets.Get("/code/:code", handler.GetByCode)
@@ -62,7 +62,7 @@ func setupSetTestApp(t *testing.T) (*fiber.App, *gorm.DB, string) {
 func TestSetList_Empty(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -85,7 +85,7 @@ func TestSetList_WithData(t *testing.T) {
 		CardCount:  100,
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -106,7 +106,7 @@ func TestSetGetByID_Found(t *testing.T) {
 		Name:       "Test Set",
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/id/abc-123", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/id/abc-123", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -130,7 +130,7 @@ func TestSetGetByID_Found(t *testing.T) {
 func TestSetGetByID_NotFound(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/id/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/id/nonexistent", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -151,7 +151,7 @@ func TestSetGetByCode_Found(t *testing.T) {
 		Name:       "Murders at Karlov Manor",
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/code/mkm", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/code/mkm", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -166,7 +166,7 @@ func TestSetGetByCode_Found(t *testing.T) {
 func TestSetGetByCode_NotFound(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/code/zzz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/code/zzz", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -181,7 +181,7 @@ func TestSetGetByCode_NotFound(t *testing.T) {
 func TestSetGetIcon_ValidCode(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/code/tst/icon", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/code/tst/icon", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -201,7 +201,7 @@ func TestSetGetIcon_ValidCode(t *testing.T) {
 func TestSetGetIcon_NotFound(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/code/nonexistent/icon", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/code/nonexistent/icon", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -217,7 +217,7 @@ func TestSetGetIcon_PathTraversal(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
 	// Attempt path traversal — should NOT return 200
-	req := httptest.NewRequest(http.MethodGet, "/sets/code/..%2F..%2F..%2Fetc%2Fpasswd/icon", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/code/..%2F..%2F..%2Fetc%2Fpasswd/icon", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -233,7 +233,7 @@ func TestSetGetIcon_PathTraversal(t *testing.T) {
 func TestSetGetIcon_PathTraversalDotDot(t *testing.T) {
 	app, _, _ := setupSetTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/sets/code/../icon", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/sets/code/../icon", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
