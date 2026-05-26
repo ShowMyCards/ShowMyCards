@@ -4,7 +4,10 @@
 # ============================================
 # Stage 1: Build Go backend
 # ============================================
-FROM golang:1.26-alpine AS backend-builder
+# Base image pinned to digest as defence against tag hijacks on Docker Hub
+# (tags are mutable). Renovate's `docker` manager keeps the digest current
+# and the version tag is retained as a human-readable hint.
+FROM golang:1.26-alpine@sha256:91eda9776261207ea25fd06b5b7fed8d397dd2c0a283e77f2ab6e91bfa71079d AS backend-builder
 
 WORKDIR /app
 
@@ -21,7 +24,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-X backend/version.Version=${VER
 # ============================================
 # Stage 2: Build SvelteKit frontend
 # ============================================
-FROM oven/bun:1-alpine AS frontend-builder
+FROM oven/bun:1-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS frontend-builder
 
 WORKDIR /app
 
@@ -34,7 +37,7 @@ RUN bun run build
 # ============================================
 # Stage 3: Runtime image
 # ============================================
-FROM alpine:3.23
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
 WORKDIR /app
 
