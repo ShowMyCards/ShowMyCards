@@ -31,8 +31,8 @@ func setupJobsTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewJobsHandler(jobService)
 
 	app := fiber.New()
-	app.Get("/jobs", handler.GetAll)
-	app.Get("/jobs/:id", handler.Get)
+	app.Get("/api/jobs", handler.GetAll)
+	app.Get("/api/jobs/:id", handler.Get)
 
 	return app, db
 }
@@ -42,7 +42,7 @@ func setupJobsTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 func TestJobsList_Empty(t *testing.T) {
 	app, _ := setupJobsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/jobs", nil)
+	req := httptest.NewRequest("GET", "/api/jobs", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -102,7 +102,7 @@ func TestJobsList_WithJobs(t *testing.T) {
 	}
 	db.Create(job3)
 
-	req := httptest.NewRequest("GET", "/jobs", nil)
+	req := httptest.NewRequest("GET", "/api/jobs", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -153,7 +153,7 @@ func TestJobsList_Pagination(t *testing.T) {
 	}
 
 	// Get page 2 with page size 2
-	req := httptest.NewRequest("GET", "/jobs?page=2&page_size=2", nil)
+	req := httptest.NewRequest("GET", "/api/jobs?page=2&page_size=2", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -210,7 +210,7 @@ func TestJobsList_StatusFilter_Pending(t *testing.T) {
 	db.Create(completed)
 
 	// Filter by pending status
-	req := httptest.NewRequest("GET", "/jobs?status=pending", nil)
+	req := httptest.NewRequest("GET", "/api/jobs?status=pending", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -268,7 +268,7 @@ func TestJobsList_StatusFilter_InProgress(t *testing.T) {
 	db.Create(pending)
 
 	// Filter by in_progress status
-	req := httptest.NewRequest("GET", "/jobs?status=in_progress", nil)
+	req := httptest.NewRequest("GET", "/api/jobs?status=in_progress", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -317,7 +317,7 @@ func TestJobsList_StatusFilter_Completed(t *testing.T) {
 	db.Create(failed)
 
 	// Filter by completed status
-	req := httptest.NewRequest("GET", "/jobs?status=completed", nil)
+	req := httptest.NewRequest("GET", "/api/jobs?status=completed", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -359,7 +359,7 @@ func TestJobsList_StatusFilter_Failed(t *testing.T) {
 	db.Create(completed)
 
 	// Filter by failed status
-	req := httptest.NewRequest("GET", "/jobs?status=failed", nil)
+	req := httptest.NewRequest("GET", "/api/jobs?status=failed", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -412,7 +412,7 @@ func TestJobsGet_Success(t *testing.T) {
 	job.StartedAt = &now
 	db.Create(job)
 
-	req := httptest.NewRequest("GET", "/jobs/"+strconv.Itoa(int(job.ID)), nil)
+	req := httptest.NewRequest("GET", "/api/jobs/"+strconv.Itoa(int(job.ID)), nil)
 	req.SetPathValue("id", strconv.Itoa(int(job.ID)))
 
 	resp, err := app.Test(req)
@@ -455,7 +455,7 @@ func TestJobsGet_Success(t *testing.T) {
 func TestJobsGet_NotFound(t *testing.T) {
 	app, _ := setupJobsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/jobs/999", nil)
+	req := httptest.NewRequest("GET", "/api/jobs/999", nil)
 	req.SetPathValue("id", "999")
 
 	resp, err := app.Test(req)
@@ -471,7 +471,7 @@ func TestJobsGet_NotFound(t *testing.T) {
 func TestJobsGet_InvalidID(t *testing.T) {
 	app, _ := setupJobsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/jobs/invalid", nil)
+	req := httptest.NewRequest("GET", "/api/jobs/invalid", nil)
 	req.SetPathValue("id", "invalid")
 
 	resp, err := app.Test(req)
@@ -513,7 +513,7 @@ func TestJobsList_OrderedByCreatedAtDesc(t *testing.T) {
 	}
 	db.Create(newJob)
 
-	req := httptest.NewRequest("GET", "/jobs", nil)
+	req := httptest.NewRequest("GET", "/api/jobs", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)

@@ -31,7 +31,7 @@ describe('handleUpdateInventory', () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		const url = fetchMock.mock.calls[0][0] as string;
 		const init = fetchMock.mock.calls[0][1] as RequestInit;
-		expect(url).toBe(`${BACKEND_URL}/inventory/42`);
+		expect(url).toBe(`${BACKEND_URL}/api/inventory/42`);
 		expect(init.method).toBe('PUT');
 		expect(JSON.parse(init.body as string)).toEqual({ quantity: 3 });
 	});

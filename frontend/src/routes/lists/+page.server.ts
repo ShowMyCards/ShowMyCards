@@ -5,7 +5,7 @@ import type { ListSummary } from '$lib';
 
 export const load: PageServerLoad = async ({ fetch }) => {
 	try {
-		const response = await fetch(`${BACKEND_URL}/lists`);
+		const response = await fetch(`${BACKEND_URL}/api/lists`);
 
 		if (!response.ok) {
 			return {
@@ -38,7 +38,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/lists`, {
+			const response = await fetch(`${BACKEND_URL}/api/lists`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -75,7 +75,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/lists/${id}`, {
+			const response = await fetch(`${BACKEND_URL}/api/lists/${id}`, {
 				method: 'DELETE'
 			});
 

@@ -11,7 +11,7 @@ import (
 func StorageRoutes(app *fiber.App, db *gorm.DB) {
 	handler := api.NewStorageHandler(db)
 
-	storage := app.Group("/storage")
+	storage := app.Group("/api/storage")
 	storage.Get("/", handler.List)
 	storage.Get("/with-counts", handler.ListWithCounts)
 	storage.Get("/:id", handler.Get)

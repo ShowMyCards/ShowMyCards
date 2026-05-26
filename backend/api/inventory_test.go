@@ -34,11 +34,11 @@ func setupInventoryTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app := fiber.New()
 	handler := NewInventoryHandler(db, services.NewAutoSortService(db))
 
-	app.Get("/inventory", handler.List)
-	app.Get("/inventory/:id", handler.Get)
-	app.Post("/inventory", handler.Create)
-	app.Put("/inventory/:id", handler.Update)
-	app.Delete("/inventory/:id", handler.Delete)
+	app.Get("/api/inventory", handler.List)
+	app.Get("/api/inventory/:id", handler.Get)
+	app.Post("/api/inventory", handler.Create)
+	app.Put("/api/inventory/:id", handler.Update)
+	app.Delete("/api/inventory/:id", handler.Delete)
 
 	return app, db
 }
@@ -63,7 +63,7 @@ func createTestInventoryItem(t *testing.T, db *gorm.DB, scryfallID string, quant
 func TestInventoryList_Empty(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -90,7 +90,7 @@ func TestInventoryList_WithItems(t *testing.T) {
 	createTestInventoryItem(t, db, "card-1", 1, nil)
 	createTestInventoryItem(t, db, "card-2", 2, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -117,7 +117,7 @@ func TestInventoryList_FilterByScryfallID(t *testing.T) {
 	createTestInventoryItem(t, db, "card-1", 1, nil)
 	createTestInventoryItem(t, db, "card-2", 2, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory?scryfall_id=card-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory?scryfall_id=card-1", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -143,7 +143,7 @@ func TestInventoryList_FilterByStorageLocation(t *testing.T) {
 	createTestInventoryItem(t, db, "card-1", 1, &locationID)
 	createTestInventoryItem(t, db, "card-2", 2, nil)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/inventory?storage_location_id=%d", locationID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/inventory?storage_location_id=%d", locationID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -169,7 +169,7 @@ func TestInventoryList_FilterByNullStorageLocation(t *testing.T) {
 	createTestInventoryItem(t, db, "card-1", 1, &locationID)
 	createTestInventoryItem(t, db, "card-2", 2, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory?storage_location_id=null", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory?storage_location_id=null", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -193,7 +193,7 @@ func TestInventoryList_Pagination(t *testing.T) {
 		createTestInventoryItem(t, db, fmt.Sprintf("card-%d", i), i, nil)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory?page=2&page_size=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory?page=2&page_size=2", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -223,7 +223,7 @@ func TestInventoryGet_Success(t *testing.T) {
 
 	item := createTestInventoryItem(t, db, "test-card", 3, nil)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/inventory/%d", item.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/inventory/%d", item.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -257,7 +257,7 @@ func TestInventoryGet_WithStorageLocation(t *testing.T) {
 	locationID := location.ID
 	item := createTestInventoryItem(t, db, "test-card", 1, &locationID)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/inventory/%d", item.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/inventory/%d", item.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -280,7 +280,7 @@ func TestInventoryGet_WithStorageLocation(t *testing.T) {
 func TestInventoryGet_NotFound(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -295,7 +295,7 @@ func TestInventoryGet_NotFound(t *testing.T) {
 func TestInventoryGet_InvalidID(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/invalid", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/invalid", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -319,7 +319,7 @@ func TestInventoryCreate_Success(t *testing.T) {
 		"quantity": 2
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -359,7 +359,7 @@ func TestInventoryCreate_DefaultQuantity(t *testing.T) {
 		"oracle_id": "test-oracle"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -390,7 +390,7 @@ func TestInventoryCreate_WithStorageLocation(t *testing.T) {
 		"storage_location_id": %d
 	}`, location.ID)
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -425,7 +425,7 @@ func TestInventoryCreate_InvalidStorageLocation(t *testing.T) {
 		"storage_location_id": 999
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -447,7 +447,7 @@ func TestInventoryCreate_EmptyScryfallID(t *testing.T) {
 		"quantity": 1
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -469,7 +469,7 @@ func TestInventoryCreate_NegativeQuantity(t *testing.T) {
 		"quantity": -1
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -487,7 +487,7 @@ func TestInventoryCreate_InvalidJSON(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
 	body := `{invalid json}`
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -514,7 +514,7 @@ func TestInventoryUpdate_Success(t *testing.T) {
 		"quantity": 5
 	}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/inventory/%d", item.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/inventory/%d", item.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -550,7 +550,7 @@ func TestInventoryUpdate_PartialUpdate(t *testing.T) {
 
 	body := `{"quantity": 10}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/inventory/%d", item.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/inventory/%d", item.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -580,7 +580,7 @@ func TestInventoryUpdate_SetStorageLocation(t *testing.T) {
 
 	body := fmt.Sprintf(`{"storage_location_id": %d}`, location.ID)
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/inventory/%d", item.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/inventory/%d", item.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -611,7 +611,7 @@ func TestInventoryUpdate_ClearStorageLocation(t *testing.T) {
 
 	body := `{"clear_storage": true}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/inventory/%d", item.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/inventory/%d", item.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -637,7 +637,7 @@ func TestInventoryUpdate_InvalidStorageLocation(t *testing.T) {
 
 	body := `{"storage_location_id": 999}`
 
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/inventory/%d", item.ID), bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/inventory/%d", item.ID), bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -655,7 +655,7 @@ func TestInventoryUpdate_NotFound(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
 	body := `{"quantity": 5}`
-	req := httptest.NewRequest(http.MethodPut, "/inventory/999", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/inventory/999", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -676,7 +676,7 @@ func TestInventoryDelete_Success(t *testing.T) {
 
 	item := createTestInventoryItem(t, db, "test-card", 1, nil)
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/inventory/%d", item.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/inventory/%d", item.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -698,7 +698,7 @@ func TestInventoryDelete_Success(t *testing.T) {
 func TestInventoryDelete_NotFound(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/inventory/999", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/inventory/999", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -713,7 +713,7 @@ func TestInventoryDelete_NotFound(t *testing.T) {
 func TestInventoryDelete_InvalidID(t *testing.T) {
 	app, _ := setupInventoryTestApp(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/inventory/invalid", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/inventory/invalid", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -732,7 +732,7 @@ func TestInventoryDelete_DoesNotDeleteStorageLocation(t *testing.T) {
 	locationID := location.ID
 	item := createTestInventoryItem(t, db, "test-card", 1, &locationID)
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/inventory/%d", item.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/inventory/%d", item.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -769,12 +769,12 @@ func setupInventoryTestAppWithRules(t *testing.T) (*fiber.App, *gorm.DB) {
 	app := fiber.New()
 	handler := NewInventoryHandler(db, services.NewAutoSortService(db))
 
-	app.Get("/inventory", handler.List)
-	app.Get("/inventory/:id", handler.Get)
-	app.Post("/inventory", handler.Create)
-	app.Put("/inventory/:id", handler.Update)
-	app.Delete("/inventory/:id", handler.Delete)
-	app.Post("/inventory/resort", handler.Resort)
+	app.Get("/api/inventory", handler.List)
+	app.Get("/api/inventory/:id", handler.Get)
+	app.Post("/api/inventory", handler.Create)
+	app.Put("/api/inventory/:id", handler.Update)
+	app.Delete("/api/inventory/:id", handler.Delete)
+	app.Post("/api/inventory/resort", handler.Resort)
 
 	return app, db
 }
@@ -830,7 +830,7 @@ func TestInventoryCreate_AutoSort_RuleMatches(t *testing.T) {
 		"treatment": "nonfoil"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -869,7 +869,7 @@ func TestInventoryCreate_AutoSort_CardNotInDB(t *testing.T) {
 		"treatment": "nonfoil"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -905,7 +905,7 @@ func TestInventoryCreate_AutoSort_NoMatchingRule(t *testing.T) {
 		"treatment": "nonfoil"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -946,7 +946,7 @@ func TestInventoryCreate_ExplicitLocation_SkipsRules(t *testing.T) {
 		"storage_location_id": %d
 	}`, manualBox.ID)
 
-	req := httptest.NewRequest(http.MethodPost, "/inventory", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -985,7 +985,7 @@ func TestResort_RuleMatches_MovedToLocation(t *testing.T) {
 	item := createTestInventoryItem(t, db, "bolt-id", 1, nil)
 
 	body := fmt.Sprintf(`{"ids": [%d]}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/resort", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/resort", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1045,7 +1045,7 @@ func TestResort_NoMatchingRule_ClearsLocation(t *testing.T) {
 	item := createTestInventoryItem(t, db, "bolt-id", 1, &oldBoxID)
 
 	body := fmt.Sprintf(`{"ids": [%d]}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/resort", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/resort", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1096,7 +1096,7 @@ func TestResort_CardNotInDB_CountedAsError(t *testing.T) {
 	item := createTestInventoryItem(t, db, "missing-card", 1, nil)
 
 	body := fmt.Sprintf(`{"ids": [%d]}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/resort", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/resort", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1133,7 +1133,7 @@ func TestResort_AlreadyInCorrectLocation_NotUpdated(t *testing.T) {
 	item := createTestInventoryItem(t, db, "bolt-id", 1, &locationID)
 
 	body := fmt.Sprintf(`{"ids": [%d]}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/resort", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/resort", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1173,7 +1173,7 @@ func TestResort_EmptyIDs_ProcessesAll(t *testing.T) {
 	createTestInventoryItem(t, db, "shock-id", 1, nil)
 
 	body := `{"ids": []}`
-	req := httptest.NewRequest(http.MethodPost, "/inventory/resort", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/resort", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1211,7 +1211,7 @@ func TestResort_MovementTracking(t *testing.T) {
 	item := createTestInventoryItem(t, db, "bolt-id", 1, &oldBoxID)
 
 	body := fmt.Sprintf(`{"ids": [%d]}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/resort", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/resort", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1264,7 +1264,7 @@ func setupFullInventoryTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewInventoryHandler(db, services.NewAutoSortService(db))
 
 	// Register all inventory routes matching server/inventory_routes.go
-	inventory := app.Group("/inventory")
+	inventory := app.Group("/api/inventory")
 	inventory.Get("/", handler.List)
 	inventory.Get("/cards", handler.ListAsCards)
 	inventory.Get("/unassigned/count", handler.GetUnassignedCount)
@@ -1313,7 +1313,7 @@ func TestListAsCards_BasicResponse(t *testing.T) {
 	createTestInventoryItem(t, db, "bolt-id", 2, nil)
 	createTestInventoryItem(t, db, "shock-id", 1, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1353,7 +1353,7 @@ func TestListAsCards_EnhancedCardFields(t *testing.T) {
 		"card_lightning_bolt.json")
 	createTestInventoryItem(t, db, "d573ef03-4730-45aa-93dd-e45ac1dbaf4a", 3, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1413,7 +1413,7 @@ func TestListAsCards_Pagination(t *testing.T) {
 	}
 
 	// Page 1 with page_size=2
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards?page=1&page_size=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards?page=1&page_size=2", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1436,7 +1436,7 @@ func TestListAsCards_Pagination(t *testing.T) {
 	}
 
 	// Page 3 should have 1 item
-	req2 := httptest.NewRequest(http.MethodGet, "/inventory/cards?page=3&page_size=2", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/inventory/cards?page=3&page_size=2", nil)
 	resp2, err := app.Test(req2)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1468,7 +1468,7 @@ func TestListAsCards_FilterByStorageLocation(t *testing.T) {
 	createTestInventoryItem(t, db, "card-a2", 1, &boxA.ID)
 	createTestInventoryItem(t, db, "card-b1", 1, &boxB.ID)
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/inventory/cards?storage_location_id=%d", boxA.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/inventory/cards?storage_location_id=%d", boxA.ID), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1496,7 +1496,7 @@ func TestListAsCards_FilterByNull(t *testing.T) {
 	createTestInventoryItem(t, db, "assigned-card", 1, &box.ID)
 	createTestInventoryItem(t, db, "unassigned-card", 1, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards?storage_location_id=null", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards?storage_location_id=null", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1522,7 +1522,7 @@ func TestListAsCards_FilterByNull(t *testing.T) {
 func TestListAsCards_InvalidLocationID(t *testing.T) {
 	app, _ := setupFullInventoryTestApp(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards?storage_location_id=abc", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards?storage_location_id=abc", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1542,7 +1542,7 @@ func TestListAsCards_CardNotInCardsTable(t *testing.T) {
 	// Inventory item with no matching card record
 	createTestInventoryItem(t, db, "missing-card", 1, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1575,7 +1575,7 @@ func TestListAsCards_MultipleInventoryPerCard(t *testing.T) {
 	createTestInventoryItem(t, db, "bolt-id", 3, nil)
 	createTestInventoryItem(t, db, "bolt-id", 2, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/inventory/cards", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/cards", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -1611,7 +1611,7 @@ func TestBatchMove_Success(t *testing.T) {
 	createTestInventoryItem(t, db, "card-3", 1, nil) // not moved
 
 	body := fmt.Sprintf(`{"ids": [%d, %d], "storage_location_id": %d}`, item1.ID, item2.ID, location.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/batch/move", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/batch/move", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1648,7 +1648,7 @@ func TestBatchMove_ClearLocation(t *testing.T) {
 	item := createTestInventoryItem(t, db, "card-1", 1, &location.ID)
 
 	body := fmt.Sprintf(`{"ids": [%d], "storage_location_id": null}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/batch/move", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/batch/move", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1682,7 +1682,7 @@ func TestBatchMove_EmptyIDs(t *testing.T) {
 	app, _ := setupFullInventoryTestApp(t)
 
 	body := `{"ids": [], "storage_location_id": 1}`
-	req := httptest.NewRequest(http.MethodPost, "/inventory/batch/move", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/batch/move", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1702,7 +1702,7 @@ func TestBatchMove_LocationNotFound(t *testing.T) {
 	item := createTestInventoryItem(t, db, "card-1", 1, nil)
 
 	body := fmt.Sprintf(`{"ids": [%d], "storage_location_id": 99999}`, item.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/batch/move", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/batch/move", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1722,7 +1722,7 @@ func TestBatchMove_NonexistentItemIDs(t *testing.T) {
 	location := createTestStorageLocation(t, db)
 
 	body := fmt.Sprintf(`{"ids": [99998, 99999], "storage_location_id": %d}`, location.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/batch/move", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/batch/move", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1754,7 +1754,7 @@ func TestBatchMove_PartialMatch(t *testing.T) {
 
 	// Include one real ID and one nonexistent
 	body := fmt.Sprintf(`{"ids": [%d, %d, 99999], "storage_location_id": %d}`, item1.ID, item2.ID, location.ID)
-	req := httptest.NewRequest(http.MethodPost, "/inventory/batch/move", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/inventory/batch/move", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1783,7 +1783,7 @@ func TestBatchDelete_Success(t *testing.T) {
 	item3 := createTestInventoryItem(t, db, "card-3", 1, nil)
 
 	body := fmt.Sprintf(`{"ids": [%d, %d]}`, item1.ID, item2.ID)
-	req := httptest.NewRequest(http.MethodDelete, "/inventory/batch", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodDelete, "/api/inventory/batch", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1822,7 +1822,7 @@ func TestBatchDelete_EmptyIDs(t *testing.T) {
 	app, _ := setupFullInventoryTestApp(t)
 
 	body := `{"ids": []}`
-	req := httptest.NewRequest(http.MethodDelete, "/inventory/batch", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodDelete, "/api/inventory/batch", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1840,7 +1840,7 @@ func TestBatchDelete_NonexistentIDs(t *testing.T) {
 	app, _ := setupFullInventoryTestApp(t)
 
 	body := `{"ids": [99998, 99999]}`
-	req := httptest.NewRequest(http.MethodDelete, "/inventory/batch", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodDelete, "/api/inventory/batch", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -1872,7 +1872,7 @@ func TestBatchDelete_DoesNotAffectOtherItems(t *testing.T) {
 
 	// Only delete item2
 	body := fmt.Sprintf(`{"ids": [%d]}`, item2.ID)
-	req := httptest.NewRequest(http.MethodDelete, "/inventory/batch", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodDelete, "/api/inventory/batch", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)

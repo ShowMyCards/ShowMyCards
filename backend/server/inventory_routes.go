@@ -13,7 +13,7 @@ func InventoryRoutes(app *fiber.App, db *gorm.DB) {
 	autoSortSvc := services.NewAutoSortService(db)
 	handler := api.NewInventoryHandler(db, autoSortSvc)
 
-	inventory := app.Group("/inventory")
+	inventory := app.Group("/api/inventory")
 	inventory.Get("/", handler.List)
 	inventory.Get("/cards", handler.ListAsCards)
 	inventory.Get("/unassigned/count", handler.GetUnassignedCount)

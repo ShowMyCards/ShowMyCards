@@ -178,93 +178,93 @@ Go types are mapped to TypeScript as follows:
 
 ### Health
 
-- `GET /health` - Returns `{"status": "OK"}`
+- `GET /api/health` - Returns `{"status": "OK"}`
 
 ### Dashboard
 
-- `GET /dashboard` - Dashboard statistics (total cards, storage locations, etc.)
+- `GET /api/dashboard` - Dashboard statistics (total cards, storage locations, etc.)
 
 ### Storage Locations
 
-- `GET /storage` - List storage locations (paginated)
-- `GET /storage/:id` - Get single storage location
-- `POST /storage` - Create storage location
-- `PUT /storage/:id` - Update storage location
-- `DELETE /storage/:id` - Delete storage location
+- `GET /api/storage` - List storage locations (paginated)
+- `GET /api/storage/:id` - Get single storage location
+- `POST /api/storage` - Create storage location
+- `PUT /api/storage/:id` - Update storage location
+- `DELETE /api/storage/:id` - Delete storage location
 
 ### Inventory
 
-- `GET /inventory` - List inventory items (paginated)
+- `GET /api/inventory` - List inventory items (paginated)
   - Query params: `scryfall_id`, `storage_location_id` (or "null" for unassigned)
-- `GET /inventory/:id` - Get single inventory item with storage location
-- `POST /inventory` - Create inventory item (auto-evaluates sorting rules if no storage location)
-- `PUT /inventory/:id` - Update inventory item (partial updates, `clear_storage` flag)
-- `DELETE /inventory/:id` - Delete inventory item
-- `GET /inventory/cards` - List inventory as enhanced card results with Scryfall data
+- `GET /api/inventory/:id` - Get single inventory item with storage location
+- `POST /api/inventory` - Create inventory item (auto-evaluates sorting rules if no storage location)
+- `PUT /api/inventory/:id` - Update inventory item (partial updates, `clear_storage` flag)
+- `DELETE /api/inventory/:id` - Delete inventory item
+- `GET /api/inventory/cards` - List inventory as enhanced card results with Scryfall data
   - Query params: `page`, `page_size`, `storage_location_id`
-- `GET /inventory/by-oracle/:oracle_id` - Get all printings of a card by oracle ID
-- `GET /inventory/unassigned/count` - Count inventory items without storage location
-- `POST /inventory/batch/move` - Batch move items to a storage location
-- `DELETE /inventory/batch` - Batch delete inventory items
-- `POST /inventory/resort` - Re-evaluate items against sorting rules
+- `GET /api/inventory/by-oracle/:oracle_id` - Get all printings of a card by oracle ID
+- `GET /api/inventory/unassigned/count` - Count inventory items without storage location
+- `POST /api/inventory/batch/move` - Batch move items to a storage location
+- `DELETE /api/inventory/batch` - Batch delete inventory items
+- `POST /api/inventory/resort` - Re-evaluate items against sorting rules
 
 ### Lists
 
-- `GET /lists` - List all card lists with summary statistics
-- `GET /lists/:id` - Get single list
-- `POST /lists` - Create new list
-- `PUT /lists/:id` - Update list
-- `DELETE /lists/:id` - Delete list (cascade deletes items)
-- `GET /lists/:id/items` - List items with enriched card data and value calculations
+- `GET /api/lists` - List all card lists with summary statistics
+- `GET /api/lists/:id` - Get single list
+- `POST /api/lists` - Create new list
+- `PUT /api/lists/:id` - Update list
+- `DELETE /api/lists/:id` - Delete list (cascade deletes items)
+- `GET /api/lists/:id/items` - List items with enriched card data and value calculations
   - Query params: `page`, `page_size`
-- `POST /lists/:id/items` - Batch add items to list
-- `PUT /lists/:id/items/:item_id` - Update list item (quantity tracking)
-- `DELETE /lists/:id/items/:item_id` - Remove item from list
+- `POST /api/lists/:id/items` - Batch add items to list
+- `PUT /api/lists/:id/items/:item_id` - Update list item (quantity tracking)
+- `DELETE /api/lists/:id/items/:item_id` - Remove item from list
 
 ### Sorting Rules
 
-- `GET /sorting-rules` - List sorting rules (paginated, ordered by priority)
+- `GET /api/sorting-rules` - List sorting rules (paginated, ordered by priority)
   - Query params: `enabled=true|false` to filter by status
-- `GET /sorting-rules/:id` - Get single sorting rule with storage location
-- `POST /sorting-rules` - Create sorting rule
-- `PUT /sorting-rules/:id` - Update sorting rule (partial updates supported)
-- `DELETE /sorting-rules/:id` - Delete sorting rule
-- `POST /sorting-rules/evaluate` - Evaluate card data against all enabled rules
-- `POST /sorting-rules/validate` - Validate rule expression syntax
+- `GET /api/sorting-rules/:id` - Get single sorting rule with storage location
+- `POST /api/sorting-rules` - Create sorting rule
+- `PUT /api/sorting-rules/:id` - Update sorting rule (partial updates supported)
+- `DELETE /api/sorting-rules/:id` - Delete sorting rule
+- `POST /api/sorting-rules/evaluate` - Evaluate card data against all enabled rules
+- `POST /api/sorting-rules/validate` - Validate rule expression syntax
 
 ### Jobs
 
-- `GET /jobs` - List background jobs (paginated)
+- `GET /api/jobs` - List background jobs (paginated)
   - Query params: `status` (filter by job status)
-- `GET /jobs/:id` - Get single job details
+- `GET /api/jobs/:id` - Get single job details
 
 ### Banners
 
-- `GET /banners` - List the UI banners that should currently be displayed.
+- `GET /api/banners` - List the UI banners that should currently be displayed.
   Derived on demand from job state (in-progress and failed Scryfall syncs);
   not persisted. See `services.BannerService`.
 
 ### Scheduler
 
-- `GET /scheduler/tasks` - List all scheduled tasks
-- `POST /scheduler/tasks` - Create/update scheduled task
-- `POST /scheduler/tasks/:name/run` - Manually trigger a task
+- `GET /api/scheduler/tasks` - List all scheduled tasks
+- `POST /api/scheduler/tasks` - Create/update scheduled task
+- `POST /api/scheduler/tasks/:name/run` - Manually trigger a task
 
 ### Settings
 
-- `GET /settings` - Get application settings
-- `PUT /settings` - Update application settings
+- `GET /api/settings` - Get application settings
+- `PUT /api/settings` - Update application settings
 
 ### Bulk Data
 
-- `POST /bulk-data/import` - Trigger bulk data import from Scryfall
+- `POST /api/bulk-data/import` - Trigger bulk data import from Scryfall
 
 ### Card Search
 
-- `GET /search` - Search cards via Scryfall with inventory data
+- `GET /api/search` - Search cards via Scryfall with inventory data
   - Query params: `q` (search query), `page` (default: 1)
   - Returns enhanced results with inventory info (this printing, other printings)
-- `GET /search/:id` - Get single card by Scryfall ID
+- `GET /api/search/:id` - Get single card by Scryfall ID
 
 ## Domain Model
 

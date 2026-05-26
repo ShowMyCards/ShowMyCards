@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 	try {
 		// Load list metadata
-		const listResponse = await fetch(`${BACKEND_URL}/lists/${id}`);
+		const listResponse = await fetch(`${BACKEND_URL}/api/lists/${id}`);
 		if (!listResponse.ok) {
 			return {
 				list: null,
@@ -26,7 +26,9 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 		// Fetch ALL list items for client-side filtering/pagination
 		// First, get page 1 to know total pages
-		const firstPageResponse = await fetch(`${BACKEND_URL}/lists/${id}/items?page=1&page_size=100`);
+		const firstPageResponse = await fetch(
+			`${BACKEND_URL}/api/lists/${id}/items?page=1&page_size=100`
+		);
 		if (!firstPageResponse.ok) {
 			return {
 				list,
@@ -50,7 +52,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			const pagePromises = [];
 			for (let page = 2; page <= totalPages; page++) {
 				pagePromises.push(
-					fetch(`${BACKEND_URL}/lists/${id}/items?page=${page}&page_size=100`).then((res) =>
+					fetch(`${BACKEND_URL}/api/lists/${id}/items?page=${page}&page_size=100`).then((res) =>
 						res.ok ? res.json() : { data: [] }
 					)
 				);
@@ -105,7 +107,7 @@ export const actions: Actions = {
 			// Fetch all pages of search results
 			while (hasMore) {
 				const searchResponse = await fetch(
-					`${BACKEND_URL}/search?q=${encodeURIComponent(query)}&page=${page}`
+					`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}&page=${page}`
 				);
 				if (searchResponse.ok) {
 					const searchData = await searchResponse.json();
@@ -146,7 +148,7 @@ export const actions: Actions = {
 		try {
 			const items = JSON.parse(itemsJson);
 
-			const response = await fetch(`${BACKEND_URL}/lists/${id}/items/batch`, {
+			const response = await fetch(`${BACKEND_URL}/api/lists/${id}/items/batch`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -177,7 +179,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/lists/${id}/items/${itemId}`, {
+			const response = await fetch(`${BACKEND_URL}/api/lists/${id}/items/${itemId}`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
@@ -209,7 +211,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			const response = await fetch(`${BACKEND_URL}/lists/${id}/items/${itemId}`, {
+			const response = await fetch(`${BACKEND_URL}/api/lists/${id}/items/${itemId}`, {
 				method: 'DELETE'
 			});
 

@@ -85,7 +85,7 @@ func (h *testSearchHandler) Search(c fiber.Ctx) error {
 func setupSearchTestApp(mock *mockScryfallClient) *fiber.App {
 	app := fiber.New()
 	handler := &testSearchHandler{mock: mock}
-	app.Get("/search", handler.Search)
+	app.Get("/api/search", handler.Search)
 	return app
 }
 
@@ -109,7 +109,7 @@ func TestSearch_Success(t *testing.T) {
 
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search?q=lightning+bolt", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=lightning+bolt", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -151,7 +151,7 @@ func TestSearch_MissingQuery(t *testing.T) {
 	mock := &mockScryfallClient{}
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -189,7 +189,7 @@ func TestSearch_Pagination(t *testing.T) {
 
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search?q=test&page=3", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=test&page=3", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -222,7 +222,7 @@ func TestSearch_InvalidPage(t *testing.T) {
 
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search?q=test&page=-5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=test&page=-5", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -243,7 +243,7 @@ func TestSearch_APIError(t *testing.T) {
 
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search?q=test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=test", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -287,7 +287,7 @@ func TestSearch_CardWithImage(t *testing.T) {
 
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search?q=test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=test", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -327,7 +327,7 @@ func TestSearch_CardWithoutImage(t *testing.T) {
 
 	app := setupSearchTestApp(mock)
 
-	req := httptest.NewRequest(http.MethodGet, "/search?q=test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=test", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

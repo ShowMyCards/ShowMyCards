@@ -31,10 +31,10 @@ func setupSettingsTestApp(t *testing.T) (*fiber.App, *services.SettingsService) 
 	handler := NewSettingsHandler(settingsService)
 
 	app := fiber.New()
-	app.Get("/settings", handler.GetAll)
-	app.Get("/settings/:key", handler.Get)
-	app.Put("/settings/:key", handler.Update)
-	app.Put("/settings", handler.UpdateBulk)
+	app.Get("/api/settings", handler.GetAll)
+	app.Get("/api/settings/:key", handler.Get)
+	app.Put("/api/settings/:key", handler.Update)
+	app.Put("/api/settings", handler.UpdateBulk)
 
 	return app, settingsService
 }
@@ -44,7 +44,7 @@ func setupSettingsTestApp(t *testing.T) (*fiber.App, *services.SettingsService) 
 func TestSettingsGet_Success(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/settings", nil)
+	req := httptest.NewRequest("GET", "/api/settings", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("failed to make request: %v", err)
@@ -92,7 +92,7 @@ func TestSettingsGet_Success(t *testing.T) {
 func TestSettingsGetSingle_Success(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/settings/bulk_data_auto_update", nil)
+	req := httptest.NewRequest("GET", "/api/settings/bulk_data_auto_update", nil)
 	req.SetPathValue("key", "bulk_data_auto_update")
 
 	resp, err := app.Test(req)
@@ -122,7 +122,7 @@ func TestSettingsGetSingle_Success(t *testing.T) {
 func TestSettingsGetSingle_NotFound(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/settings/nonexistent_key", nil)
+	req := httptest.NewRequest("GET", "/api/settings/nonexistent_key", nil)
 	req.SetPathValue("key", "nonexistent_key")
 
 	resp, err := app.Test(req)
@@ -145,7 +145,7 @@ func TestSettingsUpdate_Success(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings/bulk_data_auto_update", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings/bulk_data_auto_update", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("key", "bulk_data_auto_update")
 
@@ -173,7 +173,7 @@ func TestSettingsUpdate_Success(t *testing.T) {
 func TestSettingsUpdate_InvalidJSON(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("PUT", "/settings/bulk_data_auto_update", bytes.NewReader([]byte("invalid json")))
+	req := httptest.NewRequest("PUT", "/api/settings/bulk_data_auto_update", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("key", "bulk_data_auto_update")
 
@@ -195,7 +195,7 @@ func TestSettingsUpdate_InvalidKey(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings/invalid_key", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings/invalid_key", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("key", "invalid_key")
 
@@ -221,7 +221,7 @@ func TestSettingsUpdateBulk_Success(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -260,7 +260,7 @@ func TestSettingsUpdateBulk_UnknownKeyIsDropped(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -301,7 +301,7 @@ func TestSettingsUpdateBulk_AppVersionIsDropped(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -327,7 +327,7 @@ func TestSettingsUpdateBulk_AppVersionIsDropped(t *testing.T) {
 func TestSettingsUpdateBulk_InvalidJSON(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader([]byte("invalid json")))
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -346,7 +346,7 @@ func TestSettingsUpdateBulk_EmptyBody(t *testing.T) {
 	updateReq := map[string]string{}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
@@ -369,7 +369,7 @@ func TestSettingsUpdateBulk_PartialUpdate(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/settings", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := app.Test(req)
