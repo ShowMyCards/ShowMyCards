@@ -44,6 +44,8 @@ describe('resolveBackendPath', () => {
 
 	describe('already-prefixed paths', () => {
 		it('passes /api/... through without doubling the prefix', () => {
+			// apiClient's server branch may receive paths that already include the
+			// /api/ prefix — the resolver should treat the leading /api/ as already-done
 			expect(resolveBackendPath('/api/data/import')).toBe('/api/data/import');
 		});
 
