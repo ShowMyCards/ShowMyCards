@@ -1,0 +1,23 @@
+[install]
+# Pin exact versions on `bun add` instead of caret ranges. Renovate already
+# turns every bump into a reviewable PR, so silent minor/patch drift is pure
+# downside.
+exact = true
+
+# Force the auditable text lockfile (`bun.lock`); prevents accidental switch
+# back to the binary `bun.lockb` that can't be code-reviewed.
+saveTextLockfile = true
+
+# Explicit registry pin. Defence-in-depth against a compromised `.npmrc` or
+# environment variable redirecting to a malicious mirror.
+registry = "https://registry.npmjs.org/"
+
+# Quarantine fresh releases for 3 days. Hijacked-account and typosquat
+# attacks are typically caught and yanked within hours; this gives the
+# ecosystem time to react before CI installs the new version.
+minimumReleaseAge = 259200
+
+# Exclude packages whose maintainers publish frequently and are
+# high-confidence to upgrade quickly. TypeScript and @types/node ship
+# multiple patch releases per week and rarely contain supply-chain risk.
+minimumReleaseAgeExcludes = ["typescript", "@types/node"]

@@ -18,6 +18,8 @@
   "rebaseWhen": "behind-base-branch",
   "platformAutomerge": true,
   "automergeStrategy": "squash",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
@@ -27,9 +29,34 @@
     "labels": ["security"],
     "schedule": ["at any time"],
     "automerge": false,
-    "prCreation": "immediate"
+    "prCreation": "immediate",
+    "minimumReleaseAge": "0"
   },
   "osvVulnerabilityAlerts": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track `go install golang.org/x/vuln/cmd/govulncheck@vX.Y.Z` in workflows. The Go module proxy resolves by module root, not subpath, so packageName is set explicitly.",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "go install golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "golang.org/x/vuln/cmd/govulncheck",
+      "packageNameTemplate": "golang.org/x/vuln",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Track `go install github.com/rhysd/actionlint/cmd/actionlint@vX.Y.Z` in workflows.",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "go install github\\.com/rhysd/actionlint/cmd/actionlint@(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "github.com/rhysd/actionlint/cmd/actionlint",
+      "packageNameTemplate": "github.com/rhysd/actionlint",
+      "datasourceTemplate": "go"
+    }
+  ],
   "packageRules": [
     {
       "description": "Auto-merge patch and lockfile-only updates for any dependency. These almost never change behaviour and have the smallest blast radius.",
