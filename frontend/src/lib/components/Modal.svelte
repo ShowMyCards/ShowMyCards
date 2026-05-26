@@ -5,16 +5,17 @@
 		open: boolean;
 		onClose: () => void;
 		title?: string;
+		boxClass?: string;
 		children: Snippet;
 		actions?: Snippet;
 	}
 
-	let { open, onClose, title, children, actions }: Props = $props();
+	let { open, onClose, title, boxClass = 'max-w-2/3', children, actions }: Props = $props();
 </script>
 
 {#if open}
 	<div class="modal modal-open">
-		<div class="modal-box max-w-2/3 max-h-2/3 w-full">
+		<div class="modal-box max-h-2/3 w-full {boxClass}">
 			{#if title}
 				<h3 class="font-bold text-lg mb-4">{title}</h3>
 			{/if}
