@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.2.0...v0.3.0) (2026-05-26)
+
+
+### Features
+
+* add filter for cards in collection ([#87](https://github.com/ShowMyCards/ShowMyCards/issues/87)) ([9348ad8](https://github.com/ShowMyCards/ShowMyCards/commit/9348ad89609a5621eb2fe48f6b458462153e8a59))
+* add search builder ([#101](https://github.com/ShowMyCards/ShowMyCards/issues/101)) ([00ca3b4](https://github.com/ShowMyCards/ShowMyCards/commit/00ca3b4b5a3a6e8191b7cd9ae3999c8e7dbf6e55))
+* enable SQLite WAL mode for safer hot backups ([#100](https://github.com/ShowMyCards/ShowMyCards/issues/100)) ([68bb8a1](https://github.com/ShowMyCards/ShowMyCards/commit/68bb8a1799d5c619aa12305e2505d1cce7e285ac))
+* Scryfall shows sync state and failures in a UI Banner ([#99](https://github.com/ShowMyCards/ShowMyCards/issues/99)) ([8f014fd](https://github.com/ShowMyCards/ShowMyCards/commit/8f014fd3213be1230e7d3f3df65bb4d3592f0566))
+
+
+### Bug Fixes
+
+* address govulns, remove vendor directory ([#108](https://github.com/ShowMyCards/ShowMyCards/issues/108)) ([982e752](https://github.com/ShowMyCards/ShowMyCards/commit/982e752e5f30c62cfb2a4fae4865fa0d3ce9f938))
+* drop non-valid settings keys ([#91](https://github.com/ShowMyCards/ShowMyCards/issues/91)) ([af8399b](https://github.com/ShowMyCards/ShowMyCards/commit/af8399b7cff534dc876d6f55866e9fd5276ec16d))
+* frontend tests locally and in ci now work correctly ([#102](https://github.com/ShowMyCards/ShowMyCards/issues/102)) ([ec33819](https://github.com/ShowMyCards/ShowMyCards/commit/ec338196130afc44c75615ee41d7f2df10049a85))
+* inventory reduction handling ([#96](https://github.com/ShowMyCards/ShowMyCards/issues/96)) ([e5903e1](https://github.com/ShowMyCards/ShowMyCards/commit/e5903e1de630bb2257fa350d68d4e66bc768a0cf))
+* use proper import icon ([#97](https://github.com/ShowMyCards/ShowMyCards/issues/97)) ([05376b6](https://github.com/ShowMyCards/ShowMyCards/commit/05376b68acca32e9254fc6fc4c7a7edcf9d22e10))
+
 ## [0.2.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.1.0...v0.2.0) (2026-05-14)
 
 
