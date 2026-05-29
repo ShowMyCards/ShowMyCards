@@ -461,6 +461,7 @@ export interface CardResult {
 	id: string;
 	oracle_id: string;
 	name: string;
+	printed_name?: string;
 	set_code?: string;
 	set_name?: string;
 	collector_number?: string;

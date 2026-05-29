@@ -95,6 +95,31 @@ func TestBuildCardResult(t *testing.T) {
 	if result.Prices.USD != "500.00" {
 		t.Errorf("Prices.USD: expected %q, got %q", "500.00", result.Prices.USD)
 	}
+	if result.PrintedName != nil {
+		t.Errorf("PrintedName: expected nil for an English card, got %q", *result.PrintedName)
+	}
+}
+
+func TestBuildCardResult_PrintedName(t *testing.T) {
+	printedName := "稲妻"
+	card := scryfall.Card{
+		ID:          "test-id",
+		Name:        "Lightning Bolt",
+		Lang:        "ja",
+		PrintedName: &printedName,
+	}
+
+	result := BuildCardResult(card)
+
+	if result.Name != "Lightning Bolt" {
+		t.Errorf("Name: expected canonical English name %q, got %q", "Lightning Bolt", result.Name)
+	}
+	if result.PrintedName == nil {
+		t.Fatal("PrintedName: expected localized name, got nil")
+	}
+	if *result.PrintedName != printedName {
+		t.Errorf("PrintedName: expected %q, got %q", printedName, *result.PrintedName)
+	}
 }
 
 func TestBuildCardResult_EmptyCard(t *testing.T) {

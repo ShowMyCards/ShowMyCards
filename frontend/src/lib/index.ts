@@ -165,6 +165,7 @@ export type { ExportData, ImportResponse } from './types/api';
 
 // Utilities
 export { getCardTreatmentName, getAvailableTreatments } from './utils/card-treatment';
+export { getDisplayName } from './utils/card-name';
 export {
 	sortBySetAndCollectorNumber,
 	createSetCollectorComparator,

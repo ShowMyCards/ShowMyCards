@@ -58,6 +58,7 @@ type CardResult struct {
 	ID              string     `json:"id"`
 	OracleID        string     `json:"oracle_id"`
 	Name            string     `json:"name"`
+	PrintedName     *string    `json:"printed_name,omitempty"`
 	SetCode         string     `json:"set_code,omitempty"`
 	SetName         string     `json:"set_name,omitempty"`
 	CollectorNumber string     `json:"collector_number,omitempty"`

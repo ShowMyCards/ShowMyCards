@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { PageHeader, getCardTreatmentName } from '$lib';
+	import { PageHeader, getCardTreatmentName, getDisplayName } from '$lib';
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, ExternalLink } from '@lucide/svelte';
 	import PriceLozenge from '$lib/components/PriceLozenge.svelte';
@@ -26,7 +26,7 @@
 </script>
 
 <svelte:head>
-	<title>{card.name} - ShowMyCards</title>
+	<title>{getDisplayName(card)} - ShowMyCards</title>
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8 max-w-6xl">
@@ -64,7 +64,7 @@
 
 		<!-- Card Details -->
 		<div class="lg:col-span-2">
-			<PageHeader title={card.name} description={card.set_name || ''} />
+			<PageHeader title={getDisplayName(card)} description={card.set_name || ''} />
 
 			<!-- Prices & Inventory -->
 			<div class="card bg-base-200 shadow-lg mb-6">
