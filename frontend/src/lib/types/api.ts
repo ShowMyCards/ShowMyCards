@@ -165,6 +165,96 @@ export interface ImportResponse {
 }
 
 //////////
+// source: decks.go
+
+/**
+ * DeckHandler handles deck endpoints.
+ */
+export interface DeckHandler {}
+/**
+ * DeckSummary represents a deck with summary statistics.
+ * Milestone 1a ships counts only. The aggregate shortfall (cards short across
+ * the deck, computed against the user's inventory) is added in 1b once the
+ * allocation service lands — see FR98/IMPLEMENTATION_PLAN.md §2.
+ * tygo:export
+ */
+export interface DeckSummary {
+	id: number /* uint */;
+	created_at: string;
+	updated_at: string;
+	name: string;
+	description: string;
+	total_items: number /* int */;
+	total_cards_demand: number /* int */;
+}
+/**
+ * CreateDeckRequest represents the request body for creating a deck.
+ * tygo:export
+ */
+export interface CreateDeckRequest {
+	name: string;
+	description: string;
+}
+/**
+ * UpdateDeckRequest represents the request body for updating a deck.
+ * tygo:export
+ */
+export interface UpdateDeckRequest {
+	name: string;
+	description: string;
+}
+/**
+ * EnrichedDeckItem represents a deck item enriched with card data and
+ * availability information.
+ * The availability fields are populated by the allocation service in
+ * Milestone 1b. In 1a the items endpoint is a stub that returns an empty
+ * response, so these fields are documented here for the type contract only.
+ * tygo:export
+ */
+export interface EnrichedDeckItem {
+	id: number /* uint */;
+	created_at: string;
+	updated_at: string;
+	deck_id: number /* uint */;
+	oracle_id: string;
+	scryfall_id: string;
+	treatment: string;
+	zone: import('./models').DeckZone;
+	desired_quantity: number /* int */;
+	/**
+	 * Enriched fields (populated from Scryfall card data in 1b).
+	 */
+	name?: string;
+	set_name?: string;
+	set_code?: string;
+	collector_number?: string;
+	rarity?: string;
+	finishes?: string[];
+	/**
+	 * Availability (populated by the allocation service in 1b).
+	 */
+	owned: number /* int */;
+	under_owned: boolean;
+	over_committed: boolean;
+}
+/**
+ * DeckItemsResponse represents the items in a deck, grouped by zone, with
+ * aggregate availability information.
+ * In 1a all zone slices are empty and AggregateShortfall is zero — the
+ * endpoint is a contract stub. 1b will populate it from the allocation
+ * service.
+ * tygo:export
+ */
+export interface DeckItemsResponse {
+	deck_id: number /* uint */;
+	command: EnrichedDeckItem[];
+	main: EnrichedDeckItem[];
+	side: EnrichedDeckItem[];
+	maybe: EnrichedDeckItem[];
+	aggregate_shortfall: number /* int */;
+}
+
+//////////
 // source: health.go
 
 /**

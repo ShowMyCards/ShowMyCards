@@ -96,6 +96,8 @@ func migrate(db *gorm.DB) error {
 		&models.Inventory{},
 		&models.List{},
 		&models.ListItem{},
+		&models.Deck{},
+		&models.DeckItem{},
 		&models.Setting{},
 		&models.Job{},
 		&models.Card{},
