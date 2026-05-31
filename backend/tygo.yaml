@@ -25,6 +25,7 @@ packages:
       time.Time: "string"
       uint: "number"
       models.Inventory: "import(\"./models\").Inventory"
+      models.DeckZone: "import(\"./models\").DeckZone"
     output_path: "../frontend/src/lib/types/api.ts"
     flatten_embed_structs: true
     # Match the repo's Prettier config (useTabs); keeps generated diffs minimal

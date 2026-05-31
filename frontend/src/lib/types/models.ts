@@ -99,6 +99,63 @@ export interface Card {
 }
 
 //////////
+// source: deck.go
+
+/**
+ * Deck represents a user-defined deck of cards.
+ * A deck is a declarative want-list: it does not hold cards directly. Owned
+ * copies live in Inventory; "decked" status is derived by the allocation
+ * service from the deck's items.
+ * tygo:export
+ */
+export interface Deck {
+	BaseModel: BaseModel;
+	name: string;
+	description?: string;
+	/**
+	 * Relationship - items in this deck
+	 */
+	items?: DeckItem[];
+}
+
+//////////
+// source: deck_item.go
+
+/**
+ * DeckZone is where a card sits within a deck.
+ * tygo:export
+ */
+export type DeckZone = string;
+export const ZoneMain: DeckZone = 'main';
+export const ZoneSide: DeckZone = 'side';
+export const ZoneCommand: DeckZone = 'command';
+export const ZoneMaybe: DeckZone = 'maybe';
+/**
+ * DeckItem represents a single card entry in a deck.
+ * ScryfallID is empty when the user does not pin a specific printing (any
+ * printing of the Oracle satisfies the entry); Treatment is empty when the
+ * user does not pin a specific finish. Both are stored as empty strings rather
+ * than NULL: SQLite treats NULLs as distinct in a unique index, which would
+ * allow duplicate "any printing" rows past the composite uniqueness check.
+ * Treatment is carried through but is NOT factored into the global
+ * over-commitment math in Milestone 1 (see FR98/IMPLEMENTATION_PLAN.md §2).
+ * tygo:export
+ */
+export interface DeckItem {
+	BaseModel: BaseModel;
+	deck_id: number /* uint */;
+	oracle_id: string;
+	scryfall_id: string;
+	treatment: string;
+	zone: DeckZone;
+	desired_quantity: number /* int */;
+	/**
+	 * Relationship
+	 */
+	deck?: Deck;
+}
+
+//////////
 // source: inventory.go
 
 /**
