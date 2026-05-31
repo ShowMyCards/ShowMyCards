@@ -15,6 +15,7 @@
 		TreatmentBadge,
 		isFoilTreatment,
 		getCardTreatmentName,
+		getDisplayName,
 		notifications,
 		usePersistedViewMode,
 		SCRYFALL_LANGUAGES,
@@ -131,7 +132,7 @@
 		if (filterText.trim()) {
 			const search = filterText.toLowerCase().trim();
 			filtered = filtered.filter((card) => {
-				const name = (card.name || '').toLowerCase();
+				const name = `${card.name ?? ''} ${card.printed_name ?? ''}`.toLowerCase();
 				const setName = (card.set_name || '').toLowerCase();
 				const treatmentName = getCardTreatmentName(
 					card.finishes,
@@ -346,7 +347,7 @@
 								<tr class="hover:bg-base-300">
 									<td>
 										<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
-											{card.name}
+											{getDisplayName(card)}
 										</a>
 									</td>
 									<td>

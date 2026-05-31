@@ -25,6 +25,7 @@ func BuildCardResult(card scryfall.Card) CardResult {
 		ID:              card.ID,
 		OracleID:        card.OracleID,
 		Name:            card.Name,
+		PrintedName:     card.PrintedName,
 		SetCode:         card.Set,
 		SetName:         card.SetName,
 		CollectorNumber: card.CollectorNumber,

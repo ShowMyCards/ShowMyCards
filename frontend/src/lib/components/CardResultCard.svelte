@@ -3,6 +3,7 @@
 	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '$lib';
 	import {
 		getCardTreatmentName,
+		getDisplayName,
 		getActionError,
 		notifications,
 		keyboard,
@@ -356,7 +357,7 @@
 				<a
 					href={resolve(`/cards/${card.id}`)}
 					class="card-title text-lg hover:text-primary transition-colors">
-					{card.name}
+					{getDisplayName(card)}
 				</a>
 				<div class="text-sm opacity-70 flex items-center gap-2 flex-wrap">
 					<span>{card.set_name}</span>
