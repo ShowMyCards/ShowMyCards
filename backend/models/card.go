@@ -129,6 +129,81 @@ func GetCardsByIDs(db *gorm.DB, scryfallIDs []string) (map[string]Card, error) {
 	return cardMap, nil
 }
 
+// PrintKey identifies a printing by its set code and collector number, which a
+// card shares across all of its language variants.
+type PrintKey struct {
+	SetCode         string
+	CollectorNumber string
+}
+
+// String returns the map key form "set|collector_number".
+func (k PrintKey) String() string {
+	return k.SetCode + "|" + k.CollectorNumber
+}
+
+// GetEnglishPricesByPrint returns English-printing prices keyed by
+// "set|collector_number" for the requested prints. Scryfall populates prices
+// only on the English printing of each set + collector number; non-English
+// printings carry empty prices, so callers use this to back-fill them.
+//
+// Prices are read with json_extract (COALESCE'd to "") to avoid unmarshaling
+// full card JSON. The query is backed by idx_cards_print_lookup.
+func GetEnglishPricesByPrint(db *gorm.DB, keys []PrintKey) (map[string]scryfall.Prices, error) {
+	result := make(map[string]scryfall.Prices)
+	if len(keys) == 0 {
+		return result, nil
+	}
+
+	// Dedupe input pairs for the IN clause.
+	seen := make(map[string]bool, len(keys))
+	pairs := make([][]any, 0, len(keys))
+	for _, k := range keys {
+		if seen[k.String()] {
+			continue
+		}
+		seen[k.String()] = true
+		pairs = append(pairs, []any{k.SetCode, k.CollectorNumber})
+	}
+
+	type priceRow struct {
+		SetCode         string
+		CollectorNumber string
+		USD             string
+		USDFoil         string
+		USDEtched       string
+		EUR             string
+		EURFoil         string
+		Tix             string
+	}
+
+	var rows []priceRow
+	if err := db.Table("cards").
+		Select(`set_code, collector_number,
+			COALESCE(json_extract(raw_json, '$.prices.usd'), '') AS usd,
+			COALESCE(json_extract(raw_json, '$.prices.usd_foil'), '') AS usd_foil,
+			COALESCE(json_extract(raw_json, '$.prices.usd_etched'), '') AS usd_etched,
+			COALESCE(json_extract(raw_json, '$.prices.eur'), '') AS eur,
+			COALESCE(json_extract(raw_json, '$.prices.eur_foil'), '') AS eur_foil,
+			COALESCE(json_extract(raw_json, '$.prices.tix'), '') AS tix`).
+		Where("lang = ? AND (set_code, collector_number) IN ?", "en", pairs).
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("fetching english prices by print: %w", err)
+	}
+
+	for _, r := range rows {
+		key := PrintKey{SetCode: r.SetCode, CollectorNumber: r.CollectorNumber}
+		result[key.String()] = scryfall.Prices{
+			USD:       r.USD,
+			USDFoil:   r.USDFoil,
+			USDEtched: r.USDEtched,
+			EUR:       r.EUR,
+			EURFoil:   r.EURFoil,
+			Tix:       r.Tix,
+		}
+	}
+	return result, nil
+}
+
 // GetScryfallCardsByIDs fetches cards by their Scryfall IDs, unmarshals them,
 // and returns a map of Scryfall ID to parsed scryfall.Card.
 // Cards that fail to unmarshal are logged and skipped.
