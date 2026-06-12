@@ -472,6 +472,83 @@ func TestCard_GetCardsByIDs(t *testing.T) {
 	}
 }
 
+// setupPriceLookupDB builds a cards table with the generated columns the
+// English-price fallback relies on, mirroring the production migration.
+func setupPriceLookupDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := setupCardTestDB(t)
+	for _, stmt := range []string{
+		`ALTER TABLE cards ADD COLUMN set_code TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.set')) VIRTUAL`,
+		`ALTER TABLE cards ADD COLUMN collector_number TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.collector_number')) VIRTUAL`,
+		`ALTER TABLE cards ADD COLUMN lang TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.lang')) VIRTUAL`,
+	} {
+		if err := db.Exec(stmt).Error; err != nil {
+			t.Fatalf("failed to add generated column: %v", err)
+		}
+	}
+	return db
+}
+
+func TestGetEnglishPricesByPrint(t *testing.T) {
+	db := setupPriceLookupDB(t)
+
+	// English and German printings of the same set + collector number. Only the
+	// English printing carries prices, mirroring how Scryfall stores data.
+	cards := []*Card{
+		{ScryfallID: "en-id", OracleID: "oracle-1", RawJSON: `{"id":"en-id","set":"c21","collector_number":"263","lang":"en","prices":{"usd":"1.73","usd_foil":null,"eur":"0.92","tix":"0.06"}}`},
+		{ScryfallID: "de-id", OracleID: "oracle-1", RawJSON: `{"id":"de-id","set":"c21","collector_number":"263","lang":"de","prices":{"usd":null,"eur":null}}`},
+		{ScryfallID: "en-id-2", OracleID: "oracle-2", RawJSON: `{"id":"en-id-2","set":"neo","collector_number":"1","lang":"en","prices":{"usd":"5.00","eur":"4.00"}}`},
+	}
+	for _, c := range cards {
+		if err := db.Create(c).Error; err != nil {
+			t.Fatalf("failed to create card: %v", err)
+		}
+	}
+
+	t.Run("resolves english prices for requested prints", func(t *testing.T) {
+		got, err := GetEnglishPricesByPrint(db, []PrintKey{
+			{SetCode: "c21", CollectorNumber: "263"},
+			{SetCode: "neo", CollectorNumber: "1"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		c21 := got["c21|263"]
+		if c21.USD != "1.73" || c21.EUR != "0.92" || c21.Tix != "0.06" {
+			t.Errorf("c21/263: expected usd 1.73 / eur 0.92 / tix 0.06, got %+v", c21)
+		}
+		if c21.USDFoil != "" {
+			t.Errorf("c21/263: expected empty usd_foil (null in source), got %q", c21.USDFoil)
+		}
+		neo := got["neo|1"]
+		if neo.USD != "5.00" || neo.EUR != "4.00" {
+			t.Errorf("neo/1: expected usd 5.00 / eur 4.00, got %+v", neo)
+		}
+	})
+
+	t.Run("only matches english printings", func(t *testing.T) {
+		// Request a print with no English printing at all.
+		got, err := GetEnglishPricesByPrint(db, []PrintKey{{SetCode: "xxx", CollectorNumber: "999"}})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("expected no matches, got %d", len(got))
+		}
+	})
+
+	t.Run("empty input returns empty map", func(t *testing.T) {
+		got, err := GetEnglishPricesByPrint(db, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("expected empty map, got %d", len(got))
+		}
+	})
+}
+
 // LOW-VALUE: Tests a one-liner that returns a constant string. Verifies Go works, not business logic.
 func TestCard_TableName(t *testing.T) {
 	card := Card{}

@@ -202,6 +202,13 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 		}
 	}
 
+	// Back-fill prices for non-English printings from their English counterpart.
+	ptrs := make([]*CardResult, len(cards))
+	for i := range cards {
+		ptrs[i] = &cards[i].CardResult
+	}
+	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), ptrs)
+
 	response := SearchResponse{
 		Data:       cards,
 		Page:       result.Page,
@@ -249,6 +256,9 @@ func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 			inventoryData.OtherPrintings = append(inventoryData.OtherPrintings, inv)
 		}
 	}
+
+	// Back-fill prices for a non-English printing from its English counterpart.
+	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), []*CardResult{&cardResult})
 
 	return c.JSON(EnhancedCardResult{
 		CardResult: cardResult,
