@@ -18,9 +18,9 @@
  * tygo:export
  */
 export type BannerSeverity = string;
-export const BannerSeverityInfo: BannerSeverity = 'info';
-export const BannerSeverityWarning: BannerSeverity = 'warning';
-export const BannerSeverityError: BannerSeverity = 'error';
+export const BannerSeverityInfo: BannerSeverity = "info";
+export const BannerSeverityWarning: BannerSeverity = "warning";
+export const BannerSeverityError: BannerSeverity = "error";
 /**
  * Banner is a transient, server-derived message surfaced in the UI.
  * Banners are computed on demand (see services.BannerService) and never
@@ -97,6 +97,14 @@ export interface Card {
 	name: string;
 	set_code: string;
 }
+/**
+ * PrintKey identifies a printing by its set code and collector number, which a
+ * card shares across all of its language variants.
+ */
+export interface PrintKey {
+	SetCode: string;
+	CollectorNumber: string;
+}
 
 //////////
 // source: deck.go
@@ -126,10 +134,10 @@ export interface Deck {
  * tygo:export
  */
 export type DeckZone = string;
-export const ZoneMain: DeckZone = 'main';
-export const ZoneSide: DeckZone = 'side';
-export const ZoneCommand: DeckZone = 'command';
-export const ZoneMaybe: DeckZone = 'maybe';
+export const ZoneMain: DeckZone = "main";
+export const ZoneSide: DeckZone = "side";
+export const ZoneCommand: DeckZone = "command";
+export const ZoneMaybe: DeckZone = "maybe";
 /**
  * DeckItem represents a single card entry in a deck.
  * ScryfallID is empty when the user does not pin a specific printing (any
@@ -183,18 +191,19 @@ export interface Inventory {
  * tygo:export
  */
 export type JobType = string;
-export const JobTypeBulkDataImport: JobType = 'bulk_data_import';
-export const JobTypeSetDataImport: JobType = 'set_data_import';
+export const JobTypeBulkDataImport: JobType = "bulk_data_import";
+export const JobTypeSetDataImport: JobType = "set_data_import";
+export const JobTypeSymbolDataImport: JobType = "symbol_data_import";
 /**
  * JobStatus represents the status of a job
  * tygo:export
  */
 export type JobStatus = string;
-export const JobStatusPending: JobStatus = 'pending';
-export const JobStatusInProgress: JobStatus = 'in_progress';
-export const JobStatusCompleted: JobStatus = 'completed';
-export const JobStatusFailed: JobStatus = 'failed';
-export const JobStatusCancelled: JobStatus = 'cancelled';
+export const JobStatusPending: JobStatus = "pending";
+export const JobStatusInProgress: JobStatus = "in_progress";
+export const JobStatusCompleted: JobStatus = "completed";
+export const JobStatusFailed: JobStatus = "failed";
+export const JobStatusCancelled: JobStatus = "cancelled";
 /**
  * Job represents a long-running background job
  * tygo:export
@@ -305,8 +314,8 @@ export interface SortingRule {
  * tygo:export
  */
 export type StorageType = string;
-export const Box: StorageType = 'Box';
-export const Binder: StorageType = 'Binder';
+export const Box: StorageType = "Box";
+export const Binder: StorageType = "Binder";
 /**
  * tygo:export
  */
@@ -314,4 +323,29 @@ export interface StorageLocation {
 	BaseModel: BaseModel;
 	name: string;
 	storage_type: StorageType;
+}
+
+//////////
+// source: symbol.go
+
+/**
+ * Symbol represents a Magic card symbol (mana, tap, etc.) sourced from
+ * Scryfall's symbology endpoint. The cached SVG content is stored directly
+ * in SQLite so it can be served without re-fetching from Scryfall.
+ * tygo:export
+ */
+export interface Symbol {
+	/**
+	 * Code is the normalized symbol key with surrounding braces stripped and
+	 * uppercased (e.g. "T", "W", "2"). It is used for API lookups.
+	 */
+	code: string;
+	/**
+	 * Symbol is the original Scryfall representation including braces (e.g. "{T}").
+	 */
+	symbol: string;
+	/**
+	 * English is the human-readable description of the symbol.
+	 */
+	english: string;
 }

@@ -14,14 +14,15 @@ import (
 type JobType string
 
 const (
-	JobTypeBulkDataImport JobType = "bulk_data_import"
-	JobTypeSetDataImport  JobType = "set_data_import"
+	JobTypeBulkDataImport   JobType = "bulk_data_import"
+	JobTypeSetDataImport    JobType = "set_data_import"
+	JobTypeSymbolDataImport JobType = "symbol_data_import"
 )
 
 // Valid checks if the job type is valid
 func (jt JobType) Valid() bool {
 	switch jt {
-	case JobTypeBulkDataImport, JobTypeSetDataImport:
+	case JobTypeBulkDataImport, JobTypeSetDataImport, JobTypeSymbolDataImport:
 		return true
 	default:
 		return false

@@ -32,6 +32,10 @@ func (m *mockAPI) ListSets(ctx context.Context) ([]scryfall.Set, error) {
 	return nil, nil
 }
 
+func (m *mockAPI) ListCardSymbols(ctx context.Context) ([]scryfall.CardSymbol, error) {
+	return nil, nil
+}
+
 func (m *mockAPI) AutocompleteCard(ctx context.Context, s string) ([]string, error) {
 	return nil, nil
 }

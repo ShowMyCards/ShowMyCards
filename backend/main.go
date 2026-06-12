@@ -71,6 +71,7 @@ func main() {
 	jobService := services.NewJobService(dbClient.DB)
 	bulkDataService := services.NewBulkDataService(dbClient.DB, jobService, settingsService)
 	setDataService := services.NewSetDataService(dbClient.DB, jobService, settingsService, scryfallClient, dataDir)
+	symbolDataService := services.NewSymbolDataService(dbClient.DB, jobService, settingsService, scryfallClient)
 
 	// Check database version compatibility
 	if err := version.CheckAndUpdate(context.Background(), settingsService); err != nil {
@@ -100,10 +101,15 @@ func main() {
 		slog.Warn("failed to trigger initial set import", "error", err)
 	}
 
-	// Initialize server with database, scryfall clients, and services
-	srv := server.NewServer(ctx, dbClient, scryfallClient, settingsService, jobService, bulkDataService, setDataService, dataDir)
+	// Trigger initial symbol data import if no data exists
+	if err := symbolDataService.TriggerInitialImport(ctx); err != nil {
+		slog.Warn("failed to trigger initial symbol import", "error", err)
+	}
 
-	scheduler := services.NewScheduler(bulkDataService, setDataService, jobService, settingsService)
+	// Initialize server with database, scryfall clients, and services
+	srv := server.NewServer(ctx, dbClient, scryfallClient, settingsService, jobService, bulkDataService, setDataService, symbolDataService, dataDir)
+
+	scheduler := services.NewScheduler(bulkDataService, setDataService, symbolDataService, jobService, settingsService)
 	scheduler.Start(ctx)
 	defer scheduler.Stop()
 
