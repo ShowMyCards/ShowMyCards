@@ -336,6 +336,23 @@ export interface BatchMoveResponse {
 	updated: number /* int */;
 }
 /**
+ * SplitMoveRequest represents the request body for moving a partial quantity of an
+ * inventory stack to another storage location.
+ * tygo:export
+ */
+export interface SplitMoveRequest {
+	quantity: number /* int */;
+	storage_location_id?: number /* uint */;
+}
+/**
+ * SplitMoveResponse represents the result of a split-move operation.
+ * tygo:export
+ */
+export interface SplitMoveResponse {
+	source?: import('./models').Inventory; // nil if the source stack was fully moved (row deleted)
+	destination: import('./models').Inventory; // the stack that was merged-into or newly created
+}
+/**
  * BatchDeleteRequest represents the request body for deleting multiple inventory items
  * tygo:export
  */
