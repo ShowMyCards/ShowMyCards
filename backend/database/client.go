@@ -172,12 +172,40 @@ func customMigrations(db *gorm.DB) error {
 		}
 	}
 
+	// collector_number and lang back the English-price fallback: non-English
+	// printings share a set + collector_number with the English printing but
+	// Scryfall populates prices only on the English one (see GetEnglishPricesByPrint).
+	// These are VIRTUAL (not STORED): SQLite rejects adding a STORED generated
+	// column to an already-populated table, whereas a VIRTUAL one can be added
+	// regardless of row count and can still be indexed (idx_cards_print_lookup).
+	if !existingCols["collector_number"] {
+		if err := db.Exec(`
+			ALTER TABLE cards ADD COLUMN collector_number TEXT
+			GENERATED ALWAYS AS (json_extract(raw_json, '$.collector_number')) VIRTUAL
+		`).Error; err != nil {
+			return fmt.Errorf("failed to add collector_number column: %w", err)
+		}
+	}
+
+	if !existingCols["lang"] {
+		if err := db.Exec(`
+			ALTER TABLE cards ADD COLUMN lang TEXT
+			GENERATED ALWAYS AS (json_extract(raw_json, '$.lang')) VIRTUAL
+		`).Error; err != nil {
+			return fmt.Errorf("failed to add lang column: %w", err)
+		}
+	}
+
 	// Create indexes (IF NOT EXISTS is natively supported)
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_cards_name ON cards(name)").Error; err != nil {
 		return fmt.Errorf("failed to create name index: %w", err)
 	}
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_cards_set_code ON cards(set_code)").Error; err != nil {
 		return fmt.Errorf("failed to create set_code index: %w", err)
+	}
+	// Composite index for the English-price fallback lookup.
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_cards_print_lookup ON cards(set_code, collector_number, lang)").Error; err != nil {
+		return fmt.Errorf("failed to create print lookup index: %w", err)
 	}
 
 	return nil

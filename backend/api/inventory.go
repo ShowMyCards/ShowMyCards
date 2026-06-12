@@ -364,6 +364,13 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 		enhancedResults = append(enhancedResults, enhancedCard)
 	}
 
+	// Back-fill prices for non-English printings from their English counterpart.
+	ptrs := make([]*CardResult, len(enhancedResults))
+	for i := range enhancedResults {
+		ptrs[i] = &enhancedResults[i].CardResult
+	}
+	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), ptrs)
+
 	// Calculate total pages
 	totalPages := utils.CalculateTotalPages(total, params.PageSize)
 
@@ -388,9 +395,9 @@ type ExistingPrintingInfo struct {
 // ByOracleResponse represents the response for checking existing printings
 // tygo:export
 type ByOracleResponse struct {
-	OracleID  string                           `json:"oracle_id"`
-	Printings []ExistingPrintingInfo           `json:"printings"`
-	Locations []models.StorageLocation         `json:"locations"` // Unique locations where this card exists
+	OracleID  string                   `json:"oracle_id"`
+	Printings []ExistingPrintingInfo   `json:"printings"`
+	Locations []models.StorageLocation `json:"locations"` // Unique locations where this card exists
 }
 
 // ByOracle returns inventory items for a given oracle ID
@@ -566,10 +573,10 @@ type ResortMovement struct {
 // ResortResponse represents the response for resort operations
 // tygo:export
 type ResortResponse struct {
-	Processed int               `json:"processed"`
-	Updated   int               `json:"updated"`
-	Errors    int               `json:"errors"`
-	Movements []ResortMovement  `json:"movements,omitempty"`
+	Processed int              `json:"processed"`
+	Updated   int              `json:"updated"`
+	Errors    int              `json:"errors"`
+	Movements []ResortMovement `json:"movements,omitempty"`
 }
 
 // resortEvalResult holds the evaluation results for batch updating after resort
@@ -577,8 +584,8 @@ type resortEvalResult struct {
 	processed int
 	errors    int
 	movements []ResortMovement
-	clearIDs  []uint            // items to unassign
-	moveMap   map[uint][]uint   // locationID -> []itemID
+	clearIDs  []uint          // items to unassign
+	moveMap   map[uint][]uint // locationID -> []itemID
 }
 
 // evaluateResortItems evaluates sorting rules against each inventory item and

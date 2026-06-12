@@ -3,7 +3,11 @@ package api
 import (
 	"testing"
 
+	"backend/models"
+
 	scryfall "github.com/BlueMonday/go-scryfall"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestBuildCardPrices(t *testing.T) {
@@ -130,5 +134,72 @@ func TestBuildCardResult_EmptyCard(t *testing.T) {
 	}
 	if result.Name != "" {
 		t.Errorf("expected empty Name, got %q", result.Name)
+	}
+}
+
+func TestCardPrices_IsEmpty(t *testing.T) {
+	if !(CardPrices{}).IsEmpty() {
+		t.Error("zero-value CardPrices should be empty")
+	}
+	if (CardPrices{USD: "1.00"}).IsEmpty() {
+		t.Error("CardPrices with a usd price should not be empty")
+	}
+	if (CardPrices{Tix: "0.01"}).IsEmpty() {
+		t.Error("CardPrices with only a tix price should not be empty")
+	}
+}
+
+// setupBackfillTestDB builds a cards table with the generated columns the
+// English-price fallback relies on, mirroring the production migration.
+func setupBackfillTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to connect to test database: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Card{}); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE cards ADD COLUMN set_code TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.set')) VIRTUAL`,
+		`ALTER TABLE cards ADD COLUMN collector_number TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.collector_number')) VIRTUAL`,
+		`ALTER TABLE cards ADD COLUMN lang TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.lang')) VIRTUAL`,
+	} {
+		if err := db.Exec(stmt).Error; err != nil {
+			t.Fatalf("failed to add generated column: %v", err)
+		}
+	}
+	return db
+}
+
+func TestBackfillEnglishPrices(t *testing.T) {
+	db := setupBackfillTestDB(t)
+
+	if err := db.Create(&models.Card{
+		ScryfallID: "en-id",
+		OracleID:   "oracle-1",
+		RawJSON:    `{"id":"en-id","set":"c21","collector_number":"263","lang":"en","prices":{"usd":"1.73","eur":"0.92"}}`,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed english card: %v", err)
+	}
+
+	german := &CardResult{ID: "de-id", Language: "de", SetCode: "c21", CollectorNumber: "263", Prices: CardPrices{}}
+	englishPriced := &CardResult{ID: "en-id", Language: "en", SetCode: "c21", CollectorNumber: "263", Prices: CardPrices{USD: "1.73"}}
+	frenchNoEnglish := &CardResult{ID: "fr-id", Language: "fr", SetCode: "xxx", CollectorNumber: "999", Prices: CardPrices{}}
+	germanWithOwnPrice := &CardResult{ID: "de-id-2", Language: "de", SetCode: "c21", CollectorNumber: "263", Prices: CardPrices{USD: "9.99"}}
+
+	BackfillEnglishPrices(db, []*CardResult{german, englishPriced, frenchNoEnglish, germanWithOwnPrice})
+
+	if german.Prices.USD != "1.73" || german.Prices.EUR != "0.92" {
+		t.Errorf("german: expected backfilled usd 1.73 / eur 0.92, got %+v", german.Prices)
+	}
+	if englishPriced.Prices.USD != "1.73" {
+		t.Errorf("english: expected untouched usd 1.73, got %+v", englishPriced.Prices)
+	}
+	if !frenchNoEnglish.Prices.IsEmpty() {
+		t.Errorf("french with no english printing: expected unchanged (empty), got %+v", frenchNoEnglish.Prices)
+	}
+	if germanWithOwnPrice.Prices.USD != "9.99" {
+		t.Errorf("german with own price: expected untouched usd 9.99, got %+v", germanWithOwnPrice.Prices)
 	}
 }
