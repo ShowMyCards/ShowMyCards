@@ -126,6 +126,16 @@
       "matchUpdateTypes": ["major", "minor"],
       "automerge": false,
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Fast-track Go toolchain patch bumps. Stdlib security fixes ship as Go patch releases, but Renovate's vulnerability alerts key off declared module dependencies and never map a stdlib advisory to the `go` directive — so the weekly schedule + minimumReleaseAge would otherwise leave govulncheck red for days. Patches are low-risk and CI-gated, so auto-merge them as soon as they land.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchUpdateTypes": ["patch"],
+      "schedule": ["at any time"],
+      "minimumReleaseAge": "0",
+      "automerge": true,
+      "labels": ["dependencies", "security"]
     }
   ]
 }
