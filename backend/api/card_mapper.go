@@ -68,6 +68,62 @@ func BackfillEnglishPrices(db *gorm.DB, results []*CardResult) {
 	}
 }
 
+// scryfallPricesEmpty reports whether a scryfall.Prices carries no price field.
+func scryfallPricesEmpty(p scryfall.Prices) bool {
+	return p.USD == "" && p.USDFoil == "" && p.USDEtched == "" &&
+		p.EUR == "" && p.EURFoil == "" && p.Tix == ""
+}
+
+// ResolveEnglishPrices returns effective prices keyed by Scryfall ID for the
+// given cards, applying the English-printing fallback for non-English printings
+// that have no price of their own. It mirrors BackfillEnglishPrices but works on
+// scryfall.Prices, for callers that compute prices as floats via
+// utils.ParsePriceFromScryfall (e.g. lists) rather than going through
+// CardResult/CardPrices. Both paths share the same English-price lookup
+// (models.GetEnglishPricesByPrint).
+//
+// Best-effort: on a query error or when no English printing is found, the
+// affected card keeps its own (possibly empty) prices.
+func ResolveEnglishPrices(db *gorm.DB, cards map[string]scryfall.Card) map[string]scryfall.Prices {
+	resolved := make(map[string]scryfall.Prices, len(cards))
+	for id, card := range cards {
+		resolved[id] = card.Prices
+	}
+
+	// Collect prints that need a fallback: non-English, no price of their own,
+	// and identifiable by set + collector number.
+	var keys []models.PrintKey
+	for _, card := range cards {
+		if string(card.Lang) == "en" || !scryfallPricesEmpty(card.Prices) {
+			continue
+		}
+		if card.Set == "" || card.CollectorNumber == "" {
+			continue
+		}
+		keys = append(keys, models.PrintKey{SetCode: card.Set, CollectorNumber: card.CollectorNumber})
+	}
+	if len(keys) == 0 {
+		return resolved
+	}
+
+	pricesByPrint, err := models.GetEnglishPricesByPrint(db, keys)
+	if err != nil {
+		slog.Warn("english price fallback lookup failed", "component", "lists", "error", err)
+		return resolved
+	}
+
+	for id, card := range cards {
+		if string(card.Lang) == "en" || !scryfallPricesEmpty(card.Prices) {
+			continue
+		}
+		key := models.PrintKey{SetCode: card.Set, CollectorNumber: card.CollectorNumber}
+		if prices, ok := pricesByPrint[key.String()]; ok {
+			resolved[id] = prices
+		}
+	}
+	return resolved
+}
+
 // BuildCardResult creates a CardResult from a Scryfall card, extracting all
 // display fields and converting enum types to strings.
 func BuildCardResult(card scryfall.Card) CardResult {

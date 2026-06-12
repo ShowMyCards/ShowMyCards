@@ -541,6 +541,167 @@ func TestListItems_CompletionPercentage_EmptyList(t *testing.T) {
 	}
 }
 
+// setupListTestAppWithPrintLookup builds a list test app whose cards table has
+// the generated columns (set_code, collector_number, lang) and index that the
+// English-price fallback (models.GetEnglishPricesByPrint) relies on, mirroring
+// the production migration.
+func setupListTestAppWithPrintLookup(t *testing.T) (*fiber.App, *gorm.DB) {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to connect to test database: %v", err)
+	}
+
+	db.Exec("PRAGMA foreign_keys = ON")
+
+	if err := db.AutoMigrate(&models.List{}, &models.ListItem{}, &models.Card{}); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE cards ADD COLUMN set_code TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.set')) VIRTUAL`,
+		`ALTER TABLE cards ADD COLUMN collector_number TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.collector_number')) VIRTUAL`,
+		`ALTER TABLE cards ADD COLUMN lang TEXT GENERATED ALWAYS AS (json_extract(raw_json, '$.lang')) VIRTUAL`,
+	} {
+		if err := db.Exec(stmt).Error; err != nil {
+			t.Fatalf("failed to add generated column: %v", err)
+		}
+	}
+
+	app := fiber.New()
+	handler := NewListHandler(db)
+	app.Get("/api/lists/:id/items", handler.ListItems)
+
+	return app, db
+}
+
+// seedCardWithPrint inserts a card with explicit set, collector number, language
+// and prices so the English-price fallback can be exercised.
+func seedCardWithPrint(t *testing.T, db *gorm.DB, scryfallID, set, collectorNumber, lang, usd, usdFoil string) {
+	t.Helper()
+	rawJSON := fmt.Sprintf(`{
+		"id": "%s", "name": "Sol Ring", "set": "%s", "set_name": "Commander 2021",
+		"rarity": "uncommon", "collector_number": "%s", "lang": "%s",
+		"released_at": "2021-04-23", "type_line": "Artifact", "mana_cost": "{1}",
+		"cmc": 1.0, "layout": "normal",
+		"prices": {"usd": "%s", "usd_foil": "%s", "usd_etched": ""},
+		"colors": [], "color_identity": [], "keywords": [],
+		"finishes": ["nonfoil", "foil"], "promo_types": []
+	}`, scryfallID, set, collectorNumber, lang, usd, usdFoil)
+	card := models.Card{
+		ScryfallID: scryfallID,
+		OracleID:   "oracle-sol-ring",
+		RawJSON:    rawJSON,
+	}
+	if err := db.Create(&card).Error; err != nil {
+		t.Fatalf("failed to create test card: %v", err)
+	}
+}
+
+// TestListItems_EnglishPriceFallback verifies that a non-English list item with
+// no price of its own is back-filled from the English printing of the same set +
+// collector number (both for the displayed price and for value totals), while an
+// already-priced English item is left untouched.
+func TestListItems_EnglishPriceFallback(t *testing.T) {
+	app, db := setupListTestAppWithPrintLookup(t)
+
+	// English printing carries the price; the German printing of the same
+	// set + collector number has empty prices (as Scryfall ships them).
+	seedCardWithPrint(t, db, "en-sol", "c21", "263", "en", "1.73", "5.00")
+	seedCardWithPrint(t, db, "de-sol", "c21", "263", "de", "", "")
+
+	list := createTestList(t, db, "Mixed Language Deck")
+	// Non-English item: should be back-filled to the English price (1.73).
+	createTestListItem(t, db, list.ID, "de-sol", "oracle-sol-ring", "nonfoil", 4, 2)
+	// English item: already priced, must stay at its own price (1.73).
+	createTestListItem(t, db, list.ID, "en-sol", "oracle-sol-ring", "nonfoil", 2, 1)
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result ListItemsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Find the enriched items by Scryfall ID.
+	prices := make(map[string]float64, len(result.Data))
+	for _, item := range result.Data {
+		prices[item.ScryfallID] = item.CurrentPrice
+	}
+
+	if prices["de-sol"] != 1.73 {
+		t.Errorf("non-english item: expected back-filled current_price 1.73, got %.2f", prices["de-sol"])
+	}
+	if prices["en-sol"] != 1.73 {
+		t.Errorf("english item: expected untouched current_price 1.73, got %.2f", prices["en-sol"])
+	}
+
+	// Value totals must include the backed-off price for the German item.
+	// Collected: de (1.73 * 2) + en (1.73 * 1) = 5.19
+	if !floatsClose(result.TotalCollectedValue, 5.19) {
+		t.Errorf("expected total_collected_value 5.19, got %.4f", result.TotalCollectedValue)
+	}
+	// Remaining: de has 2 remaining (1.73 * 2 = 3.46); en has 1 remaining (1.73). Total 5.19.
+	if !floatsClose(result.TotalRemainingValue, 5.19) {
+		t.Errorf("expected total_remaining_value 5.19, got %.4f", result.TotalRemainingValue)
+	}
+}
+
+// floatsClose reports whether two float values are equal within a small epsilon,
+// to avoid spurious failures from floating-point accumulation in value totals.
+func floatsClose(a, b float64) bool {
+	const epsilon = 1e-9
+	diff := a - b
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff < epsilon
+}
+
+// TestListItems_NonEnglishWithOwnPrice verifies that a non-English item that
+// does carry its own price keeps it and is not overwritten by the fallback.
+func TestListItems_NonEnglishWithOwnPrice(t *testing.T) {
+	app, db := setupListTestAppWithPrintLookup(t)
+
+	// English printing priced at 1.73, but the German printing has its own 9.99.
+	seedCardWithPrint(t, db, "en-sol", "c21", "263", "en", "1.73", "5.00")
+	seedCardWithPrint(t, db, "de-sol", "c21", "263", "de", "9.99", "")
+
+	list := createTestList(t, db, "German Deck")
+	createTestListItem(t, db, list.ID, "de-sol", "oracle-sol-ring", "nonfoil", 1, 1)
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/lists/%d/items", list.ID), nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result ListItemsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result.Data) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(result.Data))
+	}
+	if result.Data[0].CurrentPrice != 9.99 {
+		t.Errorf("non-english item with own price: expected 9.99 untouched, got %.2f", result.Data[0].CurrentPrice)
+	}
+	if result.TotalCollectedValue != 9.99 {
+		t.Errorf("expected total_collected_value 9.99, got %.2f", result.TotalCollectedValue)
+	}
+}
+
 func TestListItems_ValueCalculation_MixedCompletion(t *testing.T) {
 	app, db := setupListTestAppWithCards(t)
 
