@@ -32,7 +32,8 @@ func setupSchedulerTest(t *testing.T) (*Scheduler, *BulkDataService, *JobService
 		t.Fatalf("failed to create scryfall client: %v", err)
 	}
 	setDataService := NewSetDataService(db, jobService, settingsService, scryfallClient, t.TempDir())
-	scheduler := NewScheduler(bulkDataService, setDataService, jobService, settingsService)
+	backupService := NewBackupService(stubExporter{}, settingsService, t.TempDir())
+	scheduler := NewScheduler(bulkDataService, setDataService, jobService, settingsService, backupService)
 
 	return scheduler, bulkDataService, jobService, settingsService, db
 }
@@ -70,7 +71,7 @@ func TestScheduler_NewScheduler_Initialization(t *testing.T) {
 func TestScheduler_NewScheduler_TasksRegistered(t *testing.T) {
 	scheduler, _, _, _, _ := setupSchedulerTest(t)
 
-	expectedTasks := []string{"bulk_data_update", "set_data_update", "job_cleanup"}
+	expectedTasks := []string{"bulk_data_update", "set_data_update", "job_cleanup", "data_backup"}
 	if len(scheduler.tasks) != len(expectedTasks) {
 		t.Errorf("expected %d tasks, got %d", len(expectedTasks), len(scheduler.tasks))
 	}

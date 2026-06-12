@@ -3,6 +3,7 @@ package api
 import (
 	"backend/models"
 	"backend/utils"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -96,14 +97,17 @@ type ImportResponse struct {
 	Warnings                []string `json:"warnings,omitempty"`
 }
 
-// Export returns all user data as a JSON file download
-func (h *DataHandler) Export(c fiber.Ctx) error {
+// BuildExport reads all user-owned data and assembles an ExportData document.
+// It runs in-process (no HTTP round-trip) so it can be reused by the scheduled
+// backup job as well as the export HTTP handler. A single read transaction
+// keeps the snapshot internally consistent.
+func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 	var storageLocations []models.StorageLocation
 	var sortingRules []models.SortingRule
 	var inventory []models.Inventory
 	var lists []models.List
 
-	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+	err := h.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Find(&storageLocations).Error; err != nil {
 			return fmt.Errorf("storage locations: %w", err)
 		}
@@ -119,11 +123,9 @@ func (h *DataHandler) Export(c fiber.Ctx) error {
 		return nil
 	})
 	if err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to export data", "database query failed", err)
+		return ExportData{}, err
 	}
 
-	// Build export data
 	exportLocations := make([]ExportStorageLocation, len(storageLocations))
 	for i, loc := range storageLocations {
 		exportLocations[i] = ExportStorageLocation{
@@ -150,7 +152,7 @@ func (h *DataHandler) Export(c fiber.Ctx) error {
 			ScryfallID: inv.ScryfallID,
 			OracleID:   inv.OracleID,
 			Treatment:  inv.Treatment,
-			Quantity:    inv.Quantity,
+			Quantity:   inv.Quantity,
 		}
 		if inv.StorageLocationID != nil {
 			exportInventory[i].StorageLocationRefID = inv.StorageLocationID
@@ -177,13 +179,33 @@ func (h *DataHandler) Export(c fiber.Ctx) error {
 		}
 	}
 
-	data := ExportData{
+	return ExportData{
 		Version:          CurrentExportVersion,
 		ExportedAt:       time.Now().UTC().Format(time.RFC3339),
 		StorageLocations: exportLocations,
 		SortingRules:     exportRules,
 		Inventory:        exportInventory,
 		Lists:            exportLists,
+	}, nil
+}
+
+// MarshalExport builds the export document and returns it as indented JSON
+// bytes. It satisfies the services.Exporter interface so the scheduled backup
+// job can produce the same document the HTTP handler serves.
+func (h *DataHandler) MarshalExport(ctx context.Context) ([]byte, error) {
+	data, err := h.BuildExport(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(data, "", "  ")
+}
+
+// Export returns all user data as a JSON file download
+func (h *DataHandler) Export(c fiber.Ctx) error {
+	data, err := h.BuildExport(c.RequestCtx())
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to export data", "database query failed", err)
 	}
 
 	filename := fmt.Sprintf("showmycards-export-%s.json", time.Now().UTC().Format("2006-01-02"))

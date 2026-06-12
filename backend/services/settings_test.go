@@ -47,6 +47,11 @@ func TestSettingsService_InitializeDefaults(t *testing.T) {
 		"job_cleanup_last_run":            "",
 		"scheduler_catchup_enabled":       "true",
 		"scheduler_catchup_delay_seconds": "60",
+		"backup_auto_create":              "true",
+		"backup_create_time":              "03:30",
+		"backup_retention_count":          "14",
+		"backup_last_run":                 "",
+		"backup_last_run_status":          "",
 	}
 
 	for key, expectedValue := range expectedDefaults {
