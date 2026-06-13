@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, ExternalLink } from '@lucide/svelte';
 	import PriceLozenge from '$lib/components/PriceLozenge.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	let { data }: { data: PageData } = $props();
 
@@ -23,6 +24,25 @@
 
 	// Get available treatments
 	const availableTreatments = $derived(card.finishes.length > 0 ? card.finishes : ['nonfoil']);
+
+	// Group storage locations by (location + treatment), summing quantities.
+	// Adding the same card to the same location creates separate inventory rows,
+	// so consolidate them into a single badge per location/treatment.
+	const storageByLocation = $derived.by(() => {
+		const map = new SvelteMap<string, { name: string; treatment: string; quantity: number }>();
+		for (const inv of card.inventory.this_printing) {
+			if (!inv.storage_location) continue;
+			const treatment = inv.treatment || 'nonfoil';
+			const key = `${inv.storage_location_id}-${treatment}`;
+			const existing = map.get(key);
+			if (existing) {
+				existing.quantity += inv.quantity;
+			} else {
+				map.set(key, { name: inv.storage_location.name, treatment, quantity: inv.quantity });
+			}
+		}
+		return [...map.entries()].map(([key, value]) => ({ key, ...value }));
+	});
 </script>
 
 <svelte:head>
@@ -97,16 +117,14 @@
 						</div>
 
 						<!-- Storage locations -->
-						{#if card.inventory.this_printing.some((i) => i.storage_location)}
+						{#if storageByLocation.length > 0}
 							<div class="mt-4">
 								<h4 class="font-semibold mb-2">Storage Locations</h4>
 								<div class="flex flex-wrap gap-2">
-									{#each card.inventory.this_printing as inv (inv.id)}
-										{#if inv.storage_location}
-											<div class="badge badge-outline">
-												{inv.storage_location.name} ({inv.quantity}x {inv.treatment || 'nonfoil'})
-											</div>
-										{/if}
+									{#each storageByLocation as location (location.key)}
+										<div class="badge badge-outline">
+											{location.name} ({location.quantity}x {location.treatment})
+										</div>
 									{/each}
 								</div>
 							</div>
