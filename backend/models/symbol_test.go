@@ -16,6 +16,9 @@ func TestNormalizeSymbolCode(t *testing.T) {
 		{"surrounding whitespace", "  {U}  ", "U"},
 		{"hybrid mana", "{W/U}", "W/U"},
 		{"phyrexian", "{W/P}", "W/P"},
+		{"phyrexian double slash", "{B/G/P}", "B/G/P"},
+		{"unicode infinity", "{∞}", "∞"},
+		{"unicode half", "{½}", "½"},
 		{"empty", "", ""},
 		{"empty braces", "{}", ""},
 	}

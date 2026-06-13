@@ -37,9 +37,60 @@ func setupSymbolTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 
 	app := fiber.New()
 	symbols := app.Group("/api/symbols")
-	symbols.Get("/:symbol", handler.GetSVG)
+	symbols.Get("/+", handler.GetSVG)
 
 	return app, db
+}
+
+// getSymbolStatus stores a symbol then requests it at the given (already
+// URL-formed) path, returning the response status code.
+func getSymbolStatus(t *testing.T, path string) int {
+	t.Helper()
+	app, db := setupSymbolTestApp(t)
+
+	db.Create(&models.Symbol{Code: "T", Symbol: "{T}", SVG: "<svg id=\"tap\"></svg>"})
+	db.Create(&models.Symbol{Code: "W/U", Symbol: "{W/U}", SVG: "<svg id=\"wu\"></svg>"})
+	db.Create(&models.Symbol{Code: "B/G/P", Symbol: "{B/G/P}", SVG: "<svg id=\"bgp\"></svg>"})
+	db.Create(&models.Symbol{Code: "∞", Symbol: "{∞}", SVG: "<svg id=\"inf\"></svg>"})
+	db.Create(&models.Symbol{Code: "½", Symbol: "{½}", SVG: "<svg id=\"half\"></svg>"})
+
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed for %q: %v", path, err)
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode
+}
+
+// TestSymbolGetSVG_ResolvesAllSpellings covers the full range of ways a client
+// can spell a symbol: bare, braced, lowercase, percent-encoded braces, hybrid
+// and Phyrexian symbols containing slashes (literal and encoded), and Unicode
+// symbols. Every form must resolve to its stored row.
+func TestSymbolGetSVG_ResolvesAllSpellings(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"bare", "/api/symbols/T"},
+		{"literal braces", "/api/symbols/{T}"},
+		{"encoded braces", "/api/symbols/%7BT%7D"},
+		{"encoded lowercase braces", "/api/symbols/%7Bt%7D"},
+		{"hybrid literal slash", "/api/symbols/W/U"},
+		{"hybrid encoded slash", "/api/symbols/W%2FU"},
+		{"hybrid encoded braces and slash", "/api/symbols/%7BW%2FU%7D"},
+		{"phyrexian double slash", "/api/symbols/B/G/P"},
+		{"unicode infinity", "/api/symbols/%E2%88%9E"},
+		{"unicode half", "/api/symbols/%C2%BD"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if status := getSymbolStatus(t, tc.path); status != http.StatusOK {
+				t.Errorf("GET %s = %d, want %d", tc.path, status, http.StatusOK)
+			}
+		})
+	}
 }
 
 func TestSymbolGetSVG_Found(t *testing.T) {

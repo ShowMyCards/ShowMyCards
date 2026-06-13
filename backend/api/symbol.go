@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
@@ -28,12 +29,21 @@ func NewSymbolHandler(db *gorm.DB, symbolDataService *services.SymbolDataService
 
 // GetSVG returns the cached SVG for a given symbol.
 //
-// The path parameter is normalized (braces stripped, uppercased) so that
-// "{T}", "t", and "T" all resolve to the same cached symbol.
+// The path parameter is URL-decoded and then normalized (braces stripped,
+// uppercased) so that every Scryfall symbol resolves regardless of how the
+// client spells it: bare ("T"), braced ("{T}"), lowercase ("t"),
+// percent-encoded ("%7BT%7D"), hybrid/Phyrexian symbols containing slashes
+// ("{W/U}", "{B/G/P}"), and Unicode symbols ("½", "∞"). A greedy "+" route
+// captures the slashes; Fiber returns the parameter without decoding, so we
+// percent-decode it ourselves.
 func (h *SymbolHandler) GetSVG(c fiber.Ctx) error {
-	raw := c.Params("symbol")
+	raw := c.Params("+")
 	if raw == "" {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid symbol")
+	}
+
+	if decoded, err := url.PathUnescape(raw); err == nil {
+		raw = decoded
 	}
 
 	code := models.NormalizeSymbolCode(raw)
