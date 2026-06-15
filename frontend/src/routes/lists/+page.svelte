@@ -9,7 +9,8 @@
 		Modal,
 		FormField,
 		ListCard,
-		notifications
+		notifications,
+		getActionError
 	} from '$lib';
 	import { Plus } from '@lucide/svelte';
 
@@ -93,9 +94,21 @@
 		method="POST"
 		action="?/create"
 		use:enhance={() => {
-			return async ({ update }) => {
-				// Don't close modal yet - let the redirect happen
-				await update({ reset: false });
+			return async ({ result, update }) => {
+				// Update the page data first so the new list appears
+				await update();
+
+				// Then show notifications based on result
+				if (result.type === 'success') {
+					notifications.success('List created successfully!');
+					// Close modal and reset the form on success
+					showCreateModal = false;
+					createName = '';
+					createDescription = '';
+				} else if (result.type === 'failure') {
+					const errorMsg = getActionError(result.data, 'Failed to create list');
+					notifications.error(errorMsg);
+				}
 			};
 		}}>
 		<div class="space-y-4">

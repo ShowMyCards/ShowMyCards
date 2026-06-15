@@ -6,7 +6,9 @@ import type {
 	BatchDeleteRequest,
 	BatchDeleteResponse,
 	ResortRequest,
-	ResortResponse
+	ResortResponse,
+	SplitMoveRequest,
+	SplitMoveResponse
 } from '$lib/types/api';
 
 /**
@@ -103,6 +105,16 @@ export const inventoryApi = {
 			ids,
 			storage_location_id: storageLocationId
 		} as BatchMoveRequest),
+
+	/**
+	 * Move a partial quantity of a single inventory stack to another storage location.
+	 * Omit storageLocationId to move the copies to the unassigned pool.
+	 */
+	splitMove: (id: number, quantity: number, storageLocationId?: number) =>
+		apiClient.post<SplitMoveResponse>(`/inventory/${id}/split-move`, {
+			quantity,
+			storage_location_id: storageLocationId
+		} as SplitMoveRequest),
 
 	/**
 	 * Delete multiple inventory items
