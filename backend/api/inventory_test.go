@@ -1274,6 +1274,7 @@ func setupFullInventoryTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	inventory.Post("/resort", handler.Resort)
 	inventory.Get("/:id", handler.Get)
 	inventory.Post("/", handler.Create)
+	inventory.Post("/:id/split-move", handler.SplitMove)
 	inventory.Put("/:id", handler.Update)
 	inventory.Delete("/:id", handler.Delete)
 
@@ -1770,6 +1771,383 @@ func TestBatchMove_PartialMatch(t *testing.T) {
 
 	if result.Updated != 2 {
 		t.Errorf("expected updated 2 (partial match), got %d", result.Updated)
+	}
+}
+
+// SplitMove tests
+
+func splitMoveRequest(t *testing.T, app *fiber.App, id uint, body string) *http.Response {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost,
+		fmt.Sprintf("/api/inventory/%d/split-move", id), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	return resp
+}
+
+func TestSplitMove_PartialCreatesNewRow(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 3, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 1, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Source == nil || result.Source.Quantity != 2 {
+		t.Errorf("expected source quantity 2, got %v", result.Source)
+	}
+	if result.Destination.Quantity != 1 {
+		t.Errorf("expected destination quantity 1, got %d", result.Destination.Quantity)
+	}
+	if result.Destination.StorageLocationID == nil || *result.Destination.StorageLocationID != dest.ID {
+		t.Errorf("expected destination at location %d, got %v", dest.ID, result.Destination.StorageLocationID)
+	}
+	if result.Destination.ID == item.ID {
+		t.Errorf("expected a new destination row, got the source row ID %d", item.ID)
+	}
+
+	// Two distinct rows in DB, quantity conserved
+	var rows []models.Inventory
+	db.Where("scryfall_id = ?", "card-1").Find(&rows)
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 inventory rows, got %d", len(rows))
+	}
+}
+
+func TestSplitMove_PartialMergesIntoExisting(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 3, &source.ID)
+	existing := createTestInventoryItem(t, db, "card-1", 2, &dest.ID) // identical stack at destination
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 1, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Destination.ID != existing.ID {
+		t.Errorf("expected merge into existing row %d, got %d", existing.ID, result.Destination.ID)
+	}
+	if result.Destination.Quantity != 3 {
+		t.Errorf("expected merged destination quantity 3, got %d", result.Destination.Quantity)
+	}
+	if result.Source == nil || result.Source.Quantity != 2 {
+		t.Errorf("expected source quantity 2, got %v", result.Source)
+	}
+
+	// No duplicate row created
+	var rows []models.Inventory
+	db.Where("scryfall_id = ?", "card-1").Find(&rows)
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 inventory rows (no duplicate), got %d", len(rows))
+	}
+}
+
+func TestSplitMove_FullMoveDeletesSourceWithMergeTarget(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 2, &source.ID)
+	existing := createTestInventoryItem(t, db, "card-1", 1, &dest.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 2, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Source != nil {
+		t.Errorf("expected nil source after full move, got %v", result.Source)
+	}
+	if result.Destination.ID != existing.ID || result.Destination.Quantity != 3 {
+		t.Errorf("expected merge into row %d with quantity 3, got id=%d qty=%d",
+			existing.ID, result.Destination.ID, result.Destination.Quantity)
+	}
+
+	// Source row is gone
+	var count int64
+	db.Model(&models.Inventory{}).Where("id = ?", item.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("expected source row deleted, but it still exists")
+	}
+}
+
+func TestSplitMove_FullMoveNoMergeTarget(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 2, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 2, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Source != nil {
+		t.Errorf("expected nil source after full move, got %v", result.Source)
+	}
+	if result.Destination.Quantity != 2 {
+		t.Errorf("expected destination quantity 2, got %d", result.Destination.Quantity)
+	}
+
+	// Exactly one row, all copies at destination (quantity conserved)
+	var rows []models.Inventory
+	db.Where("scryfall_id = ?", "card-1").Find(&rows)
+	if len(rows) != 1 {
+		t.Fatalf("expected exactly 1 inventory row, got %d", len(rows))
+	}
+	if rows[0].StorageLocationID == nil || *rows[0].StorageLocationID != dest.ID {
+		t.Errorf("expected the remaining row at destination %d, got %v", dest.ID, rows[0].StorageLocationID)
+	}
+}
+
+func TestSplitMove_MoveToUnassigned(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 3, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, `{"quantity": 1, "storage_location_id": null}`)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Destination.StorageLocationID != nil {
+		t.Errorf("expected destination unassigned, got %v", result.Destination.StorageLocationID)
+	}
+	if result.Destination.Quantity != 1 {
+		t.Errorf("expected destination quantity 1, got %d", result.Destination.Quantity)
+	}
+	if result.Source == nil || result.Source.Quantity != 2 {
+		t.Errorf("expected source quantity 2, got %v", result.Source)
+	}
+}
+
+func TestSplitMove_QuantityTooHigh(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 5, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 6, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d for quantity too high, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestSplitMove_QuantityZero(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 5, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 0, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d for zero quantity, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestSplitMove_LocationNotFound(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 5, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, `{"quantity": 1, "storage_location_id": 99999}`)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d for nonexistent location, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestSplitMove_SourceNotFound(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	dest := createTestStorageLocation(t, db)
+
+	resp := splitMoveRequest(t, app, 99999, fmt.Sprintf(`{"quantity": 1, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d for nonexistent source, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestSplitMove_SameLocation(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	item := createTestInventoryItem(t, db, "card-1", 5, &source.ID)
+
+	resp := splitMoveRequest(t, app, item.ID, fmt.Sprintf(`{"quantity": 1, "storage_location_id": %d}`, source.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status %d for same location, got %d", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestSplitMove_AggregatesDuplicateSourceRows(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	// Two separate rows of qty 1 form a single 2-copy stack (Create never merges).
+	row1 := createTestInventoryItem(t, db, "card-1", 1, &source.ID)
+	createTestInventoryItem(t, db, "card-1", 1, &source.ID)
+
+	resp := splitMoveRequest(t, app, row1.ID, fmt.Sprintf(`{"quantity": 1, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Source == nil || result.Source.Quantity != 1 {
+		t.Errorf("expected consolidated source quantity 1, got %v", result.Source)
+	}
+	if result.Destination.Quantity != 1 {
+		t.Errorf("expected destination quantity 1, got %d", result.Destination.Quantity)
+	}
+
+	// Source consolidated to a single row at the source location.
+	var sourceRows []models.Inventory
+	db.Where("scryfall_id = ? AND storage_location_id = ?", "card-1", source.ID).Find(&sourceRows)
+	if len(sourceRows) != 1 || sourceRows[0].Quantity != 1 {
+		t.Errorf("expected one source row of qty 1, got %+v", sourceRows)
+	}
+
+	// One row at the destination, total quantity conserved (2).
+	var destRows []models.Inventory
+	db.Where("scryfall_id = ? AND storage_location_id = ?", "card-1", dest.ID).Find(&destRows)
+	if len(destRows) != 1 || destRows[0].Quantity != 1 {
+		t.Errorf("expected one destination row of qty 1, got %+v", destRows)
+	}
+}
+
+func TestSplitMove_PartialFromConsolidatedRows(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	row1 := createTestInventoryItem(t, db, "card-1", 3, &source.ID)
+	createTestInventoryItem(t, db, "card-1", 3, &source.ID) // total available = 6
+
+	resp := splitMoveRequest(t, app, row1.ID, fmt.Sprintf(`{"quantity": 2, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Source == nil || result.Source.Quantity != 4 {
+		t.Errorf("expected consolidated source quantity 4, got %v", result.Source)
+	}
+	if result.Destination.Quantity != 2 {
+		t.Errorf("expected destination quantity 2, got %d", result.Destination.Quantity)
+	}
+
+	var sourceRows []models.Inventory
+	db.Where("scryfall_id = ? AND storage_location_id = ?", "card-1", source.ID).Find(&sourceRows)
+	if len(sourceRows) != 1 || sourceRows[0].Quantity != 4 {
+		t.Errorf("expected one source row of qty 4, got %+v", sourceRows)
+	}
+}
+
+func TestSplitMove_FullMoveFromMultipleRows(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	source := createTestStorageLocation(t, db)
+	dest := createTestStorageLocation(t, db)
+	row1 := createTestInventoryItem(t, db, "card-1", 1, &source.ID)
+	createTestInventoryItem(t, db, "card-1", 1, &source.ID) // total available = 2
+
+	resp := splitMoveRequest(t, app, row1.ID, fmt.Sprintf(`{"quantity": 2, "storage_location_id": %d}`, dest.ID))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var result SplitMoveResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if result.Source != nil {
+		t.Errorf("expected nil source after full move, got %v", result.Source)
+	}
+	if result.Destination.Quantity != 2 {
+		t.Errorf("expected destination quantity 2, got %d", result.Destination.Quantity)
+	}
+
+	// No rows remain at the source location.
+	var sourceCount int64
+	db.Model(&models.Inventory{}).Where("scryfall_id = ? AND storage_location_id = ?", "card-1", source.ID).Count(&sourceCount)
+	if sourceCount != 0 {
+		t.Errorf("expected no source rows remaining, got %d", sourceCount)
 	}
 }
 

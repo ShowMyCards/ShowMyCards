@@ -10,7 +10,7 @@ it can be removed.
 
 | Package | Pinned | Advisory | Severity | Parent (why we need it) | Remove when |
 | --- | --- | --- | --- | --- | --- |
-| `devalue` | `^5.8.1` | [GHSA-77vg-94rm-hx3p](https://github.com/advisories/GHSA-77vg-94rm-hx3p) — DoS via sparse array deserialization | High | `astro` declares `devalue: "^5.6.3"`, but `bun update` leaves the transitive dep locked at `devalue@5.8.0`, inside the `>=5.6.3 <=5.8.0` vulnerable range. The override forces resolution to the patched `5.8.1`. | A fresh `bun install` with this entry removed resolves `devalue >= 5.8.1` — typically once Astro ships a release that locks devalue past the vulnerable range. Verify per "How to check if an override is still required" below. |
+| `esbuild` | `^0.28.1` | [GHSA-gv7w-rqvm-qjhr](https://github.com/advisories/GHSA-gv7w-rqvm-qjhr) — missing binary integrity verification enables RCE via `NPM_CONFIG_REGISTRY` | High | `astro › esbuild` and `vite › esbuild` both resolve `esbuild <0.28.1` (0.27.7), inside the `>=0.17.0 <0.28.1` vulnerable range. The override forces resolution to the patched `0.28.1`. | `astro`/`vite` stop resolving an `esbuild <0.28.1` (no 0.27.x backport exists; `0.28.1` is the only fixed release). Verify per "How to check if an override is still required" below. |
 
 ## When to add an override
 

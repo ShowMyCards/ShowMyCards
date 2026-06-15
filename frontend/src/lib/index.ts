@@ -67,6 +67,7 @@ export { default as StorageLocationRow } from './components/StorageLocationRow.s
 export { default as StorageLocationDropdown } from './components/StorageLocationDropdown.svelte';
 export { default as KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp.svelte';
 export { default as BulkActionsBar } from './components/BulkActionsBar.svelte';
+export { default as SplitMoveModal } from './components/SplitMoveModal.svelte';
 export { default as InventoryBrowser } from './components/InventoryBrowser.svelte';
 export { default as ResortModal } from './components/ResortModal.svelte';
 export { default as PrintingConflictModal } from './components/PrintingConflictModal.svelte';
