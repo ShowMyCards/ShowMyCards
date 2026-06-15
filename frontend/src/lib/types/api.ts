@@ -16,8 +16,7 @@
 /**
  * BannerHandler handles banner-related HTTP requests.
  */
-export interface BannerHandler {
-}
+export interface BannerHandler {}
 
 //////////
 // source: bulk_data.go
@@ -25,8 +24,7 @@ export interface BannerHandler {
 /**
  * BulkDataHandler handles bulk data-related HTTP requests
  */
-export interface BulkDataHandler {
-}
+export interface BulkDataHandler {}
 
 //////////
 // source: constants.go
@@ -61,8 +59,7 @@ export const DefaultJobRetentionDays = 30;
 /**
  * DashboardHandler handles dashboard endpoints
  */
-export interface DashboardHandler {
-}
+export interface DashboardHandler {}
 /**
  * DashboardStats represents the statistics for the dashboard
  * tygo:export
@@ -89,8 +86,7 @@ export const CurrentExportVersion = 1;
 /**
  * DataHandler handles data import and export endpoints
  */
-export interface DataHandler {
-}
+export interface DataHandler {}
 /**
  * ExportData represents the full application data export
  * tygo:export
@@ -174,8 +170,7 @@ export interface ImportResponse {
 /**
  * DeckHandler handles deck endpoints.
  */
-export interface DeckHandler {
-}
+export interface DeckHandler {}
 /**
  * DeckSummary represents a deck with summary statistics.
  * Milestone 1a ships counts only. The aggregate shortfall (cards short across
@@ -224,7 +219,7 @@ export interface EnrichedDeckItem {
 	oracle_id: string;
 	scryfall_id: string;
 	treatment: string;
-	zone: import("./models").DeckZone;
+	zone: import('./models').DeckZone;
 	desired_quantity: number /* int */;
 	/**
 	 * Enriched fields (populated from Scryfall card data in 1b).
@@ -265,8 +260,7 @@ export interface DeckItemsResponse {
 /**
  * HealthHandler handles health check endpoints
  */
-export interface HealthHandler {
-}
+export interface HealthHandler {}
 
 //////////
 // source: inventory.go
@@ -274,8 +268,7 @@ export interface HealthHandler {
 /**
  * InventoryHandler handles inventory endpoints
  */
-export interface InventoryHandler {
-}
+export interface InventoryHandler {}
 /**
  * CreateInventoryRequest represents the request body for creating an inventory item
  */
@@ -407,8 +400,7 @@ export interface ResortResponse {
 /**
  * JobsHandler handles job-related HTTP requests
  */
-export interface JobsHandler {
-}
+export interface JobsHandler {}
 
 //////////
 // source: lists.go
@@ -416,8 +408,7 @@ export interface JobsHandler {
 /**
  * ListHandler handles list endpoints
  */
-export interface ListHandler {
-}
+export interface ListHandler {}
 /**
  * ListSummary represents a list with summary statistics
  * tygo:export
@@ -538,8 +529,7 @@ export interface ScheduledTaskInfo {
 /**
  * SchedulerHandler handles scheduler-related API requests
  */
-export interface SchedulerHandler {
-}
+export interface SchedulerHandler {}
 
 //////////
 // source: search.go
@@ -547,8 +537,7 @@ export interface SchedulerHandler {
 /**
  * SearchHandler handles card search endpoints
  */
-export interface SearchHandler {
-}
+export interface SearchHandler {}
 /**
  * SearchResponse wraps search results with pagination metadata
  * tygo:export
@@ -597,8 +586,8 @@ export interface CardResult {
  * tygo:export
  */
 export interface CardInventoryData {
-	this_printing: import("./models").Inventory[];
-	other_printings: import("./models").Inventory[];
+	this_printing: import('./models').Inventory[];
+	other_printings: import('./models').Inventory[];
 	total_quantity: number /* int */;
 }
 /**
@@ -622,8 +611,7 @@ export interface AutocompleteResponse {
 /**
  * SetHandler handles set endpoints
  */
-export interface SetHandler {
-}
+export interface SetHandler {}
 /**
  * TriggerImportResponse represents the response from triggering an import
  * tygo:export
@@ -639,8 +627,7 @@ export interface TriggerImportResponse {
 /**
  * SettingsHandler handles settings-related HTTP requests
  */
-export interface SettingsHandler {
-}
+export interface SettingsHandler {}
 
 //////////
 // source: sorting_rules.go
@@ -648,8 +635,7 @@ export interface SettingsHandler {
 /**
  * SortingRulesHandler handles sorting rule endpoints
  */
-export interface SortingRulesHandler {
-}
+export interface SortingRulesHandler {}
 /**
  * CreateSortingRuleRequest represents the request body for creating a sorting rule
  */
@@ -674,7 +660,7 @@ export interface UpdateSortingRuleRequest {
  * EvaluateRequest represents the request body for evaluating a card against rules
  */
 export interface EvaluateRequest {
-	card_data: { [key: string]: any};
+	card_data: { [key: string]: any };
 	treatment?: string; // Optional treatment (foil, nonfoil, etched, etc.)
 }
 /**
@@ -729,8 +715,7 @@ It contains handlers for inventory, storage, lists, sorting rules, and other end
 /**
  * StorageHandler handles storage location endpoints
  */
-export interface StorageHandler {
-}
+export interface StorageHandler {}
 /**
  * CreateStorageRequest represents the request body for creating a storage location
  */
@@ -759,5 +744,4 @@ export interface StorageLocationWithCount {
 /**
  * SymbolHandler handles symbol endpoints
  */
-export interface SymbolHandler {
-}
+export interface SymbolHandler {}

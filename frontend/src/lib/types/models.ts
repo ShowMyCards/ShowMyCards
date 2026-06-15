@@ -18,9 +18,9 @@
  * tygo:export
  */
 export type BannerSeverity = string;
-export const BannerSeverityInfo: BannerSeverity = "info";
-export const BannerSeverityWarning: BannerSeverity = "warning";
-export const BannerSeverityError: BannerSeverity = "error";
+export const BannerSeverityInfo: BannerSeverity = 'info';
+export const BannerSeverityWarning: BannerSeverity = 'warning';
+export const BannerSeverityError: BannerSeverity = 'error';
 /**
  * Banner is a transient, server-derived message surfaced in the UI.
  * Banners are computed on demand (see services.BannerService) and never
@@ -134,10 +134,10 @@ export interface Deck {
  * tygo:export
  */
 export type DeckZone = string;
-export const ZoneMain: DeckZone = "main";
-export const ZoneSide: DeckZone = "side";
-export const ZoneCommand: DeckZone = "command";
-export const ZoneMaybe: DeckZone = "maybe";
+export const ZoneMain: DeckZone = 'main';
+export const ZoneSide: DeckZone = 'side';
+export const ZoneCommand: DeckZone = 'command';
+export const ZoneMaybe: DeckZone = 'maybe';
 /**
  * DeckItem represents a single card entry in a deck.
  * ScryfallID is empty when the user does not pin a specific printing (any
@@ -191,19 +191,19 @@ export interface Inventory {
  * tygo:export
  */
 export type JobType = string;
-export const JobTypeBulkDataImport: JobType = "bulk_data_import";
-export const JobTypeSetDataImport: JobType = "set_data_import";
-export const JobTypeSymbolDataImport: JobType = "symbol_data_import";
+export const JobTypeBulkDataImport: JobType = 'bulk_data_import';
+export const JobTypeSetDataImport: JobType = 'set_data_import';
+export const JobTypeSymbolDataImport: JobType = 'symbol_data_import';
 /**
  * JobStatus represents the status of a job
  * tygo:export
  */
 export type JobStatus = string;
-export const JobStatusPending: JobStatus = "pending";
-export const JobStatusInProgress: JobStatus = "in_progress";
-export const JobStatusCompleted: JobStatus = "completed";
-export const JobStatusFailed: JobStatus = "failed";
-export const JobStatusCancelled: JobStatus = "cancelled";
+export const JobStatusPending: JobStatus = 'pending';
+export const JobStatusInProgress: JobStatus = 'in_progress';
+export const JobStatusCompleted: JobStatus = 'completed';
+export const JobStatusFailed: JobStatus = 'failed';
+export const JobStatusCancelled: JobStatus = 'cancelled';
 /**
  * Job represents a long-running background job
  * tygo:export
@@ -314,8 +314,8 @@ export interface SortingRule {
  * tygo:export
  */
 export type StorageType = string;
-export const Box: StorageType = "Box";
-export const Binder: StorageType = "Binder";
+export const Box: StorageType = 'Box';
+export const Binder: StorageType = 'Binder';
 /**
  * tygo:export
  */
