@@ -62,6 +62,43 @@ export const actions: Actions = {
 		}
 	},
 
+	update: async ({ request, fetch }) => {
+		const data = await request.formData();
+		const id = data.get('id') as string;
+		const name = data.get('name') as string;
+		const description = data.get('description') as string;
+
+		if (!id) {
+			return fail(400, { error: 'ID is required' });
+		}
+
+		if (!name) {
+			return fail(400, { error: 'Name is required' });
+		}
+
+		try {
+			const response = await fetch(`${BACKEND_URL}/api/lists/${id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					name,
+					description
+				})
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				return fail(response.status, { error: errorData.error || 'Failed to update list' });
+			}
+
+			return { success: true, action: 'update' };
+		} catch {
+			return fail(500, { error: 'Failed to update list' });
+		}
+	},
+
 	delete: async ({ request, fetch }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
