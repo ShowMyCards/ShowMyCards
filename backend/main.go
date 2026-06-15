@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"backend/api"
 	"backend/database"
 	"backend/scryfall"
 	"backend/server"
@@ -71,6 +72,10 @@ func main() {
 	jobService := services.NewJobService(dbClient.DB)
 	bulkDataService := services.NewBulkDataService(dbClient.DB, jobService, settingsService)
 	setDataService := services.NewSetDataService(dbClient.DB, jobService, settingsService, scryfallClient, dataDir)
+	// The data handler doubles as the in-process exporter for the backup job,
+	// keeping the backup payload identical to the /data/export download.
+	exporter := api.NewDataHandler(dbClient.DB)
+	backupService := services.NewBackupService(exporter, settingsService, dataDir)
 
 	// Check database version compatibility
 	if err := version.CheckAndUpdate(context.Background(), settingsService); err != nil {
@@ -103,7 +108,7 @@ func main() {
 	// Initialize server with database, scryfall clients, and services
 	srv := server.NewServer(ctx, dbClient, scryfallClient, settingsService, jobService, bulkDataService, setDataService, dataDir)
 
-	scheduler := services.NewScheduler(bulkDataService, setDataService, jobService, settingsService)
+	scheduler := services.NewScheduler(bulkDataService, setDataService, jobService, settingsService, backupService)
 	scheduler.Start(ctx)
 	defer scheduler.Stop()
 
