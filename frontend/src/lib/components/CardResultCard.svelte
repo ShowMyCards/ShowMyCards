@@ -10,6 +10,7 @@
 		selection,
 		audio
 	} from '$lib';
+	import { FolderInput } from '@lucide/svelte';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
@@ -23,12 +24,14 @@
 		card,
 		onremove,
 		storageLocations = [],
-		selectable = false
+		selectable = false,
+		onSplitMove
 	}: {
 		card: EnhancedCardResult;
 		onremove?: (cardId: string) => void;
 		storageLocations?: StorageLocation[];
 		selectable?: boolean;
+		onSplitMove?: (inv: Inventory, available: number) => void;
 	} = $props();
 
 	// Selected storage location for manual override (default to auto)
@@ -315,6 +318,15 @@
 			selection.selectMany(inventoryIds);
 		}
 	}
+
+	// Open the split-move dialog for a treatment's inventory stack. The stack may span
+	// multiple rows (the add flow never merges), so pass the aggregated quantity.
+	function handleSplitMove(treatment: string) {
+		const inv = inventory.find((i) => i.treatment === treatment);
+		if (!inv) return;
+		const available = thisPrintingByTreatment.get(treatment) ?? inv.quantity;
+		onSplitMove?.(inv, available);
+	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -421,6 +433,16 @@
 							class="btn btn-sm btn-square bg-base-100">
 							+
 						</button>
+						{#if onSplitMove && quantity > 0}
+							<button
+								onclick={() => handleSplitMove(treatment)}
+								disabled={adding || removing}
+								class="btn btn-sm btn-square bg-base-100"
+								title="Move copies to another location"
+								aria-label="Move copies to another location">
+								<FolderInput class="h-4 w-4" />
+							</button>
+						{/if}
 					</div>
 				</div>
 			{/each}

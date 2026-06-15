@@ -23,6 +23,7 @@ func InventoryRoutes(app *fiber.App, db *gorm.DB) {
 	inventory.Post("/resort", handler.Resort)
 	inventory.Get("/:id", handler.Get)
 	inventory.Post("/", handler.Create)
+	inventory.Post("/:id/split-move", handler.SplitMove)
 	inventory.Put("/:id", handler.Update)
 	inventory.Delete("/:id", handler.Delete)
 }

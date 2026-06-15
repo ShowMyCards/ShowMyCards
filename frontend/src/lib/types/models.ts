@@ -97,6 +97,14 @@ export interface Card {
 	name: string;
 	set_code: string;
 }
+/**
+ * PrintKey identifies a printing by its set code and collector number, which a
+ * card shares across all of its language variants.
+ */
+export interface PrintKey {
+	SetCode: string;
+	CollectorNumber: string;
+}
 
 //////////
 // source: deck.go
