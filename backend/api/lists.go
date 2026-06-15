@@ -361,27 +361,21 @@ func (h *ListHandler) calculateListValue(ctx context.Context, listID uint) (coll
 		return 0, 0
 	}
 
-	var allCards []models.Card
-	if err := h.db.WithContext(ctx).Where("scryfall_id IN ?", allScryfallIDs).Find(&allCards).Error; err != nil {
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(ctx), allScryfallIDs)
+	if err != nil {
 		slog.Warn("failed to fetch cards for value calculation", "component", "lists", "list_id", listID, "error", err)
 		return 0, 0
 	}
 
-	allCardMap := make(map[string]models.Card, len(allCards))
-	for _, card := range allCards {
-		allCardMap[card.ScryfallID] = card
-	}
+	// Back-fill prices for non-English printings from their English printing so
+	// value totals don't undercount localized cards.
+	resolvedPrices := ResolveEnglishPrices(h.db.WithContext(ctx), scryfallCardMap)
 
 	for _, item := range allListItems {
-		card, ok := allCardMap[item.ScryfallID]
-		if !ok {
+		if _, ok := scryfallCardMap[item.ScryfallID]; !ok {
 			continue
 		}
-		scryfallCard, err := card.ToScryfallCard()
-		if err != nil {
-			continue
-		}
-		price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+		price := utils.ParsePriceFromScryfall(resolvedPrices[item.ScryfallID], item.Treatment)
 		collectedValue += price * float64(item.CollectedQuantity)
 		remaining := item.DesiredQuantity - item.CollectedQuantity
 		if remaining > 0 {
@@ -416,6 +410,10 @@ func (h *ListHandler) enrichListItems(ctx context.Context, listID uint, page, pa
 		slog.Warn("failed to fetch card data for enrichment", "component", "lists", "error", err)
 	}
 
+	// Back-fill prices for non-English printings from their English printing so
+	// list prices match search / card detail / inventory-cards.
+	resolvedPrices := ResolveEnglishPrices(h.db.WithContext(ctx), scryfallCardMap)
+
 	enrichedItems := make([]EnrichedListItem, len(items))
 	for i, item := range items {
 		enrichedItem := EnrichedListItem{
@@ -436,7 +434,7 @@ func (h *ListHandler) enrichListItems(ctx context.Context, listID uint, page, pa
 			enrichedItem.SetCode = scryfallCard.Set
 			enrichedItem.CollectorNumber = scryfallCard.CollectorNumber
 			enrichedItem.Rarity = string(scryfallCard.Rarity)
-			enrichedItem.CurrentPrice = utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+			enrichedItem.CurrentPrice = utils.ParsePriceFromScryfall(resolvedPrices[item.ScryfallID], item.Treatment)
 			enrichedItem.Finishes = utils.ConvertEnumSliceToStrings(scryfallCard.Finishes)
 			enrichedItem.FrameEffects = utils.ConvertEnumSliceToStrings(scryfallCard.FrameEffects)
 			enrichedItem.PromoTypes = scryfallCard.PromoTypes
