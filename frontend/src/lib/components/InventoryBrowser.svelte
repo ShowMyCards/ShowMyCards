@@ -6,6 +6,7 @@
 		EmptyState,
 		Pagination,
 		BulkActionsBar,
+		SplitMoveModal,
 		ViewToggle,
 		CardFilter,
 		TreatmentBadge,
@@ -16,9 +17,11 @@
 		selection,
 		usePersistedViewMode,
 		type EnhancedCardResult,
+		type Inventory,
 		type StorageLocationWithCount
 	} from '$lib';
 	import SetIcon from '$lib/components/SetIcon.svelte';
+	import { FolderInput } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
 
@@ -39,6 +42,27 @@
 	}: Props = $props();
 
 	let removedCardIds = $state(new Set<string>());
+
+	// The inventory stack currently targeted by the split-move dialog. A stack may span
+	// multiple rows (the add flow never merges), so we track the aggregated quantity.
+	let moveTarget = $state<{ inv: Inventory; available: number } | null>(null);
+
+	/**
+	 * Group a card's inventory rows into user-facing stacks by treatment. Within a single
+	 * inventory view all rows share one location, so (treatment) identifies a stack.
+	 */
+	function treatmentGroups(items: Inventory[]): { rep: Inventory; total: number }[] {
+		const groups: { rep: Inventory; total: number }[] = [];
+		for (const inv of items) {
+			const existing = groups.find((g) => g.rep.treatment === inv.treatment);
+			if (existing) {
+				existing.total += inv.quantity;
+			} else {
+				groups.push({ rep: inv, total: inv.quantity });
+			}
+		}
+		return groups;
+	}
 
 	// View mode state with localStorage persistence
 	const view = usePersistedViewMode('smc-inventory-view-mode', 'grid');
@@ -159,8 +183,21 @@
 	{:else if view.viewMode === 'grid'}
 		<!-- Grid View -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-			{#each paginatedCards as card (card.id)}
-				<CardResultCard {card} onremove={handleRemove} selectable />
+			<!--
+				Key intentionally includes total_quantity, not just card.id. CardResultCard
+				captures card.inventory into local $state once on mount and never re-syncs from
+				the prop (it diverges via optimistic +/-). After a split-move calls
+				invalidateAll(), the reloaded card keeps the same id but a new quantity; keying
+				on id alone would reuse the stale instance and show the pre-move quantity. The
+				quantity in the key forces a remount so the fresh data is read. Do not simplify
+				to (card.id) without first making CardResultCard reconcile from props.
+			-->
+			{#each paginatedCards as card (`${card.id}-${card.inventory.total_quantity}`)}
+				<CardResultCard
+					{card}
+					onremove={handleRemove}
+					selectable
+					onSplitMove={(inv, available) => (moveTarget = { inv, available })} />
 			{/each}
 		</div>
 	{:else}
@@ -194,6 +231,7 @@
 						<th>Language</th>
 						<th>Treatment(s)</th>
 						<th>Qty</th>
+						<th>Actions</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -249,6 +287,20 @@
 							<td>
 								<span class="badge badge-primary">{totalQty}</span>
 							</td>
+							<td>
+								<div class="flex flex-wrap gap-1">
+									{#each treatmentGroups(card.inventory.this_printing) as group (group.rep.id)}
+										<button
+											class="btn btn-ghost btn-xs"
+											onclick={() => (moveTarget = { inv: group.rep, available: group.total })}
+											title="Move copies to another location"
+											aria-label="Move copies to another location">
+											<FolderInput class="h-4 w-4" />
+											Move
+										</button>
+									{/each}
+								</div>
+							</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -264,4 +316,13 @@
 	{/if}
 
 	<BulkActionsBar locations={allLocations} onComplete={handleBulkComplete} />
+
+	<SplitMoveModal
+		open={!!moveTarget}
+		inventory={moveTarget?.inv ?? null}
+		availableQuantity={moveTarget?.available ?? 0}
+		currentLocationId={moveTarget?.inv.storage_location_id}
+		locations={allLocations}
+		onClose={() => (moveTarget = null)}
+		onComplete={handleBulkComplete} />
 </div>

@@ -516,6 +516,189 @@ func (h *InventoryHandler) BatchMove(c fiber.Ctx) error {
 	return c.JSON(BatchMoveResponse{Updated: int(result.RowsAffected)})
 }
 
+// SplitMoveRequest represents the request body for moving a partial quantity of an
+// inventory stack to another storage location.
+// tygo:export
+type SplitMoveRequest struct {
+	Quantity          int   `json:"quantity"`
+	StorageLocationID *uint `json:"storage_location_id"`
+}
+
+// SplitMoveResponse represents the result of a split-move operation.
+// tygo:export
+type SplitMoveResponse struct {
+	Source      *models.Inventory `json:"source"`      // nil if the source stack was fully moved (row deleted)
+	Destination models.Inventory  `json:"destination"` // the stack that was merged-into or newly created
+}
+
+// sameLocation reports whether two nullable storage location IDs refer to the same location.
+func sameLocation(a, b *uint) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// SplitMove moves a chosen number of copies from a single inventory stack to another
+// storage location, leaving the remainder behind. If the destination already holds an
+// identical stack (same scryfall_id + treatment), the moved copies are merged into it
+// rather than creating a duplicate row.
+func (h *InventoryHandler) SplitMove(c fiber.Ctx) error {
+	id := fiber.Params[int](c, "id")
+	if id == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid id")
+	}
+
+	var source models.Inventory
+	if err := h.db.WithContext(c.RequestCtx()).First(&source, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ReturnError(c, fiber.StatusNotFound, "inventory item not found")
+		}
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch inventory item", "database query failed", err)
+	}
+
+	var req SplitMoveRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Quantity < 1 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity must be at least 1")
+	}
+
+	// A user-facing "stack" can be spread across multiple rows (the Create handler never
+	// merges, so each "+" adds a fresh row). All rows for a printing+treatment in one
+	// location form a single stack; sum their quantities to get the real available count.
+	siblingQuery := h.db.WithContext(c.RequestCtx()).
+		Where("scryfall_id = ? AND treatment = ?", source.ScryfallID, source.Treatment)
+	if source.StorageLocationID == nil {
+		siblingQuery = siblingQuery.Where("storage_location_id IS NULL")
+	} else {
+		siblingQuery = siblingQuery.Where("storage_location_id = ?", *source.StorageLocationID)
+	}
+	var siblings []models.Inventory
+	if err := siblingQuery.Find(&siblings).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch inventory stack", "database query failed", err)
+	}
+	available := 0
+	for _, s := range siblings {
+		available += s.Quantity
+	}
+
+	if req.Quantity > available {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity exceeds available stack")
+	}
+
+	// Validate destination storage location exists if provided
+	if req.StorageLocationID != nil {
+		var location models.StorageLocation
+		if err := h.db.WithContext(c.RequestCtx()).First(&location, *req.StorageLocationID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return utils.ReturnError(c, fiber.StatusBadRequest, "storage location not found")
+			}
+			return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+				"Failed to validate storage location", "storage location lookup failed", err)
+		}
+	}
+
+	if sameLocation(source.StorageLocationID, req.StorageLocationID) {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "source and destination are the same location")
+	}
+
+	var dest models.Inventory
+	sourceDeleted := false
+	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		// Consolidate the source stack into the canonical row: delete the sibling rows so
+		// the remainder lands in a single tidy row. The destination location differs from
+		// the source location (guarded above), so this never touches the merge target.
+		consolidateQuery := tx.Where("scryfall_id = ? AND treatment = ? AND id <> ?",
+			source.ScryfallID, source.Treatment, source.ID)
+		if source.StorageLocationID == nil {
+			consolidateQuery = consolidateQuery.Where("storage_location_id IS NULL")
+		} else {
+			consolidateQuery = consolidateQuery.Where("storage_location_id = ?", *source.StorageLocationID)
+		}
+		if err := consolidateQuery.Delete(&models.Inventory{}).Error; err != nil {
+			return err
+		}
+
+		// Find an identical stack at the destination to merge into (excluding the source row).
+		mergeQuery := tx.Where("scryfall_id = ? AND treatment = ? AND id <> ?",
+			source.ScryfallID, source.Treatment, source.ID)
+		if req.StorageLocationID == nil {
+			mergeQuery = mergeQuery.Where("storage_location_id IS NULL")
+		} else {
+			mergeQuery = mergeQuery.Where("storage_location_id = ?", *req.StorageLocationID)
+		}
+
+		mergeErr := mergeQuery.First(&dest).Error
+		switch {
+		case mergeErr == nil:
+			// Merge into the existing destination stack.
+			dest.Quantity += req.Quantity
+			if err := tx.Save(&dest).Error; err != nil {
+				return err
+			}
+		case errors.Is(mergeErr, gorm.ErrRecordNotFound):
+			// Create a new stack at the destination.
+			dest = models.Inventory{
+				ScryfallID:        source.ScryfallID,
+				OracleID:          source.OracleID,
+				Treatment:         source.Treatment,
+				Quantity:          req.Quantity,
+				StorageLocationID: req.StorageLocationID,
+			}
+			if err := tx.Create(&dest).Error; err != nil {
+				return err
+			}
+		default:
+			return mergeErr
+		}
+
+		// Set the consolidated source remainder, or delete the stack when fully moved.
+		if req.Quantity == available {
+			if err := tx.Delete(&source).Error; err != nil {
+				return err
+			}
+			sourceDeleted = true
+		} else {
+			source.Quantity = available - req.Quantity
+			if err := tx.Save(&source).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to move inventory copies", "split-move transaction failed", err)
+	}
+
+	// Reload the destination with its storage location for the response.
+	if err := h.db.WithContext(c.RequestCtx()).Preload("StorageLocation").First(&dest, dest.ID).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to reload inventory item", "database query failed", err)
+	}
+
+	resp := SplitMoveResponse{Destination: dest}
+	if !sourceDeleted {
+		if err := h.db.WithContext(c.RequestCtx()).Preload("StorageLocation").First(&source, source.ID).Error; err != nil {
+			return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+				"Failed to reload inventory item", "database query failed", err)
+		}
+		resp.Source = &source
+	}
+
+	slog.Info("split-moved item", "component", "inventory",
+		"source_id", id, "quantity", req.Quantity, "available", available,
+		"storage_location_id", req.StorageLocationID,
+		"destination_id", dest.ID, "source_deleted", sourceDeleted)
+
+	return c.JSON(resp)
+}
+
 // BatchDeleteRequest represents the request body for deleting multiple inventory items
 // tygo:export
 type BatchDeleteRequest struct {
