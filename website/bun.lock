@@ -18,7 +18,6 @@
     },
   },
   "overrides": {
-    "devalue": "^5.8.1",
     "esbuild": "^0.28.1",
   },
   "packages": {
