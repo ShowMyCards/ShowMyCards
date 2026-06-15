@@ -16,6 +16,15 @@ const (
 	DefaultJobCleanupRetentionDays = 30
 )
 
+// Setting keys for the scheduled backup task.
+const (
+	settingBackupEnabled       = "backup_auto_create"
+	settingBackupTime          = "backup_create_time"
+	settingBackupLastRun       = "backup_last_run"
+	settingBackupLastRunStatus = "backup_last_run_status"
+	settingBackupRetention     = "backup_retention_count"
+)
+
 // ScheduledTask defines a task that runs on a schedule
 type ScheduledTask struct {
 	// Name is the unique identifier for this task
@@ -46,6 +55,7 @@ type Scheduler struct {
 	symbolDataService *SymbolDataService
 	jobService        *JobService
 	settingsService   *SettingsService
+	backupService     *BackupService
 	ticker            *time.Ticker
 	done              chan bool
 	started           atomic.Bool
@@ -56,13 +66,14 @@ type Scheduler struct {
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataService, symbolDataService *SymbolDataService, jobService *JobService, settingsService *SettingsService) *Scheduler {
+func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataService, symbolDataService *SymbolDataService, jobService *JobService, settingsService *SettingsService, backupService *BackupService) *Scheduler {
 	s := &Scheduler{
 		bulkDataService:   bulkDataService,
 		setDataService:    setDataService,
 		symbolDataService: symbolDataService,
 		jobService:        jobService,
 		settingsService:   settingsService,
+		backupService:     backupService,
 		done:              make(chan bool, 1),
 		lastRun:           make(map[string]time.Time),
 	}
@@ -99,6 +110,14 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			TimeOfDay:         "00:00", // Midnight
 			LastRunSettingKey: "job_cleanup_last_run",
 			Run:               s.runJobCleanup,
+		},
+		{
+			Name:              "data_backup",
+			Interval:          24 * time.Hour,
+			TimeOfDay:         settingBackupTime,
+			EnabledSettingKey: settingBackupEnabled,
+			LastRunSettingKey: settingBackupLastRun,
+			Run:               s.runBackup,
 		},
 	}
 
@@ -362,4 +381,37 @@ func (s *Scheduler) runJobCleanup(ctx context.Context) {
 	}
 
 	slog.Info("cleaned up old jobs", "component", "scheduler", "deleted_count", deletedCount)
+}
+
+func (s *Scheduler) runBackup(ctx context.Context) {
+	if s.backupService == nil {
+		return
+	}
+
+	path, err := s.backupService.CreateBackup(ctx)
+	if err != nil {
+		slog.Error("error creating data backup", "component", "scheduler", "error", err)
+		if setErr := s.settingsService.Set(ctx, settingBackupLastRunStatus, "failed: "+err.Error()); setErr != nil {
+			slog.Warn("failed to persist backup status", "component", "scheduler", "error", setErr)
+		}
+		return
+	}
+
+	retention := s.settingsService.GetInt(ctx, settingBackupRetention, DefaultBackupRetention)
+	pruned, err := s.backupService.PruneBackups(retention)
+	if err != nil {
+		// The backup itself succeeded; a prune failure is non-fatal.
+		slog.Warn("failed to prune old backups", "component", "scheduler", "error", err)
+	}
+
+	// Persist completion time and status.
+	now := time.Now()
+	if err := s.settingsService.SetTime(ctx, settingBackupLastRun, now); err != nil {
+		slog.Warn("failed to persist backup_last_run", "component", "scheduler", "error", err)
+	}
+	if err := s.settingsService.Set(ctx, settingBackupLastRunStatus, "success"); err != nil {
+		slog.Warn("failed to persist backup status", "component", "scheduler", "error", err)
+	}
+
+	slog.Info("created data backup", "component", "scheduler", "path", path, "pruned", pruned, "retention", retention)
 }
