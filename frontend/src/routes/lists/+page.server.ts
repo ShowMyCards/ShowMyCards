@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '$lib';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type { ListSummary } from '$lib';
 
 export const load: PageServerLoad = async ({ fetch }) => {
@@ -56,12 +56,8 @@ export const actions: Actions = {
 
 			const list = await response.json();
 
-			// Redirect to the new list page
-			throw redirect(303, `/lists/${list.id}`);
-		} catch (error) {
-			if (error instanceof Response && error.status === 303) {
-				throw error;
-			}
+			return { success: true, action: 'create', data: list };
+		} catch {
 			return fail(500, { error: 'Failed to create list' });
 		}
 	},
