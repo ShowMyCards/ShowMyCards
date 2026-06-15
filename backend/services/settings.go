@@ -44,6 +44,11 @@ func (s *SettingsService) initializeDefaults(ctx context.Context) {
 		"job_cleanup_last_run":            "",
 		"scheduler_catchup_enabled":       "true",
 		"scheduler_catchup_delay_seconds": "60",
+		"backup_auto_create":              "true",
+		"backup_create_time":              "03:30",
+		"backup_retention_count":          strconv.Itoa(DefaultBackupRetention),
+		"backup_last_run":                 "",
+		"backup_last_run_status":          "",
 	}
 
 	for key, value := range defaults {
@@ -177,6 +182,11 @@ func ValidSettingKeys() map[string]bool {
 		"job_cleanup_last_run":            true,
 		"scheduler_catchup_enabled":       true,
 		"scheduler_catchup_delay_seconds": true,
+		"backup_auto_create":              true,
+		"backup_create_time":              true,
+		"backup_retention_count":          true,
+		"backup_last_run":                 true,
+		"backup_last_run_status":          true,
 	}
 }
 
