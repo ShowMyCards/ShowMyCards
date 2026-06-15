@@ -38,13 +38,8 @@
     },
   },
   "overrides": {
-    "brace-expansion": "^5.0.5",
     "cookie": "^0.7.2",
     "esbuild": "^0.28.1",
-    "flatted": "^3.4.0",
-    "picomatch": "^4.0.4",
-    "postcss": "^8.5.10",
-    "yaml": "^1.10.3",
   },
   "packages": {
     "@blazediff/core": ["@blazediff/core@1.9.1", "", {}, "sha512-ehg3jIkYKulZh+8om/O25vkvSsXXwC+skXmyA87FFx6A/45eqOkZsBltMw/TVteb0mloiGT8oGRTcjRAz66zaA=="],
