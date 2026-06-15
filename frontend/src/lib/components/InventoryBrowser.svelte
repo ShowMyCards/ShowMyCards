@@ -183,6 +183,15 @@
 	{:else if view.viewMode === 'grid'}
 		<!-- Grid View -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+			<!--
+				Key intentionally includes total_quantity, not just card.id. CardResultCard
+				captures card.inventory into local $state once on mount and never re-syncs from
+				the prop (it diverges via optimistic +/-). After a split-move calls
+				invalidateAll(), the reloaded card keeps the same id but a new quantity; keying
+				on id alone would reuse the stale instance and show the pre-move quantity. The
+				quantity in the key forces a remount so the fresh data is read. Do not simplify
+				to (card.id) without first making CardResultCard reconcile from props.
+			-->
 			{#each paginatedCards as card (`${card.id}-${card.inventory.total_quantity}`)}
 				<CardResultCard
 					{card}
