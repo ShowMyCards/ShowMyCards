@@ -33,6 +33,7 @@ type ScryfallAPI interface {
 	SearchCards(ctx context.Context, query string, opts scryfall.SearchCardsOptions) (scryfall.CardListResponse, error)
 	GetCard(ctx context.Context, id string) (scryfall.Card, error)
 	ListSets(ctx context.Context) ([]scryfall.Set, error)
+	ListCardSymbols(ctx context.Context) ([]scryfall.CardSymbol, error)
 	AutocompleteCard(ctx context.Context, s string) ([]string, error)
 }
 
@@ -133,6 +134,14 @@ func (c *Client) ListSets(ctx context.Context) ([]scryfall.Set, error) {
 	defer cancel()
 
 	return c.api.ListSets(ctx)
+}
+
+// ListSymbols retrieves all card symbols (mana, tap, etc.) from Scryfall.
+func (c *Client) ListSymbols(ctx context.Context) ([]scryfall.CardSymbol, error) {
+	ctx, cancel := context.WithTimeout(ctx, DefaultAPITimeout)
+	defer cancel()
+
+	return c.api.ListCardSymbols(ctx)
 }
 
 // Autocomplete returns card name suggestions for a partial query.

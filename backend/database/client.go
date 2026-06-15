@@ -102,6 +102,7 @@ func migrate(db *gorm.DB) error {
 		&models.Job{},
 		&models.Card{},
 		&models.Set{},
+		&models.Symbol{},
 	); err != nil {
 		return fmt.Errorf("auto-migrate failed: %w", err)
 	}

@@ -50,30 +50,32 @@ type ScheduledTask struct {
 
 // Scheduler handles scheduled tasks
 type Scheduler struct {
-	bulkDataService *BulkDataService
-	setDataService  *SetDataService
-	jobService      *JobService
-	settingsService *SettingsService
-	backupService   *BackupService
-	ticker          *time.Ticker
-	done            chan bool
-	started         atomic.Bool
-	lastRunMu       sync.RWMutex
-	lastRun         map[string]time.Time
-	runningTasks    sync.Map
-	tasks           []ScheduledTask
+	bulkDataService   *BulkDataService
+	setDataService    *SetDataService
+	symbolDataService *SymbolDataService
+	jobService        *JobService
+	settingsService   *SettingsService
+	backupService     *BackupService
+	ticker            *time.Ticker
+	done              chan bool
+	started           atomic.Bool
+	lastRunMu         sync.RWMutex
+	lastRun           map[string]time.Time
+	runningTasks      sync.Map
+	tasks             []ScheduledTask
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataService, jobService *JobService, settingsService *SettingsService, backupService *BackupService) *Scheduler {
+func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataService, symbolDataService *SymbolDataService, jobService *JobService, settingsService *SettingsService, backupService *BackupService) *Scheduler {
 	s := &Scheduler{
-		bulkDataService: bulkDataService,
-		setDataService:  setDataService,
-		jobService:      jobService,
-		settingsService: settingsService,
-		backupService:   backupService,
-		done:            make(chan bool, 1),
-		lastRun:         make(map[string]time.Time),
+		bulkDataService:   bulkDataService,
+		setDataService:    setDataService,
+		symbolDataService: symbolDataService,
+		jobService:        jobService,
+		settingsService:   settingsService,
+		backupService:     backupService,
+		done:              make(chan bool, 1),
+		lastRun:           make(map[string]time.Time),
 	}
 
 	// Register all scheduled tasks
@@ -93,6 +95,14 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			EnabledSettingKey: "set_data_auto_update",
 			LastRunSettingKey: "set_data_last_update",
 			Run:               s.runSetDataUpdate,
+		},
+		{
+			Name:              "symbol_data_update",
+			Interval:          30 * 24 * time.Hour, // Monthly — symbols rarely change
+			TimeOfDay:         "symbol_data_update_time",
+			EnabledSettingKey: "symbol_data_auto_update",
+			LastRunSettingKey: "symbol_data_last_update",
+			Run:               s.runSymbolDataUpdate,
 		},
 		{
 			Name:              "job_cleanup",
@@ -334,6 +344,25 @@ func (s *Scheduler) runSetDataUpdate(ctx context.Context) {
 		}()
 		if err := s.setDataService.DownloadAndImport(ctx, job.ID); err != nil {
 			slog.Error("error in set data import", "component", "scheduler", "error", err)
+		}
+	}()
+}
+
+func (s *Scheduler) runSymbolDataUpdate(ctx context.Context) {
+	job, err := s.symbolDataService.CreateImportJob(ctx)
+	if err != nil {
+		slog.Error("error creating symbol data import job", "component", "scheduler", "error", err)
+		return
+	}
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("panic in symbol data import", "component", "scheduler", "panic", r)
+			}
+		}()
+		if err := s.symbolDataService.DownloadAndImport(ctx, job.ID); err != nil {
+			slog.Error("error in symbol data import", "component", "scheduler", "error", err)
 		}
 	}()
 }

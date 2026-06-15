@@ -737,3 +737,11 @@ export interface StorageLocationWithCount {
 	item_count: number /* int */; // Count of distinct records
 	total_value: number /* float64 */; // USD total value
 }
+
+//////////
+// source: symbol.go
+
+/**
+ * SymbolHandler handles symbol endpoints
+ */
+export interface SymbolHandler {}
