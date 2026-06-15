@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '$lib';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type { ListSummary } from '$lib';
 
 export const load: PageServerLoad = async ({ fetch }) => {
@@ -56,13 +56,46 @@ export const actions: Actions = {
 
 			const list = await response.json();
 
-			// Redirect to the new list page
-			throw redirect(303, `/lists/${list.id}`);
-		} catch (error) {
-			if (error instanceof Response && error.status === 303) {
-				throw error;
-			}
+			return { success: true, action: 'create', data: list };
+		} catch {
 			return fail(500, { error: 'Failed to create list' });
+		}
+	},
+
+	update: async ({ request, fetch }) => {
+		const data = await request.formData();
+		const id = data.get('id') as string;
+		const name = data.get('name') as string;
+		const description = data.get('description') as string;
+
+		if (!id) {
+			return fail(400, { error: 'ID is required' });
+		}
+
+		if (!name) {
+			return fail(400, { error: 'Name is required' });
+		}
+
+		try {
+			const response = await fetch(`${BACKEND_URL}/api/lists/${id}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					name,
+					description
+				})
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				return fail(response.status, { error: errorData.error || 'Failed to update list' });
+			}
+
+			return { success: true, action: 'update' };
+		} catch {
+			return fail(500, { error: 'Failed to update list' });
 		}
 	},
 
