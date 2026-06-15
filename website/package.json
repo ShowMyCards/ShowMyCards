@@ -21,6 +21,6 @@
 		"wrangler": "^4.93.0"
 	},
 	"overrides": {
-		"devalue": "^5.8.1"
+		"esbuild": "^0.28.1"
 	}
 }
