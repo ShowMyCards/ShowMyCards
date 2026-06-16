@@ -173,9 +173,11 @@ export interface ImportResponse {
 export interface DeckHandler {}
 /**
  * DeckSummary represents a deck with summary statistics.
- * Milestone 1a ships counts only. The aggregate shortfall (cards short across
- * the deck, computed against the user's inventory) is added in 1b once the
- * allocation service lands — see FR98/IMPLEMENTATION_PLAN.md §2.
+ * AggregateShortfall is the under-owned shortfall — the number of cards the deck
+ * wants that the user does not physically own (Σ max(0, desired − owned_O) over
+ * the deck's demand-zone items). It is independent of other decks; the
+ * cross-deck over-commitment signal lives on the deck-detail items endpoint.
+ * See FR98/IMPLEMENTATION_PLAN.md §2.
  * tygo:export
  */
 export interface DeckSummary {
@@ -186,6 +188,7 @@ export interface DeckSummary {
 	description: string;
 	total_items: number /* int */;
 	total_cards_demand: number /* int */;
+	aggregate_shortfall: number /* int */;
 }
 /**
  * CreateDeckRequest represents the request body for creating a deck.
@@ -206,9 +209,12 @@ export interface UpdateDeckRequest {
 /**
  * EnrichedDeckItem represents a deck item enriched with card data and
  * availability information.
- * The availability fields are populated by the allocation service in
- * Milestone 1b. In 1a the items endpoint is a stub that returns an empty
- * response, so these fields are documented here for the type contract only.
+ * Owned is the Oracle-level owned count. UnderOwned is true when this item's
+ * desired quantity exceeds what the user physically owns of the Oracle.
+ * OverCommitted is the Oracle's cross-deck over-commitment flag (you own enough
+ * for this deck alone, but not for every deck at once, or a pinned printing is
+ * over-subscribed). These are two distinct signals — see
+ * FR98/IMPLEMENTATION_PLAN.md §2 "Two distinct deck-detail signals".
  * tygo:export
  */
 export interface EnrichedDeckItem {
@@ -240,9 +246,9 @@ export interface EnrichedDeckItem {
 /**
  * DeckItemsResponse represents the items in a deck, grouped by zone, with
  * aggregate availability information.
- * In 1a all zone slices are empty and AggregateShortfall is zero — the
- * endpoint is a contract stub. 1b will populate it from the allocation
- * service.
+ * AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
+ * owned_O) over demand-zone items). Maybe-board items are returned but never
+ * contribute to the shortfall.
  * tygo:export
  */
 export interface DeckItemsResponse {
@@ -252,6 +258,37 @@ export interface DeckItemsResponse {
 	side: EnrichedDeckItem[];
 	maybe: EnrichedDeckItem[];
 	aggregate_shortfall: number /* int */;
+}
+/**
+ * CreateDeckItemRequest represents a single item to add to a deck.
+ * tygo:export
+ */
+export interface CreateDeckItemRequest {
+	oracle_id: string;
+	scryfall_id: string;
+	treatment: string;
+	desired_quantity: number /* int */;
+	zone: import('./models').DeckZone;
+}
+/**
+ * CreateDeckItemsBatchRequest represents the request body for batch adding deck
+ * items.
+ * tygo:export
+ */
+export interface CreateDeckItemsBatchRequest {
+	items: CreateDeckItemRequest[];
+}
+/**
+ * UpdateDeckItemRequest represents the request body for updating a deck item.
+ * All fields are optional; only provided fields are changed. ScryfallID and
+ * Treatment use pointers so callers can explicitly clear a pin (set to "").
+ * tygo:export
+ */
+export interface UpdateDeckItemRequest {
+	desired_quantity?: number /* int */;
+	zone?: import('./models').DeckZone;
+	scryfall_id?: string;
+	treatment?: string;
 }
 
 //////////
