@@ -9,6 +9,7 @@
 		treatment: string;
 		existingPrintings: ExistingPrintingInfo[];
 		existingLocations: StorageLocation[];
+		selectedLocation: StorageLocation | null;
 		onClose: () => void;
 		onChoose: (locationId: number | 'auto') => void;
 	}
@@ -19,6 +20,7 @@
 		treatment,
 		existingPrintings,
 		existingLocations,
+		selectedLocation,
 		onClose,
 		onChoose
 	}: Props = $props();
@@ -74,10 +76,21 @@
 				Auto-sort (use rules)
 			</button>
 			{#each existingLocations as location (location.id)}
-				<button type="button" class="btn btn-primary" onclick={() => onChoose(location.id)}>
-					Send to {location.name}
-				</button>
+				{#if location.id !== selectedLocation?.id}
+					<button
+						type="button"
+						class="btn {selectedLocation ? 'btn-outline' : 'btn-primary'}"
+						onclick={() => onChoose(location.id)}>
+						Send to {location.name}
+					</button>
+				{/if}
 			{/each}
+			{#if selectedLocation}
+				{@const picked = selectedLocation}
+				<button type="button" class="btn btn-primary" onclick={() => onChoose(picked.id)}>
+					Send to {picked.name}
+				</button>
+			{/if}
 		</div>
 	{/snippet}
 </Modal>
