@@ -1,9 +1,10 @@
-import { BACKEND_URL, type SearchResponse, type StorageLocation } from '$lib';
+import { BACKEND_URL, type SearchResponse } from '$lib';
 import {
 	handleAddInventory,
 	handleDeleteInventory,
 	handleUpdateInventory
 } from '$lib/server/inventory-actions';
+import { loadStorageLocations } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 
@@ -15,19 +16,6 @@ export const load: PageServerLoad = async ({ fetch }) => {
 	]);
 	return { storageLocations, defaultLanguage };
 };
-
-async function loadStorageLocations(fetch: typeof globalThis.fetch): Promise<StorageLocation[]> {
-	try {
-		const response = await fetch(`${BACKEND_URL}/api/storage`);
-		if (response.ok) {
-			const data = await response.json();
-			return data.data as StorageLocation[];
-		}
-	} catch {
-		// Ignore errors, dropdown will just be empty
-	}
-	return [];
-}
 
 async function loadDefaultLanguage(fetch: typeof globalThis.fetch): Promise<string> {
 	try {

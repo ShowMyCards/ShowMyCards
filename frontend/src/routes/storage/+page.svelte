@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import {
 		PageHeader,
@@ -25,17 +24,6 @@
 	let createFormValues = $state({
 		name: '',
 		storage_type: 'Box' as 'Box' | 'Binder'
-	});
-
-	// Display load error if present (browser only)
-	// Only show error once per page load
-	let hasShownLoadError = $state(false);
-	$effect(() => {
-		if (!browser || hasShownLoadError) return;
-		if (data.error) {
-			hasShownLoadError = true;
-			notifications.error(data.error);
-		}
 	});
 </script>
 

@@ -9,6 +9,7 @@ import {
 	handleDeleteInventory,
 	handleUpdateInventory
 } from '$lib/server/inventory-actions';
+import { loadStorageLocationsWithCounts } from '$lib/server/storage';
 import type { PageServerLoad, Actions } from './$types';
 import { error } from '@sveltejs/kit';
 
@@ -16,10 +17,11 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 	const { id } = params;
 
 	try {
-		// Fetch storage location info and all locations in parallel
-		const [locationResponse, allLocationsResponse] = await Promise.all([
+		// Fetch storage location info and all locations (for the bulk move
+		// dropdown) in parallel
+		const [locationResponse, allLocations] = await Promise.all([
 			fetch(`${BACKEND_URL}/api/storage/${id}`),
-			fetch(`${BACKEND_URL}/api/storage`)
+			loadStorageLocationsWithCounts(fetch)
 		]);
 
 		if (!locationResponse.ok) {
@@ -29,13 +31,6 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			throw new Error('Failed to fetch storage location');
 		}
 		const location: StorageLocationWithCount = await locationResponse.json();
-
-		// Parse all locations (for bulk move dropdown)
-		let allLocations: StorageLocationWithCount[] = [];
-		if (allLocationsResponse.ok) {
-			const allLocationsData = await allLocationsResponse.json();
-			allLocations = allLocationsData.data || [];
-		}
 
 		// Fetch ALL cards for this location (for client-side filtering)
 		// First, get page 1 to know total pages

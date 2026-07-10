@@ -1,31 +1,13 @@
 import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '$lib';
 import { fail } from '@sveltejs/kit';
-import type { StorageLocation } from '$lib';
+import { loadStorageLocations } from '$lib/server/storage';
 
 export const load: PageServerLoad = async ({ fetch }) => {
-	try {
-		const response = await fetch(`${BACKEND_URL}/api/storage`);
-
-		if (!response.ok) {
-			return {
-				locations: [],
-				error: 'Failed to load storage locations'
-			};
-		}
-
-		const result = await response.json();
-		const locations: StorageLocation[] = result.data || [];
-
-		return {
-			locations
-		};
-	} catch {
-		return {
-			locations: [],
-			error: 'Failed to load storage locations'
-		};
-	}
+	const locations = await loadStorageLocations(fetch);
+	return {
+		locations
+	};
 };
 
 export const actions: Actions = {
