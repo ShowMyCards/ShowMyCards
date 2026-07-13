@@ -128,10 +128,10 @@
       "dependencyDashboardApproval": true
     },
     {
-      "description": "Fast-track Go toolchain patch bumps. Stdlib security fixes ship as Go patch releases, but Renovate's vulnerability alerts key off declared module dependencies and never map a stdlib advisory to the `go` directive — so the weekly schedule + minimumReleaseAge would otherwise leave govulncheck red for days. Patches are low-risk and CI-gated, so auto-merge them as soon as they land.",
-      "matchManagers": ["gomod"],
-      "matchDepNames": ["go"],
-      "matchUpdateTypes": ["patch"],
+      "description": "Fast-track Go toolchain patch bumps, and keep the golang base image in lockstep with them. Stdlib security fixes ship as Go patch releases, but Renovate's vulnerability alerts key off declared module dependencies and never map a stdlib advisory to the `go` directive — so the weekly schedule + minimumReleaseAge would otherwise leave govulncheck red for days. The Docker build sets GOTOOLCHAIN=local, so if the `go` directive outpaces the pinned golang image the build fails; grouping them puts both in one PR. The go.mod side is a `patch` update, while the image side is a `digest` update (the `1.26-alpine` tag is unchanged — only the digest moves), so both types must match here. Patches are low-risk and CI-gated, so auto-merge them as soon as they land.",
+      "matchDepNames": ["go", "golang"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "groupName": "go toolchain",
       "schedule": ["at any time"],
       "minimumReleaseAge": "0",
       "automerge": true,
