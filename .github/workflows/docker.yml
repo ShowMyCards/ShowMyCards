@@ -1,11 +1,16 @@
 name: Build and Push Docker Image
 
 on:
-  # Deliberately no `paths-ignore` on pull_request. `docker (build)` is a
-  # required status check, and a required check that never fires on a given PR
-  # blocks it forever — a path filter here would deadlock website-only PRs.
-  # See #80 for the same failure mode.
+  # Deliberately no `paths-ignore` here, unlike the push trigger below.
+  # `docker (build)` is a required status check, and a required check that
+  # never fires on a given PR blocks it forever — a path filter would deadlock
+  # website-only PRs. See #80 for the same failure mode.
+  #
+  # `branches: [main]` is safe, and matches ci.yml/security.yml: the rulesets
+  # only gate merges into main, so that is the only base where this check has
+  # to report.
   pull_request:
+    branches: [main]
   push:
     branches: [main]
     tags:
