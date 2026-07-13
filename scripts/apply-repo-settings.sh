@@ -72,11 +72,23 @@ echo "==> 4. Branch protection on main (rulesets)"
 # still obeys CI":
 #
 #   main-guardrails  — status checks, linear history, no force-push/delete.
-#                      NO bypass actors. Binds everyone, Renovate included.
+#                      NO bypass actors. Binds everyone: Renovate, and admins.
 #   main-review      — 1 approving CODEOWNER review.
-#                      Renovate (app 2740) bypasses this one only.
+#                      Renovate (app 2740) and repo admins bypass this one only.
+#
+# The admin bypass replaces the old `enforce_admins: false`, which is load
+# bearing: CODEOWNERS maps * to a single maintainer who authors most PRs, and
+# GitHub forbids self-approval — so without it the sole code owner is the one
+# person who cannot satisfy the code-owner review, and nothing merges at all.
+#
+# Note this is deliberately NARROWER than the `enforce_admins: false` it
+# replaces. That flag let admins bypass the entire protection, status checks
+# included, so a red `bun audit` could be merged with one click. Here admins
+# skip only the review requirement; main-guardrails has no bypass actors, so CI
+# still binds them absolutely. Do not add a bypass actor to main-guardrails.
 #
 RENOVATE_APP_ID=2740
+ADMIN_ROLE_ID=5 # built-in repository role: admin
 
 # Idempotent create-or-update: rulesets have no PUT-by-name, so look up the id.
 apply_ruleset() {
@@ -93,6 +105,12 @@ apply_ruleset() {
 
 # Required status checks must match the job names GitHub has actually seen.
 # integration_id 15368 is the GitHub Actions app — it owns all of these.
+#
+# Only ever require a check whose workflow is already on main AND which fires on
+# every PR into main. A required check that never reports blocks its PR forever
+# — that is #80, and it is why docker.yml's pull_request trigger carries no
+# paths-ignore. `docker (build)` below therefore depends on the docker.yml
+# change being merged first; requiring it earlier would deadlock every open PR.
 apply_ruleset "main-guardrails" "$(cat <<'JSON'
 {
   "name": "main-guardrails",
@@ -117,7 +135,8 @@ apply_ruleset "main-guardrails" "$(cat <<'JSON'
           { "context": "actionlint (workflows)",         "integration_id": 15368 },
           { "context": "zizmor (workflow security)",     "integration_id": 15368 },
           { "context": "Analyze (go)",                   "integration_id": 15368 },
-          { "context": "Analyze (javascript-typescript)","integration_id": 15368 }
+          { "context": "Analyze (javascript-typescript)","integration_id": 15368 },
+          { "context": "docker (build)",                 "integration_id": 15368 }
         ]
       }
     }
@@ -133,7 +152,8 @@ apply_ruleset "main-review" "$(cat <<JSON
   "enforcement": "active",
   "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
   "bypass_actors": [
-    { "actor_id": $RENOVATE_APP_ID, "actor_type": "Integration", "bypass_mode": "always" }
+    { "actor_id": $RENOVATE_APP_ID, "actor_type": "Integration", "bypass_mode": "always" },
+    { "actor_id": $ADMIN_ROLE_ID, "actor_type": "RepositoryRole", "bypass_mode": "always" }
   ],
   "rules": [
     {
