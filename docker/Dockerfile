@@ -9,6 +9,15 @@
 # and the version tag is retained as a human-readable hint.
 FROM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS backend-builder
 
+# The base image's Go must satisfy backend/go.mod's `go` directive on its own.
+# Left unset, GOTOOLCHAIN defaults to `auto`, and Go quietly downloads a newer
+# toolchain mid-build — so a stale image digest still produces a correct binary
+# and the drift goes unnoticed until someone reads the Dockerfile. `local`
+# turns that silent fetch into an explicit build failure naming both versions.
+# Renovate groups the `go` directive and this image under `go toolchain` so
+# they always bump in the same PR.
+ENV GOTOOLCHAIN=local
+
 WORKDIR /app
 
 RUN apk add --no-cache gcc musl-dev
