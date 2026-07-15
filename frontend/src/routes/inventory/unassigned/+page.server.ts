@@ -4,7 +4,7 @@ import {
 	handleDeleteInventory,
 	handleUpdateInventory
 } from '$lib/server/inventory-actions';
-import { loadStorageLocationsWithCounts } from '$lib/server/storage';
+import { loadStorageLocations } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch }) => {
@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 		// dropdown) in parallel. First, get page 1 to know total pages.
 		const [firstPageResponse, allLocations] = await Promise.all([
 			fetch(`${BACKEND_URL}/api/inventory/cards?storage_location_id=null&page=1&page_size=100`),
-			loadStorageLocationsWithCounts(fetch)
+			loadStorageLocations(fetch)
 		]);
 
 		if (!firstPageResponse.ok) {

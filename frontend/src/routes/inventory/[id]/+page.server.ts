@@ -9,7 +9,7 @@ import {
 	handleDeleteInventory,
 	handleUpdateInventory
 } from '$lib/server/inventory-actions';
-import { loadStorageLocationsWithCounts } from '$lib/server/storage';
+import { loadStorageLocations } from '$lib/server/storage';
 import type { PageServerLoad, Actions } from './$types';
 import { error } from '@sveltejs/kit';
 
@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 		// dropdown) in parallel
 		const [locationResponse, allLocations] = await Promise.all([
 			fetch(`${BACKEND_URL}/api/storage/${id}`),
-			loadStorageLocationsWithCounts(fetch)
+			loadStorageLocations(fetch)
 		]);
 
 		if (!locationResponse.ok) {

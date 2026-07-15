@@ -1,13 +1,21 @@
 import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '$lib';
 import { fail } from '@sveltejs/kit';
-import { loadStorageLocations } from '$lib/server/storage';
+import { fetchStorageLocations } from '$lib/server/storage';
 
 export const load: PageServerLoad = async ({ fetch }) => {
-	const locations = await loadStorageLocations(fetch);
-	return {
-		locations
-	};
+	// The location list is this page's primary content, so a failed load must be
+	// distinguishable from a genuinely empty collection — use the throwing
+	// variant and surface the error rather than rendering an empty list.
+	try {
+		const locations = await fetchStorageLocations(fetch);
+		return { locations, error: null };
+	} catch {
+		return {
+			locations: [],
+			error: 'Failed to load storage locations'
+		};
+	}
 };
 
 export const actions: Actions = {

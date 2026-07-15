@@ -5,7 +5,7 @@
 		inventoryApi,
 		notifications,
 		type Inventory,
-		type StorageLocationWithCount
+		type StorageLocation
 	} from '$lib';
 
 	interface Props {
@@ -13,7 +13,7 @@
 		inventory: Inventory | null;
 		availableQuantity: number;
 		currentLocationId?: number;
-		locations: StorageLocationWithCount[];
+		locations: StorageLocation[];
 		onClose: () => void;
 		onComplete?: () => void;
 	}

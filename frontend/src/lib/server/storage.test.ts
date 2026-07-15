@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, type Mock } from 'vitest';
-import { loadStorageLocations, loadStorageLocationsWithCounts } from './storage';
+import { loadStorageLocations, fetchStorageLocationsWithCounts } from './storage';
 
 const BACKEND_URL = 'http://localhost:3000';
 
@@ -84,7 +84,7 @@ describe('loadStorageLocations', () => {
 	});
 });
 
-describe('loadStorageLocationsWithCounts', () => {
+describe('fetchStorageLocationsWithCounts', () => {
 	it('fetches the unbounded with-counts endpoint and returns the bare array', async () => {
 		const locations = [
 			{ ...loc(1), card_count: 3, item_count: 2, total_value: 10 },
@@ -92,26 +92,22 @@ describe('loadStorageLocationsWithCounts', () => {
 		];
 		const fetchMock = vi.fn().mockResolvedValue(jsonResponse(locations));
 
-		const result = await loadStorageLocationsWithCounts(asFetch(fetchMock));
+		const result = await fetchStorageLocationsWithCounts(asFetch(fetchMock));
 
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(fetchMock.mock.calls[0][0]).toBe(`${BACKEND_URL}/api/storage/with-counts`);
 		expect(result).toHaveLength(2);
 	});
 
-	it('returns an empty array when the request is not ok', async () => {
+	it('throws when the request is not ok, so failure is distinguishable from empty', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 500 }));
 
-		const result = await loadStorageLocationsWithCounts(asFetch(fetchMock));
-
-		expect(result).toEqual([]);
+		await expect(fetchStorageLocationsWithCounts(asFetch(fetchMock))).rejects.toThrow();
 	});
 
-	it('returns an empty array when fetch throws', async () => {
+	it('propagates the error when fetch throws', async () => {
 		const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
 
-		const result = await loadStorageLocationsWithCounts(asFetch(fetchMock));
-
-		expect(result).toEqual([]);
+		await expect(fetchStorageLocationsWithCounts(asFetch(fetchMock))).rejects.toThrow('network down');
 	});
 });

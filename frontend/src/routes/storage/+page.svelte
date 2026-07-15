@@ -5,6 +5,7 @@
 		Modal,
 		EmptyState,
 		FormField,
+		Notification,
 		StorageLocationRow,
 		notifications,
 		getActionError
@@ -41,7 +42,9 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if storageLocations.length === 0}
+	{#if data.error}
+		<Notification type="error">{data.error}</Notification>
+	{:else if storageLocations.length === 0}
 		<EmptyState message="No storage locations yet">
 			<button onclick={() => (showCreateModal = true)} class="btn btn-primary">
 				Create your first location

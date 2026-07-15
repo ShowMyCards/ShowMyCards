@@ -1,4 +1,5 @@
-import { BACKEND_URL, type StorageLocationWithCount } from '$lib';
+import { BACKEND_URL } from '$lib';
+import { fetchStorageLocationsWithCounts } from '$lib/server/storage';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch, depends, setHeaders }) => {
@@ -11,12 +12,9 @@ export const load: PageServerLoad = async ({ fetch, depends, setHeaders }) => {
 	});
 
 	try {
-		// Fetch storage locations with card counts
-		const locationsResponse = await fetch(`${BACKEND_URL}/api/storage/with-counts`);
-		if (!locationsResponse.ok) {
-			throw new Error('Failed to fetch storage locations');
-		}
-		const locations: StorageLocationWithCount[] = await locationsResponse.json();
+		// Fetch storage locations with card counts. Throws on failure so the
+		// catch below can surface an error rather than render an empty list.
+		const locations = await fetchStorageLocationsWithCounts(fetch);
 
 		// Fetch unassigned count
 		const unassignedResponse = await fetch(`${BACKEND_URL}/api/inventory/unassigned/count`);
