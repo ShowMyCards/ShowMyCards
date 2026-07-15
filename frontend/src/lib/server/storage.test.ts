@@ -108,6 +108,8 @@ describe('fetchStorageLocationsWithCounts', () => {
 	it('propagates the error when fetch throws', async () => {
 		const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
 
-		await expect(fetchStorageLocationsWithCounts(asFetch(fetchMock))).rejects.toThrow('network down');
+		await expect(fetchStorageLocationsWithCounts(asFetch(fetchMock))).rejects.toThrow(
+			'network down'
+		);
 	});
 });
