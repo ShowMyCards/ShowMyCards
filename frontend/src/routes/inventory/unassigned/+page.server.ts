@@ -1,23 +1,19 @@
-import {
-	BACKEND_URL,
-	type InventoryCardsResponse,
-	type StorageLocationWithCount,
-	type EnhancedCardResult
-} from '$lib';
+import { BACKEND_URL, type InventoryCardsResponse, type EnhancedCardResult } from '$lib';
 import {
 	handleAddInventory,
 	handleDeleteInventory,
 	handleUpdateInventory
 } from '$lib/server/inventory-actions';
+import { loadStorageLocations } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch }) => {
 	try {
-		// Fetch ALL unassigned cards and all locations in parallel
-		// First, get page 1 to know total pages
-		const [firstPageResponse, locationsResponse] = await Promise.all([
+		// Fetch ALL unassigned cards and all locations (for the bulk move
+		// dropdown) in parallel. First, get page 1 to know total pages.
+		const [firstPageResponse, allLocations] = await Promise.all([
 			fetch(`${BACKEND_URL}/api/inventory/cards?storage_location_id=null&page=1&page_size=100`),
-			fetch(`${BACKEND_URL}/api/storage`)
+			loadStorageLocations(fetch)
 		]);
 
 		if (!firstPageResponse.ok) {
@@ -42,13 +38,6 @@ export const load: PageServerLoad = async ({ fetch }) => {
 			for (const pageData of remainingPages) {
 				allCards.push(...(pageData.data || []));
 			}
-		}
-
-		// Parse locations for bulk move dropdown
-		let allLocations: StorageLocationWithCount[] = [];
-		if (locationsResponse.ok) {
-			const locationsData = await locationsResponse.json();
-			allLocations = locationsData.data || [];
 		}
 
 		return {
