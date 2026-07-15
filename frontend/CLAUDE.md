@@ -494,6 +494,10 @@ export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost
 
 Set `VITE_BACKEND_URL` environment variable to override the default.
 
+- **Data-loader error contract.** Shared loaders (e.g. `$lib/server/storage.ts`)
+  follow a swallow-vs-throw convention chosen by whether the data is the page's
+  primary content or auxiliary — see FRONTEND_REVIEW_STANDARDS.md §9.
+
 ### Domain Model Reference
 
 For the complete domain model reference, see the backend [CLAUDE.md](../backend/CLAUDE.md#domain-model).

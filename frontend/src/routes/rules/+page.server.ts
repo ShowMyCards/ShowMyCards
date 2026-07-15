@@ -1,5 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '$lib';
+import { loadStorageLocations } from '$lib/server/storage';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ fetch, url }) => {
@@ -21,8 +22,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 		const rulesData = await rulesResponse.json();
 
 		// Fetch storage locations for dropdown
-		const locationsResponse = await fetch(`${BACKEND_URL}/api/storage?page_size=100`);
-		const locationsData = locationsResponse.ok ? await locationsResponse.json() : { data: [] };
+		const storageLocations = await loadStorageLocations(fetch);
 
 		return {
 			rules: rulesData.data || [],
@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 				total: rulesData.total || 0,
 				total_pages: rulesData.total_pages || 1
 			},
-			storageLocations: locationsData.data || []
+			storageLocations
 		};
 	} catch {
 		return {

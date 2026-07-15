@@ -18,7 +18,7 @@
 		usePersistedViewMode,
 		type EnhancedCardResult,
 		type Inventory,
-		type StorageLocationWithCount
+		type StorageLocation
 	} from '$lib';
 	import SetIcon from '$lib/components/SetIcon.svelte';
 	import { FolderInput } from '@lucide/svelte';
@@ -27,7 +27,7 @@
 
 	interface Props {
 		cards: EnhancedCardResult[];
-		allLocations: StorageLocationWithCount[];
+		allLocations: StorageLocation[];
 		error?: string;
 		emptyMessage?: string;
 		header: Snippet;
