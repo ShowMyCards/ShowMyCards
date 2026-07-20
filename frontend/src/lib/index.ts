@@ -59,6 +59,9 @@ export { default as RuleTester } from './components/RuleTester.svelte';
 export { default as SortableRuleRow } from './components/SortableRuleRow.svelte';
 export { default as ScheduledTaskCard } from './components/ScheduledTaskCard.svelte';
 export { default as ListCard } from './components/ListCard.svelte';
+export { default as DeckCard } from './components/DeckCard.svelte';
+export { default as DeckItemRow } from './components/DeckItemRow.svelte';
+export { default as DeckAddResultCard } from './components/DeckAddResultCard.svelte';
 export { default as ListStatsBar } from './components/ListStatsBar.svelte';
 export { default as ListCardGrid } from './components/ListCardGrid.svelte';
 export { default as ListCardTable } from './components/ListCardTable.svelte';
@@ -134,6 +137,10 @@ export type {
 // Re-export List types from models
 export type { List, ListItem } from './types/models';
 
+// Re-export Deck types from models
+export type { Deck, DeckItem, DeckZone } from './types/models';
+export { ZoneMain, ZoneSide, ZoneCommand, ZoneMaybe } from './types/models';
+
 // Re-export runtime-accurate API types
 export type {
 	SearchResponse,
@@ -156,6 +163,18 @@ export type {
 	CreateListItemRequest,
 	CreateItemsBatchRequest,
 	UpdateListItemRequest
+} from './types/api';
+
+// Re-export deck-related API types
+export type {
+	DeckSummary,
+	CreateDeckRequest,
+	UpdateDeckRequest,
+	EnrichedDeckItem,
+	DeckItemsResponse,
+	CreateDeckItemRequest,
+	CreateDeckItemsBatchRequest,
+	UpdateDeckItemRequest
 } from './types/api';
 
 // Re-export scheduler and dashboard types from API
