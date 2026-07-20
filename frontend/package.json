@@ -36,7 +36,7 @@
 		"tailwindcss": "^4.3.0",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.59.4",
-		"vite": "^7.3.3",
+		"vite": "^7.3.6",
 		"vitest": "^4.1.6",
 		"vitest-browser-svelte": "^2.1.1"
 	},
@@ -49,6 +49,7 @@
 	},
 	"overrides": {
 		"cookie": "^0.7.2",
-		"esbuild": "^0.28.1"
+		"esbuild": "^0.28.1",
+		"vite": "^7.3.6"
 	}
 }

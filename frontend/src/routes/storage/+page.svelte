@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import {
 		PageHeader,
 		Modal,
 		EmptyState,
 		FormField,
+		Notification,
 		StorageLocationRow,
 		notifications,
 		getActionError
@@ -26,17 +26,6 @@
 		name: '',
 		storage_type: 'Box' as 'Box' | 'Binder'
 	});
-
-	// Display load error if present (browser only)
-	// Only show error once per page load
-	let hasShownLoadError = $state(false);
-	$effect(() => {
-		if (!browser || hasShownLoadError) return;
-		if (data.error) {
-			hasShownLoadError = true;
-			notifications.error(data.error);
-		}
-	});
 </script>
 
 <svelte:head>
@@ -53,7 +42,9 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if storageLocations.length === 0}
+	{#if data.error}
+		<Notification type="error">{data.error}</Notification>
+	{:else if storageLocations.length === 0}
 		<EmptyState message="No storage locations yet">
 			<button onclick={() => (showCreateModal = true)} class="btn btn-primary">
 				Create your first location

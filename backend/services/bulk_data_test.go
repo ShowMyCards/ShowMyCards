@@ -2,6 +2,7 @@ package services
 
 import (
 	"backend/models"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -13,6 +14,38 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+// bulkDataListResponse builds a /bulk-data list payload pointing all_cards at
+// the given gzipped-JSONL URL, matching Scryfall's response shape.
+func bulkDataListResponse(jsonlURL string) map[string]interface{} {
+	return map[string]interface{}{
+		"data": []interface{}{
+			map[string]interface{}{
+				"type":               "all_cards",
+				"jsonl_download_uri": jsonlURL,
+			},
+		},
+	}
+}
+
+// writeJSONLGzip writes cards as gzipped JSONL (one card object per line,
+// gzip-compressed), matching Scryfall's bulk data file format.
+func writeJSONLGzip(t *testing.T, w http.ResponseWriter, cards []scryfall.Card) {
+	t.Helper()
+	w.Header().Set("Content-Type", "application/gzip")
+	gz := gzip.NewWriter(w)
+	defer gz.Close()
+	// json.Encoder.Encode writes a trailing newline after each value, so
+	// encoding cards in sequence yields JSONL. Encode &cards[i] (an
+	// addressable pointer) so scryfall.Date's pointer-receiver MarshalJSON is
+	// honored and dates serialize date-only, as real Scryfall data does.
+	enc := json.NewEncoder(gz)
+	for i := range cards {
+		if err := enc.Encode(&cards[i]); err != nil {
+			t.Fatalf("failed to encode card as JSONL: %v", err)
+		}
+	}
+}
 
 func setupBulkDataServiceTest(t *testing.T) (*BulkDataService, *JobService, *SettingsService, *gorm.DB) {
 	t.Helper()
@@ -177,29 +210,19 @@ func TestBulkDataService_DownloadAndImport_SuccessfulImport(t *testing.T) {
 	// Mock download server for both bulk data list and actual data
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
 		if r.URL.Path == "/bulk-data" {
 			// Return bulk data list
-			response := map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"type":         "all_cards",
-						"download_uri": server.URL + "/cards.json",
-						"updated_at":   "2024-01-15T00:00:00.000Z",
-					},
-				},
-			}
-			json.NewEncoder(w).Encode(response)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz"))
 		} else {
-			// Return card data
-			json.NewEncoder(w).Encode(cards)
+			// Return gzipped JSONL card data
+			writeJSONLGzip(t, w, cards)
 		}
 	}))
 	defer server.Close()
 
 	// Set bulk data URL
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL+"/bulk-data")
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
 
 	// Create job
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
@@ -238,24 +261,16 @@ func TestBulkDataService_DownloadAndImport_LowFailureRate(t *testing.T) {
 
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/bulk-data" {
-			response := map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"type":         "all_cards",
-						"download_uri": server.URL + "/cards.json",
-					},
-				},
-			}
-			json.NewEncoder(w).Encode(response)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz"))
 		} else {
-			json.NewEncoder(w).Encode(cards)
+			writeJSONLGzip(t, w, cards)
 		}
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL+"/bulk-data")
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
@@ -293,24 +308,16 @@ func TestBulkDataService_DownloadAndImport_HighFailureRate(t *testing.T) {
 
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/bulk-data" {
-			response := map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"type":         "all_cards",
-						"download_uri": server.URL + "/cards.json",
-					},
-				},
-			}
-			json.NewEncoder(w).Encode(response)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz"))
 		} else {
-			json.NewEncoder(w).Encode(cards)
+			writeJSONLGzip(t, w, cards)
 		}
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL+"/bulk-data")
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
@@ -340,7 +347,7 @@ func TestBulkDataService_DownloadAndImport_ContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL+"/bulk-data")
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -355,7 +362,7 @@ func TestBulkDataService_DownloadAndImport_ContextCancellation(t *testing.T) {
 func TestBulkDataService_DownloadAndImport_InvalidURL(t *testing.T) {
 	service, jobService, _, _ := setupBulkDataServiceTest(t)
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", "http://invalid-url-that-does-not-exist.example.com")
+	service.settingsService.Set(context.Background(), "bulk_data_url", "http://invalid-url-that-does-not-exist.example.com")
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
@@ -379,7 +386,7 @@ func TestBulkDataService_DownloadAndImport_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL)
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL)
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
@@ -402,12 +409,41 @@ func TestBulkDataService_DownloadAndImport_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL)
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL)
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+
+	updatedJob, _ := jobService.Get(context.Background(), job.ID)
+	if updatedJob.Status != models.JobStatusFailed {
+		t.Errorf("expected job status %s, got %s", models.JobStatusFailed, updatedJob.Status)
+	}
+}
+
+func TestBulkDataService_DownloadAndImport_InvalidGzip(t *testing.T) {
+	service, jobService, _, _ := setupBulkDataServiceTest(t)
+
+	// Bulk data list is valid, but the card file is not gzip-compressed.
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bulk-data" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz"))
+		} else {
+			w.Write([]byte("not gzip data"))
+		}
+	}))
+	defer server.Close()
+
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
+	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
+
+	err := service.DownloadAndImport(context.Background(), job.ID)
+	if err == nil {
+		t.Error("expected error for non-gzip card data")
 	}
 
 	updatedJob, _ := jobService.Get(context.Background(), job.ID)
@@ -434,7 +470,7 @@ func TestBulkDataService_DownloadAndImport_NoDefaultCardsInList(t *testing.T) {
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL)
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL)
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
@@ -457,24 +493,16 @@ func TestBulkDataService_DownloadAndImport_UpdatesSettings(t *testing.T) {
 
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/bulk-data" {
-			response := map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"type":         "all_cards",
-						"download_uri": server.URL + "/cards.json",
-					},
-				},
-			}
-			json.NewEncoder(w).Encode(response)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz"))
 		} else {
-			json.NewEncoder(w).Encode(cards)
+			writeJSONLGzip(t, w, cards)
 		}
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL+"/bulk-data")
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)
@@ -483,12 +511,12 @@ func TestBulkDataService_DownloadAndImport_UpdatesSettings(t *testing.T) {
 	}
 
 	// Verify settings were updated
-	status, _ := settingsService.Get(context.Background(),"bulk_data_last_update_status")
+	status, _ := settingsService.Get(context.Background(), "bulk_data_last_update_status")
 	if status != "success" {
 		t.Errorf("expected status 'success', got '%s'", status)
 	}
 
-	lastUpdate, _ := settingsService.GetTime(context.Background(),"bulk_data_last_update")
+	lastUpdate, _ := settingsService.GetTime(context.Background(), "bulk_data_last_update")
 	if lastUpdate == nil {
 		t.Error("expected last_update timestamp to be set")
 	}
@@ -512,24 +540,16 @@ func TestBulkDataService_DownloadAndImport_PreservesExistingData(t *testing.T) {
 
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/bulk-data" {
-			response := map[string]interface{}{
-				"data": []interface{}{
-					map[string]interface{}{
-						"type":         "all_cards",
-						"download_uri": server.URL + "/cards.json",
-					},
-				},
-			}
-			json.NewEncoder(w).Encode(response)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz"))
 		} else {
-			json.NewEncoder(w).Encode(cards)
+			writeJSONLGzip(t, w, cards)
 		}
 	}))
 	defer server.Close()
 
-	service.settingsService.Set(context.Background(),"bulk_data_url", server.URL+"/bulk-data")
+	service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 
 	err := service.DownloadAndImport(context.Background(), job.ID)

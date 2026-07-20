@@ -56,6 +56,14 @@
 	let existingPrintings = $state<ExistingPrintingInfo[]>([]);
 	let existingLocations = $state<StorageLocation[]>([]);
 
+	// The location the user picked in the dropdown (null when left on auto-sort), so the
+	// conflict modal can offer it as a primary "Send to ..." action.
+	const selectedLocationObj = $derived(
+		selectedStorageLocation === 'auto'
+			? null
+			: (storageLocations.find((l) => l.id === selectedStorageLocation) ?? null)
+	);
+
 	// Group inventory by treatment for this printing
 	const thisPrintingByTreatment = $derived.by(() => {
 		const map = new SvelteMap<string, number>();
@@ -104,10 +112,8 @@
 	// Handle user's choice from conflict modal
 	function handleConflictChoice(locationId: number | 'auto') {
 		showConflictModal = false;
-		// Set the selected location and proceed with add
-		if (locationId !== 'auto') {
-			selectedStorageLocation = locationId;
-		}
+		// Apply the choice (including 'auto') so doAddToInventory sends what was picked.
+		selectedStorageLocation = locationId;
 		doAddToInventory(conflictTreatment);
 	}
 
@@ -456,5 +462,6 @@
 	treatment={conflictTreatment}
 	{existingPrintings}
 	{existingLocations}
+	selectedLocation={selectedLocationObj}
 	onClose={() => (showConflictModal = false)}
 	onChoose={handleConflictChoice} />

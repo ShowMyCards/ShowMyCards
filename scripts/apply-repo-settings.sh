@@ -6,6 +6,10 @@
 # new workflows (CI, Security, CodeQL) have run at least once — branch
 # protection cannot require status check names that GitHub has never seen.
 #
+# Also install the Renovate GitHub App on the org before running this:
+# https://github.com/apps/renovate. Step 4 names the app as a bypass actor, and
+# GitHub will not accept a bypass actor for an app that is not installed.
+#
 # Re-running the script is safe: every call is idempotent.
 
 set -euo pipefail
@@ -53,49 +57,140 @@ gh api -X PUT "repos/$REPO/actions/permissions/workflow" \
   -F default_workflow_permissions=read \
   -F can_approve_pull_request_reviews=true > /dev/null
 
-echo "==> 4. Branch protection on main"
+echo "==> 4. Branch protection on main (rulesets)"
+#
+# We use two rulesets rather than one, and rather than legacy branch protection.
+#
+# The reason is a hard constraint in GitHub's model: a ruleset's bypass_actors
+# bypass the WHOLE ruleset. There is no per-rule bypass. Renovate has to skip
+# the human-review requirement (it cannot approve its own PRs, and CODEOWNERS
+# maps * to a human), but it must NOT skip CI — govulncheck and bun audit are
+# the checks that stop a vulnerable dependency reaching main, and a Renovate PR
+# is exactly the PR we most want them to run on.
+#
+# Splitting them is the only way to express "Renovate skips review, Renovate
+# still obeys CI":
+#
+#   main-guardrails  — status checks, linear history, no force-push/delete.
+#                      NO bypass actors. Binds everyone: Renovate, and admins.
+#   main-review      — 1 approving CODEOWNER review.
+#                      Renovate (app 2740) and repo admins bypass this one only.
+#
+# The admin bypass replaces the old `enforce_admins: false`, which is load
+# bearing: CODEOWNERS maps * to a single maintainer who authors most PRs, and
+# GitHub forbids self-approval — so without it the sole code owner is the one
+# person who cannot satisfy the code-owner review, and nothing merges at all.
+#
+# Note this is deliberately NARROWER than the `enforce_admins: false` it
+# replaces. That flag let admins bypass the entire protection, status checks
+# included, so a red `bun audit` could be merged with one click. Here admins
+# skip only the review requirement; main-guardrails has no bypass actors, so CI
+# still binds them absolutely. Do not add a bypass actor to main-guardrails.
+#
+RENOVATE_APP_ID=2740
+ADMIN_ROLE_ID=5 # built-in repository role: admin
+
+# Idempotent create-or-update: rulesets have no PUT-by-name, so look up the id.
+apply_ruleset() {
+  local name="$1" payload="$2" id
+  id=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$name\") | .id")
+  if [[ -n "$id" ]]; then
+    gh api -X PUT "repos/$REPO/rulesets/$id" --input - <<<"$payload" > /dev/null
+    echo "    updated ruleset '$name' ($id)"
+  else
+    gh api -X POST "repos/$REPO/rulesets" --input - <<<"$payload" > /dev/null
+    echo "    created ruleset '$name'"
+  fi
+}
+
 # Required status checks must match the job names GitHub has actually seen.
-# The names below come from the new workflow files in this PR.
-gh api -X PUT "repos/$REPO/branches/main/protection" \
-  --input - <<'JSON' > /dev/null
+# integration_id 15368 is the GitHub Actions app — it owns all of these.
+#
+# Only ever require a check whose workflow is already on main AND which fires on
+# every PR into main. A required check that never reports blocks its PR forever
+# — that is #80, and it is why docker.yml's pull_request trigger carries no
+# paths-ignore. `docker (build)` below therefore depends on the docker.yml
+# change being merged first; requiring it earlier would deadlock every open PR.
+apply_ruleset "main-guardrails" "$(cat <<'JSON'
 {
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "backend",
-      "frontend",
-      "govulncheck (backend)",
-      "bun audit (frontend)",
-      "bun audit (website)",
-      "actionlint (workflows)",
-      "zizmor (workflow security)",
-      "Analyze (go)",
-      "Analyze (javascript-typescript)"
-    ]
-  },
-  "enforce_admins": false,
-  "required_pull_request_reviews": {
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": true,
-    "required_approving_review_count": 1,
-    "require_last_push_approval": false
-  },
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "required_conversation_resolution": true,
-  "lock_branch": false,
-  "allow_fork_syncing": true
+  "name": "main-guardrails",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "bypass_actors": [],
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "required_linear_history" },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          { "context": "backend",                        "integration_id": 15368 },
+          { "context": "frontend",                       "integration_id": 15368 },
+          { "context": "govulncheck (backend)",          "integration_id": 15368 },
+          { "context": "bun audit (frontend)",           "integration_id": 15368 },
+          { "context": "bun audit (website)",            "integration_id": 15368 },
+          { "context": "actionlint (workflows)",         "integration_id": 15368 },
+          { "context": "zizmor (workflow security)",     "integration_id": 15368 },
+          { "context": "Analyze (go)",                   "integration_id": 15368 },
+          { "context": "Analyze (javascript-typescript)","integration_id": 15368 },
+          { "context": "docker (build)",                 "integration_id": 15368 }
+        ]
+      }
+    }
+  ]
 }
 JSON
+)"
+
+apply_ruleset "main-review" "$(cat <<JSON
+{
+  "name": "main-review",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "bypass_actors": [
+    { "actor_id": $RENOVATE_APP_ID, "actor_type": "Integration", "bypass_mode": "always" },
+    { "actor_id": $ADMIN_ROLE_ID, "actor_type": "RepositoryRole", "bypass_mode": "always" }
+  ],
+  "rules": [
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "require_code_owner_review": true,
+        "dismiss_stale_reviews_on_push": true,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": ["squash"]
+      }
+    }
+  ]
+}
+JSON
+)"
+
+echo "==> 5. Remove legacy branch protection on main"
+# This MUST happen, and must happen last. Legacy branch protection and rulesets
+# are additive — the most restrictive wins — and legacy protection has no
+# concept of an app bypass. Leaving it in place would keep enforcing the
+# 1-review requirement against Renovate and silently undo the whole exercise.
+# 404 is the success case on a re-run, so don't let it trip set -e.
+gh api -X DELETE "repos/$REPO/branches/main/protection" > /dev/null 2>&1 \
+  && echo "    legacy branch protection deleted" \
+  || echo "    no legacy branch protection present (already migrated)"
 
 echo
 echo "Done. Verify in the GitHub UI:"
-echo "  https://github.com/$REPO/settings/branches"
+echo "  https://github.com/$REPO/settings/rules"
 echo "  https://github.com/$REPO/settings/security_analysis"
 echo "  https://github.com/$REPO/settings/actions"
 echo
 echo "If a required status check is missing from the list, the workflow has"
 echo "not yet run on main — push a no-op commit or wait for the next merge,"
 echo "then re-run this script."
+echo
+echo "The 'main-review' bypass actor only resolves if the Renovate GitHub App"
+echo "is installed on the org. Install it first: https://github.com/apps/renovate"

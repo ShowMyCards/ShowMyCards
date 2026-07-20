@@ -1,23 +1,12 @@
-import { BACKEND_URL, type StorageLocation, type SearchResponse } from '$lib';
+import { BACKEND_URL, type SearchResponse } from '$lib';
 import { handleAddInventory } from '$lib/server/inventory-actions';
+import { loadStorageLocations } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ fetch }) => {
-	try {
-		const response = await fetch(`${BACKEND_URL}/api/storage`);
-		if (response.ok) {
-			const data = await response.json();
-			return {
-				storageLocations: data.data as StorageLocation[]
-			};
-		}
-	} catch {
-		// Ignore errors, dropdown will just be empty
-	}
-	return {
-		storageLocations: [] as StorageLocation[]
-	};
+	const storageLocations = await loadStorageLocations(fetch);
+	return { storageLocations };
 };
 
 export const actions = {
