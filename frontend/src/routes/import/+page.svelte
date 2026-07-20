@@ -311,8 +311,7 @@
 				<label for="card-language" class="text-sm font-medium mb-2 block">Card Language</label>
 				<p id="card-language-help" class="text-xs text-base-content/60 mb-2">
 					Applied to every line as <code class="bg-base-300 px-1 rounded">l:&lt;code&gt;</code>
-					unless the line already specifies a language. Choose "Any language" to leave lines
-					untouched.
+					unless the line already specifies a language. Choose "Any language" to leave lines untouched.
 				</p>
 				<select
 					id="card-language"
