@@ -6,6 +6,7 @@
 		StorageLocationDropdown,
 		notifications,
 		getCardTreatmentName,
+		SCRYFALL_LANGUAGES,
 		type EnhancedCardResult,
 		type Inventory
 	} from '$lib';
@@ -16,6 +17,7 @@
 		getTreatmentMarker,
 		type ParsedCard
 	} from '$lib/utils/card-list-parser';
+	import { preprocessImportText } from '$lib/utils/manabox';
 	import { deserialize } from '$app/forms';
 	import { FileText, Search, Plus, Check, AlertCircle, Loader2, X } from '@lucide/svelte';
 
@@ -23,6 +25,7 @@
 
 	// Input state
 	let inputText = $state('');
+	let selectedLanguage = $state('en');
 	let selectedStorageLocation = $state<number | 'auto'>('auto');
 
 	const textareaPlaceholder = '4 e:who cn:1056\n2! !"Lightning Bolt"\n1!! e:cmr cn:361\nsol ring';
@@ -66,8 +69,10 @@
 	async function handleParseAndPreview() {
 		if (isPreviewing) return;
 
-		// Parse the input
-		const result = parseCardList(inputText);
+		// Convert ManaBox lines to Scryfall syntax and apply the chosen language,
+		// then parse the result.
+		const processed = preprocessImportText(inputText, selectedLanguage);
+		const result = parseCardList(processed);
 		parseErrors = result.errors;
 
 		if (result.cards.length === 0) {
@@ -268,8 +273,9 @@
 			</h2>
 
 			<p class="text-sm text-base-content/70 mb-2">
-				Enter one card per line using Scryfall search syntax. Prefix with quantity and treatment
-				markers.
+				Enter one card per line using Scryfall search syntax (prefix with quantity and treatment
+				markers) or paste a ManaBox text export — those lines are detected and converted
+				automatically.
 			</p>
 
 			<textarea
@@ -298,6 +304,25 @@
 					<X class="w-4 h-4" />
 					Clear
 				</button>
+			</div>
+
+			<!-- Card language -->
+			<div class="mt-4 pt-4 border-t border-base-300">
+				<label for="card-language" class="text-sm font-medium mb-2 block">Card Language</label>
+				<p id="card-language-help" class="text-xs text-base-content/60 mb-2">
+					Applied to every line as <code class="bg-base-300 px-1 rounded">l:&lt;code&gt;</code>
+					unless the line already specifies a language. Choose "Any language" to leave lines untouched.
+				</p>
+				<select
+					id="card-language"
+					aria-describedby="card-language-help"
+					bind:value={selectedLanguage}
+					class="select select-bordered w-full max-w-xs">
+					<option value="">Any language</option>
+					{#each SCRYFALL_LANGUAGES as lang (lang.code)}
+						<option value={lang.code}>{lang.name}</option>
+					{/each}
+				</select>
 			</div>
 
 			<!-- Storage location override -->
@@ -551,6 +576,19 @@
 				<code class="bg-base-300 px-1 rounded">cn:NUM</code> (collector number),
 				<code class="bg-base-300 px-1 rounded">!"Exact Name"</code> (exact match).
 			</p>
+		</div>
+
+		<div class="mt-4 pt-4 border-t border-base-300">
+			<h3 class="font-semibold mb-2">ManaBox export</h3>
+			<p class="text-sm text-base-content/70 mb-3">
+				Lines from a <span class="font-medium">ManaBox text export</span> are detected by their
+				<code class="bg-base-300 px-1 rounded">(SET)</code> code and collector number, and converted
+				automatically. A trailing <code class="bg-base-300 px-1 rounded">*F*</code> marks a foil. The
+				selected card language is appended to every line.
+			</p>
+			<pre
+				class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">1 Lightning Bolt (2ED) 161    →  1 e:2ED cn:161
+2 Counterspell (EMA) 43 *F*   →  2! e:EMA cn:43</pre>
 		</div>
 	</div>
 </div>

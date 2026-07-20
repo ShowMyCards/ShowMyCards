@@ -5,8 +5,10 @@ package services
 import (
 	"backend/models"
 	"backend/version"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -106,17 +108,19 @@ func (s *BulkDataService) TriggerInitialImport(ctx context.Context) error {
 	return nil
 }
 
-// BulkDataInfo represents a bulk data file from Scryfall's API
+// BulkDataInfo represents a bulk data file from Scryfall's API.
+// Scryfall serves bulk files as gzipped JSONL (one card object per line);
+// JSONLDownloadURI points at the .jsonl.gz file we ingest.
 type BulkDataInfo struct {
-	Object      string    `json:"object"`
-	ID          string    `json:"id"`
-	Type        string    `json:"type"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	URI         string    `json:"uri"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Size        int64     `json:"size"`
-	DownloadURI string    `json:"download_uri"`
+	Object           string    `json:"object"`
+	ID               string    `json:"id"`
+	Type             string    `json:"type"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	URI              string    `json:"uri"`
+	Name             string    `json:"name"`
+	Description      string    `json:"description"`
+	Size             int64     `json:"size"`
+	JSONLDownloadURI string    `json:"jsonl_download_uri"`
 }
 
 // BulkDataListResponse represents the response from Scryfall's bulk data list endpoint
@@ -306,7 +310,10 @@ func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkData
 	// Find the "all_cards" bulk data
 	for _, bulkData := range bulkDataList.Data {
 		if bulkData.Type == BulkDataTypeAllCards {
-			return bulkData.DownloadURI, nil
+			if bulkData.JSONLDownloadURI == "" {
+				return "", fmt.Errorf("%s bulk data has no jsonl_download_uri", BulkDataTypeAllCards)
+			}
+			return bulkData.JSONLDownloadURI, nil
 		}
 	}
 
@@ -315,6 +322,11 @@ func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkData
 
 // downloadBulkDataStream downloads and streams bulk data, calling the callback
 // for each batch of cards. This avoids loading the entire file into memory.
+//
+// Scryfall serves the file as gzipped JSONL: a gzip-compressed stream of card
+// objects, one per line, with no wrapping array. The gzip is part of the file
+// (Content-Type: application/gzip), not HTTP transfer-encoding, so we
+// decompress it explicitly rather than relying on the transport.
 func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadURI string, batchSize int, callback func([]scryfall.Card) error) error {
 	// Create HTTP request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", downloadURI, nil)
@@ -322,7 +334,6 @@ func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadUR
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", version.UserAgent())
-	req.Header.Set("Accept", "application/json")
 
 	slog.Info("downloading bulk data", "url", downloadURI)
 
@@ -342,21 +353,18 @@ func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadUR
 		return fmt.Errorf("bulk data download returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	decoder := json.NewDecoder(resp.Body)
-
-	// Read opening bracket of array
-	token, err := decoder.Token()
+	gzReader, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read JSON array start: %w", err)
+		return fmt.Errorf("failed to open gzip reader: %w", err)
 	}
-	if delim, ok := token.(json.Delim); !ok || delim != '[' {
-		return fmt.Errorf("expected JSON array, got %v", token)
-	}
+	defer gzReader.Close()
+
+	decoder := json.NewDecoder(gzReader)
 
 	batch := make([]scryfall.Card, 0, batchSize)
 
-	// Process cards one at a time
-	for decoder.More() {
+	// Decode successive newline-separated card objects until the stream ends.
+	for {
 		// Check context periodically
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("download cancelled: %w", err)
@@ -364,6 +372,9 @@ func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadUR
 
 		var card scryfall.Card
 		if err := decoder.Decode(&card); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			return fmt.Errorf("failed to decode card: %w", err)
 		}
 
@@ -383,15 +394,6 @@ func (s *BulkDataService) downloadBulkDataStream(ctx context.Context, downloadUR
 		if err := callback(batch); err != nil {
 			return fmt.Errorf("failed to process final batch: %w", err)
 		}
-	}
-
-	// Read closing bracket
-	token, err = decoder.Token()
-	if err != nil {
-		return fmt.Errorf("failed to read JSON array end: %w", err)
-	}
-	if delim, ok := token.(json.Delim); !ok || delim != ']' {
-		return fmt.Errorf("expected JSON array end, got %v", token)
 	}
 
 	return nil

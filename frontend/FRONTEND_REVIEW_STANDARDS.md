@@ -227,6 +227,19 @@ usable.
   Don't rely solely on the backend for validation feedback.
 - **Empty states.** When a list or dataset is empty, show an intentional empty
   state — not a blank page or a broken layout.
+- **Distinguish "failed to load" from "empty".** When a `load` function or
+  shared loader can't fetch its data, don't silently return an empty list for
+  content the user is looking _at_ — a backend outage would masquerade as an
+  empty collection. Make the failure contract explicit in a shared loader's
+  name/signature — e.g. a `fetch*` variant that throws vs a `load*` variant that
+  returns `[]` — and choose it by the data's role:
+  - **Primary content** (the list _is_ the page — e.g. `/storage`,
+    `/inventory`): surface the failure. Return an `error` field the page
+    renders, or let the loader throw and catch it in the `load` function. The
+    empty state must not render when the load actually failed.
+  - **Auxiliary data** (a value sitting _beside_ the content — e.g. a bulk-move
+    dropdown): swallowing the error and returning `[]` is acceptable; an empty
+    list and a failed one are interchangeable there.
 - **Loading indicators.** Long-running operations should show progress. Don't
   leave the user staring at an unchanged screen during fetches.
 
