@@ -308,12 +308,18 @@
 
 			<!-- Card language -->
 			<div class="mt-4 pt-4 border-t border-base-300">
-				<p class="text-sm font-medium mb-2">Card Language</p>
-				<p class="text-xs text-base-content/60 mb-2">
+				<label for="card-language" class="text-sm font-medium mb-2 block">Card Language</label>
+				<p id="card-language-help" class="text-xs text-base-content/60 mb-2">
 					Applied to every line as <code class="bg-base-300 px-1 rounded">l:&lt;code&gt;</code>
-					unless the line already specifies a language.
+					unless the line already specifies a language. Choose "Any language" to leave lines
+					untouched.
 				</p>
-				<select bind:value={selectedLanguage} class="select select-bordered w-full max-w-xs">
+				<select
+					id="card-language"
+					aria-describedby="card-language-help"
+					bind:value={selectedLanguage}
+					class="select select-bordered w-full max-w-xs">
+					<option value="">Any language</option>
 					{#each SCRYFALL_LANGUAGES as lang (lang.code)}
 						<option value={lang.code}>{lang.name}</option>
 					{/each}
