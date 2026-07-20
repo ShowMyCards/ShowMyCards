@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.4.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.3.0...v0.4.0) (2026-07-20)
+
+
+### Features
+
+* add support for ManaBox syntax in import screen ([#145](https://github.com/ShowMyCards/ShowMyCards/issues/145)) ([dec0507](https://github.com/ShowMyCards/ShowMyCards/commit/dec05074b33f33cf2a9076555ed7d9d9e6ddfd07))
+* allow partial card relocation ([#122](https://github.com/ShowMyCards/ShowMyCards/issues/122)) ([1a54d8b](https://github.com/ShowMyCards/ShowMyCards/commit/1a54d8be6865d3a174236f5bc5f2668f33a6641a))
+* **backend:** add deck lists foundation (FR98 milestone 1a) ([#113](https://github.com/ShowMyCards/ShowMyCards/issues/113)) ([7020498](https://github.com/ShowMyCards/ShowMyCards/commit/702049810b629f2f5ca6558b44d6a9f00e56dbf0))
+* **backend:** add scheduled gzipped JSON backups (FR90) ([#131](https://github.com/ShowMyCards/ShowMyCards/issues/131)) ([ff7d014](https://github.com/ShowMyCards/ShowMyCards/commit/ff7d014f4653e8887d8990dec375f9c6885682cb))
+* **backend:** add symbology scheduled task and symbol SVG endpoint ([#104](https://github.com/ShowMyCards/ShowMyCards/issues/104)) ([#130](https://github.com/ShowMyCards/ShowMyCards/issues/130)) ([255998f](https://github.com/ShowMyCards/ShowMyCards/commit/255998f4021d800f7d19d2b31b714a6f82e748a9))
+* **backend:** deck allocation service + deck item endpoints (FR98 1b) ([#146](https://github.com/ShowMyCards/ShowMyCards/issues/146)) ([28a976a](https://github.com/ShowMyCards/ShowMyCards/commit/28a976a61fadca282fea6a15f86172058a933cdc))
+* **backend:** ingest Scryfall bulk data as gzipped JSONL ([#155](https://github.com/ShowMyCards/ShowMyCards/issues/155)) ([38c0019](https://github.com/ShowMyCards/ShowMyCards/commit/38c0019b2e63bcbf5ed5c8eee57ff5d9580ac7f0))
+* display card title in card language ([#110](https://github.com/ShowMyCards/ShowMyCards/issues/110)) ([137e34f](https://github.com/ShowMyCards/ShowMyCards/commit/137e34ff08613f732699503af8b66586db146f3a))
+
+
+### Bug Fixes
+
+* add edit and delete controls for lists ([#124](https://github.com/ShowMyCards/ShowMyCards/issues/124)) ([#127](https://github.com/ShowMyCards/ShowMyCards/issues/127)) ([8e6776e](https://github.com/ShowMyCards/ShowMyCards/commit/8e6776ed3247f788053716cbf5047641462c459c))
+* allow sending cards to arbitrary locations ([#147](https://github.com/ShowMyCards/ShowMyCards/issues/147)) ([cab66c1](https://github.com/ShowMyCards/ShowMyCards/commit/cab66c129b029036211a87183f00a8880b85ed24))
+* back-fill English prices for non-English list items ([#128](https://github.com/ShowMyCards/ShowMyCards/issues/128)) ([e2a7735](https://github.com/ShowMyCards/ShowMyCards/commit/e2a7735a6d0027be672b1f1097f128d9fa98aa85))
+* **backend:** bump Go toolchain to 1.26.4 for stdlib vulns ([#120](https://github.com/ShowMyCards/ShowMyCards/issues/120)) ([30f7ac7](https://github.com/ShowMyCards/ShowMyCards/commit/30f7ac7d8785bc31bd62ed3003c317d378db7d7d))
+* **deps:** clear govulncheck and bun audit findings blocking all merges ([#150](https://github.com/ShowMyCards/ShowMyCards/issues/150)) ([2dcbd34](https://github.com/ShowMyCards/ShowMyCards/commit/2dcbd3448750bb2d94d5656b46ce9f4906066879))
+* **deps:** pin esbuild &gt;=0.28.1 to clear RCE advisory GHSA-gv7w-rqvm-qjhr ([#142](https://github.com/ShowMyCards/ShowMyCards/issues/142)) ([2f02e0f](https://github.com/ShowMyCards/ShowMyCards/commit/2f02e0fd8c0ba8472d6851db6bcdb005f78ecb87))
+* display prices for non-english cards ([#118](https://github.com/ShowMyCards/ShowMyCards/issues/118)) ([409fe62](https://github.com/ShowMyCards/ShowMyCards/commit/409fe62a37d11f70ae7d0290b2367d288c43bc76))
+* **docker:** repin golang base image to digest shipping Go 1.26.4 ([#121](https://github.com/ShowMyCards/ShowMyCards/issues/121)) ([d109bde](https://github.com/ShowMyCards/ShowMyCards/commit/d109bde3e0d671c666ad0f48e6998db2377de724))
+* **frontend:** card back button returns to originating page ([#116](https://github.com/ShowMyCards/ShowMyCards/issues/116)) ([#129](https://github.com/ShowMyCards/ShowMyCards/issues/129)) ([77c0fb4](https://github.com/ShowMyCards/ShowMyCards/commit/77c0fb4f2a2e990824361dda0e7e69280d5a0a87))
+* **frontend:** close create-list dialog and surface feedback ([#123](https://github.com/ShowMyCards/ShowMyCards/issues/123)) ([#126](https://github.com/ShowMyCards/ShowMyCards/issues/126)) ([ef5c838](https://github.com/ShowMyCards/ShowMyCards/commit/ef5c8386997344f9784d256df692e7919d4dd140))
+* group card instances by storage location ([#114](https://github.com/ShowMyCards/ShowMyCards/issues/114)) ([bd97ff9](https://github.com/ShowMyCards/ShowMyCards/commit/bd97ff9c0c3019eb458b49bfe294ef196dfceba7))
+* load all storage locations in non-paginating views ([#148](https://github.com/ShowMyCards/ShowMyCards/issues/148)) ([f06e485](https://github.com/ShowMyCards/ShowMyCards/commit/f06e485945437329e7c570ef64b4d29edbecba2d))
+
 ## [0.3.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.2.0...v0.3.0) (2026-05-26)
 
 
