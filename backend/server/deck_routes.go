@@ -8,9 +8,6 @@ import (
 )
 
 // DeckRoutes registers deck routes.
-//
-// Items endpoints beyond the stub GET land in FR98 Milestone 1b alongside the
-// allocation service.
 func DeckRoutes(app *fiber.App, db *gorm.DB) {
 	handler := api.NewDeckHandler(db)
 
@@ -21,6 +18,9 @@ func DeckRoutes(app *fiber.App, db *gorm.DB) {
 	decks.Put("/:id", handler.Update)
 	decks.Delete("/:id", handler.Delete)
 
-	// Stub — see DeckHandler.ListItems. Real implementation lands in 1b.
+	// Deck item routes
 	decks.Get("/:id/items", handler.ListItems)
+	decks.Post("/:id/items/batch", handler.CreateItemsBatch)
+	decks.Put("/:id/items/:item_id", handler.UpdateItem)
+	decks.Delete("/:id/items/:item_id", handler.DeleteItem)
 }
