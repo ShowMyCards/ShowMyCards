@@ -4,10 +4,15 @@
 		PageHeader,
 		EmptyState,
 		StorageLocationDropdown,
+		Modal,
+		FormField,
 		notifications,
 		getCardTreatmentName,
+		getActionError,
 		SCRYFALL_LANGUAGES,
 		type EnhancedCardResult,
+		type CardResult,
+		type ResolveResult,
 		type Inventory
 	} from '$lib';
 	import {
@@ -15,26 +20,55 @@
 		resolveTreatment,
 		getTreatmentDisplayName,
 		getTreatmentMarker,
-		type ParsedCard
+		type ParsedCard,
+		type ImportZone
 	} from '$lib/utils/card-list-parser';
-	import { preprocessImportText } from '$lib/utils/manabox';
 	import { deserialize } from '$app/forms';
-	import { FileText, Search, Plus, Check, AlertCircle, Loader2, X } from '@lucide/svelte';
+	import { invalidateAll } from '$app/navigation';
+	import {
+		FileText,
+		Search,
+		Plus,
+		Check,
+		AlertCircle,
+		Loader2,
+		X,
+		Package,
+		Layers
+	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	// Destination: inventory (default) or a deck.
+	let destination = $state<'inventory' | 'deck'>('inventory');
+	let selectedDeckId = $state('');
+
+	// Inline "create new deck" modal.
+	let showCreateDeckModal = $state(false);
+	let newDeckName = $state('');
+	let newDeckDescription = $state('');
+	let creatingDeck = $state(false);
 
 	// Input state
 	let inputText = $state('');
 	let selectedLanguage = $state('en');
 	let selectedStorageLocation = $state<number | 'auto'>('auto');
 
-	const textareaPlaceholder = '4 e:who cn:1056\n2! !"Lightning Bolt"\n1!! e:cmr cn:361\nsol ring';
+	const textareaPlaceholder =
+		"1 Ashnod's Altar (BRR) 67 *F*\n4 Lightning Bolt\n\nSideboard\n2 Damn";
+
+	const ZONE_LABELS: Record<ImportZone, string> = {
+		command: 'Command',
+		main: 'Main',
+		side: 'Side',
+		maybe: 'Maybe'
+	};
 
 	// Preview state - combines parsing and searching
 	interface PreviewCard {
 		parsed: ParsedCard;
 		status: 'searching' | 'ready' | 'error' | 'adding' | 'added';
-		searchResult?: EnhancedCardResult;
+		searchResult?: CardResult;
 		resolvedTreatment?: string;
 		resolvedTreatmentName?: string;
 		error?: string;
@@ -44,6 +78,8 @@
 	let parseErrors = $state<ParsedCard[]>([]);
 	let isPreviewing = $state(false);
 	let isImporting = $state(false);
+
+	const canImportToDeck = $derived(destination === 'deck' && selectedDeckId !== '');
 
 	async function searchCard(query: string): Promise<EnhancedCardResult | null> {
 		const formData = new FormData();
@@ -66,13 +102,62 @@
 		return null;
 	}
 
+	// Resolve the treatment for a found card and set the preview row's final state.
+	function finalizePreviewCard(index: number, searchResult: CardResult | null) {
+		const card = previewCards[index];
+		if (!searchResult) {
+			previewCards[index] = { ...card, status: 'error', error: 'Card not found' };
+			return;
+		}
+
+		const resolvedTreatment = resolveTreatment(card.parsed.treatment, searchResult.finishes);
+		if (!resolvedTreatment) {
+			previewCards[index] = {
+				...card,
+				status: 'error',
+				searchResult,
+				error: `${getTreatmentDisplayName(card.parsed.treatment)} not available`
+			};
+			return;
+		}
+
+		const resolvedTreatmentName = getCardTreatmentName(
+			searchResult.finishes,
+			searchResult.frame_effects || [],
+			resolvedTreatment
+		);
+		previewCards[index] = {
+			...card,
+			status: 'ready',
+			searchResult,
+			resolvedTreatment,
+			resolvedTreatmentName
+		};
+	}
+
+	async function resolveLocalBatch(
+		items: { set?: string; collector_number?: string; name?: string }[]
+	): Promise<ResolveResult[] | null> {
+		const formData = new FormData();
+		formData.append('items', JSON.stringify(items));
+		formData.append('language', selectedLanguage);
+
+		const response = await fetch('?/resolveLocal', { method: 'POST', body: formData });
+		const result = deserialize(await response.text());
+
+		if (result.type === 'success' && result.data) {
+			const payload = result.data as { data?: { results?: ResolveResult[] } };
+			return payload.data?.results ?? null;
+		}
+		return null;
+	}
+
 	async function handleParseAndPreview() {
 		if (isPreviewing) return;
 
-		// Convert ManaBox lines to Scryfall syntax and apply the chosen language,
-		// then parse the result.
-		const processed = preprocessImportText(inputText, selectedLanguage);
-		const result = parseCardList(processed);
+		// The native parser understands decklist exports (zones + pinned printings +
+		// *F*/*E*) and Scryfall syntax, and appends the chosen language clause.
+		const result = parseCardList(inputText, { language: selectedLanguage });
 		parseErrors = result.errors;
 
 		if (result.cards.length === 0) {
@@ -80,70 +165,62 @@
 			return;
 		}
 
-		// Initialize preview cards with searching status
-		previewCards = result.cards.map((parsed) => ({
-			parsed,
-			status: 'searching' as const
-		}));
-
+		previewCards = result.cards.map((parsed) => ({ parsed, status: 'searching' as const }));
 		isPreviewing = true;
 
-		// Search each card
+		// 1) Resolve pinned (set+collector) and plain-name lines against the local DB
+		//    in one batch — fast, and free of Scryfall's outbound rate limit. Raw
+		//    Scryfall-query lines (no parsed name) skip local resolution.
+		const localTargets: number[] = [];
+		const resolveItems: { set?: string; collector_number?: string; name?: string }[] = [];
 		for (let i = 0; i < previewCards.length; i++) {
-			const card = previewCards[i];
+			const p = previewCards[i].parsed;
+			if (p.pinned && p.set && p.collectorNumber) {
+				localTargets.push(i);
+				resolveItems.push({ set: p.set, collector_number: p.collectorNumber });
+			} else if (!p.pinned && p.name) {
+				localTargets.push(i);
+				resolveItems.push({ name: p.name });
+			}
+		}
 
+		// Lines that must hit Scryfall: those not sent to local resolution, plus any
+		// local misses discovered below.
+		const localSet = new Set(localTargets);
+		const fallback: number[] = [];
+		for (let i = 0; i < previewCards.length; i++) {
+			if (!localSet.has(i)) fallback.push(i);
+		}
+
+		if (resolveItems.length > 0) {
+			const results = await resolveLocalBatch(resolveItems);
+			for (let j = 0; j < localTargets.length; j++) {
+				const index = localTargets[j];
+				const resolved = results?.[j];
+				if (resolved?.found && resolved.card) {
+					finalizePreviewCard(index, resolved.card);
+				} else {
+					// Missing locally (or the resolve call failed) — fall back to Scryfall.
+					fallback.push(index);
+				}
+			}
+			previewCards = [...previewCards];
+		}
+
+		// 2) Scryfall fallback for local misses + raw-query lines, client-paced to
+		//    respect the upstream rate limit.
+		fallback.sort((a, b) => a - b);
+		for (const index of fallback) {
 			try {
-				const searchResult = await searchCard(card.parsed.query);
-
-				if (!searchResult) {
-					previewCards[i] = {
-						...card,
-						status: 'error',
-						error: 'Card not found'
-					};
-					continue;
-				}
-
-				// Resolve the treatment based on preference and available finishes
-				const resolvedTreatment = resolveTreatment(card.parsed.treatment, searchResult.finishes);
-
-				if (!resolvedTreatment) {
-					const treatmentName = getTreatmentDisplayName(card.parsed.treatment);
-					previewCards[i] = {
-						...card,
-						status: 'error',
-						searchResult,
-						error: `${treatmentName} not available`
-					};
-					continue;
-				}
-
-				// Get the proper display name using frame_effects
-				const resolvedTreatmentName = getCardTreatmentName(
-					searchResult.finishes,
-					searchResult.frame_effects || [],
-					resolvedTreatment
-				);
-
-				previewCards[i] = {
-					...card,
-					status: 'ready',
-					searchResult,
-					resolvedTreatment,
-					resolvedTreatmentName
-				};
+				finalizePreviewCard(index, await searchCard(previewCards[index].parsed.query));
 			} catch (e) {
-				previewCards[i] = {
-					...card,
+				previewCards[index] = {
+					...previewCards[index],
 					status: 'error',
 					error: e instanceof Error ? e.message : 'Search failed'
 				};
 			}
-
-			// Force reactivity update
 			previewCards = [...previewCards];
-
-			// Small delay to avoid rate limiting
 			await new Promise((resolve) => setTimeout(resolve, 100));
 		}
 
@@ -157,7 +234,7 @@
 	}
 
 	async function addToInventory(
-		card: EnhancedCardResult,
+		card: CardResult,
 		quantity: number,
 		treatment: string
 	): Promise<Inventory | null> {
@@ -183,7 +260,7 @@
 		return null;
 	}
 
-	async function handleImportAll() {
+	async function handleImportToInventory() {
 		if (isImporting) return;
 		isImporting = true;
 
@@ -249,6 +326,97 @@
 		}
 	}
 
+	async function handleImportToDeck() {
+		if (isImporting || !canImportToDeck) return;
+
+		const ready = previewCards.filter((c) => c.status === 'ready' && c.searchResult);
+		if (ready.length === 0) return;
+
+		isImporting = true;
+
+		// Pinned lines lock a specific printing; plain lines keep only the Oracle ID.
+		// Finish is carried through but is not part of the M1 availability math.
+		const items = ready.map((c) => ({
+			oracle_id: c.searchResult!.oracle_id,
+			scryfall_id: c.parsed.pinned ? c.searchResult!.id : '',
+			treatment: c.parsed.treatment === 'nonfoil' ? '' : c.parsed.treatment,
+			desired_quantity: c.parsed.quantity,
+			zone: c.parsed.zone
+		}));
+
+		const formData = new FormData();
+		formData.append('deck_id', selectedDeckId);
+		formData.append('items', JSON.stringify(items));
+
+		try {
+			const response = await fetch('?/addDeckItems', { method: 'POST', body: formData });
+			const result = deserialize(await response.text());
+
+			if (result.type === 'success') {
+				previewCards = previewCards.map((c) =>
+					c.status === 'ready' ? { ...c, status: 'added' } : c
+				);
+				const deckName = data.decks.find((d) => String(d.id) === selectedDeckId)?.name ?? 'deck';
+				notifications.success(
+					`Added ${items.length} card${items.length !== 1 ? 's' : ''} to ${deckName}`
+				);
+				await invalidateAll();
+			} else {
+				notifications.error(
+					result.type === 'failure'
+						? getActionError(result.data, 'Failed to add cards to deck')
+						: 'Failed to add cards to deck'
+				);
+			}
+		} catch (e) {
+			notifications.error(e instanceof Error ? e.message : 'Failed to add cards to deck');
+		} finally {
+			isImporting = false;
+		}
+	}
+
+	function handleImport() {
+		if (destination === 'deck') {
+			handleImportToDeck();
+		} else {
+			handleImportToInventory();
+		}
+	}
+
+	async function handleCreateDeck() {
+		if (creatingDeck || !newDeckName.trim()) return;
+		creatingDeck = true;
+
+		const formData = new FormData();
+		formData.append('name', newDeckName.trim());
+		formData.append('description', newDeckDescription.trim());
+
+		try {
+			const response = await fetch('?/createDeck', { method: 'POST', body: formData });
+			const result = deserialize(await response.text());
+
+			if (result.type === 'success' && result.data) {
+				const created = (result.data as { deck: { id: number } }).deck;
+				await invalidateAll();
+				selectedDeckId = String(created.id);
+				showCreateDeckModal = false;
+				newDeckName = '';
+				newDeckDescription = '';
+				notifications.success('Deck created');
+			} else {
+				notifications.error(
+					result.type === 'failure'
+						? getActionError(result.data, 'Failed to create deck')
+						: 'Failed to create deck'
+				);
+			}
+		} catch (e) {
+			notifications.error(e instanceof Error ? e.message : 'Failed to create deck');
+		} finally {
+			creatingDeck = false;
+		}
+	}
+
 	// Derived stats
 	const totalQuantity = $derived(
 		previewCards
@@ -261,7 +429,7 @@
 	const searchingCount = $derived(previewCards.filter((c) => c.status === 'searching').length);
 </script>
 
-<PageHeader title="Bulk Import" description="Import cards using Scryfall queries" />
+<PageHeader title="Bulk Import" description="Import cards to your inventory or a deck" />
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 	<!-- Input Section -->
@@ -272,10 +440,53 @@
 				Card List
 			</h2>
 
+			<!-- Destination selector -->
+			<div class="mb-2">
+				<p class="text-sm font-medium mb-2">Destination</p>
+				<div class="join">
+					<button
+						class="btn join-item btn-sm"
+						class:btn-primary={destination === 'inventory'}
+						onclick={() => (destination = 'inventory')}>
+						<Package class="w-4 h-4" />
+						Inventory
+					</button>
+					<button
+						class="btn join-item btn-sm"
+						class:btn-primary={destination === 'deck'}
+						onclick={() => (destination = 'deck')}>
+						<Layers class="w-4 h-4" />
+						Deck
+					</button>
+				</div>
+
+				{#if destination === 'deck'}
+					<div class="flex flex-wrap items-end gap-2 mt-3">
+						<label class="flex flex-col gap-1 text-sm">
+							<span class="font-medium">Target deck</span>
+							<select bind:value={selectedDeckId} class="select select-bordered select-sm min-w-56">
+								<option value="" disabled>Select a deck…</option>
+								{#each data.decks as deck (deck.id)}
+									<option value={String(deck.id)}>{deck.name}</option>
+								{/each}
+							</select>
+						</label>
+						<button class="btn btn-sm bg-base-100" onclick={() => (showCreateDeckModal = true)}>
+							<Plus class="w-4 h-4" />
+							New deck
+						</button>
+					</div>
+					{#if data.decks.length === 0}
+						<p class="text-xs text-base-content/60 mt-2">
+							You have no decks yet — create one to import into.
+						</p>
+					{/if}
+				{/if}
+			</div>
+
 			<p class="text-sm text-base-content/70 mb-2">
-				Enter one card per line using Scryfall search syntax (prefix with quantity and treatment
-				markers) or paste a ManaBox text export — those lines are detected and converted
-				automatically.
+				Paste a decklist export (Moxfield, MTGGoldfish, MTGA/MTGO) or enter Scryfall search syntax.
+				Section headers and blank-line blocks set zones for deck import.
 			</p>
 
 			<textarea
@@ -325,8 +536,8 @@
 				</select>
 			</div>
 
-			<!-- Storage location override -->
-			{#if data.storageLocations.length > 0}
+			<!-- Storage location override (inventory only) -->
+			{#if destination === 'inventory' && data.storageLocations.length > 0}
 				<div class="mt-4 pt-4 border-t border-base-300">
 					<p class="text-sm font-medium mb-2">Storage Location</p>
 					<StorageLocationDropdown
@@ -355,14 +566,16 @@
 							</span>
 							<button
 								class="btn btn-primary btn-sm"
-								onclick={handleImportAll}
-								disabled={isImporting || readyCount === 0}>
+								onclick={handleImport}
+								disabled={isImporting ||
+									readyCount === 0 ||
+									(destination === 'deck' && !canImportToDeck)}>
 								{#if isImporting}
 									<Loader2 class="w-4 h-4 animate-spin" />
 									Importing...
 								{:else}
 									<Plus class="w-4 h-4" />
-									Import All
+									{destination === 'deck' ? 'Import to Deck' : 'Import to Inventory'}
 								{/if}
 							</button>
 						{/if}
@@ -370,8 +583,12 @@
 				{/if}
 			</div>
 
+			{#if destination === 'deck' && !canImportToDeck && previewCards.length > 0 && !isPreviewing}
+				<p class="text-xs text-warning mt-1">Select a target deck to enable import.</p>
+			{/if}
+
 			{#if previewCards.length === 0 && !isPreviewing}
-				<EmptyState message="Enter card queries and click Parse & Preview" />
+				<EmptyState message="Enter a card list and click Parse & Preview" />
 			{:else}
 				<!-- Progress bar during preview/import -->
 				{#if isPreviewing || isImporting}
@@ -415,6 +632,9 @@
 							<tr>
 								<th>Qty</th>
 								<th>Card</th>
+								{#if destination === 'deck'}
+									<th>Zone</th>
+								{/if}
 								<th>Treatment</th>
 								<th>Status</th>
 							</tr>
@@ -427,7 +647,12 @@
 									<td>
 										{#if card.searchResult}
 											<div class="font-medium">{card.searchResult.name}</div>
-											<div class="text-xs text-base-content/60">{card.searchResult.set_name}</div>
+											<div class="text-xs text-base-content/60">
+												{card.searchResult.set_name}
+												{#if card.parsed.pinned}
+													<span class="badge badge-outline badge-xs ml-1">pinned</span>
+												{/if}
+											</div>
 										{:else if card.status === 'searching'}
 											<span class="text-base-content/50 text-xs font-mono"
 												>{card.parsed.query}</span>
@@ -435,6 +660,12 @@
 											<span class="text-xs font-mono">{card.parsed.query}</span>
 										{/if}
 									</td>
+									{#if destination === 'deck'}
+										<td>
+											<span class="badge badge-ghost badge-sm"
+												>{ZONE_LABELS[card.parsed.zone]}</span>
+										</td>
+									{/if}
 									<td>
 										{#if card.resolvedTreatmentName}
 											{@const isFoil = card.resolvedTreatment !== 'nonfoil'}
@@ -515,80 +746,102 @@
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			<div>
-				<h3 class="font-semibold mb-2">Syntax</h3>
+				<h3 class="font-semibold mb-2">Decklist exports</h3>
 				<p class="text-sm text-base-content/70 mb-3">
-					Each line follows the pattern: <code class="bg-base-300 px-1 rounded"
-						>[quantity][treatment] [scryfall query]</code>
+					Paste exports from Moxfield, MTGGoldfish, MTGA or MTGO. Each line is
+					<code class="bg-base-300 px-1 rounded">[qty] Name [(SET) COLLECTOR] [*F*/*E*]</code>. A
+					<code class="bg-base-300 px-1 rounded">(SET) COLLECTOR</code>
+					suffix pins that exact printing; <code class="bg-base-300 px-1 rounded">*F*</code> is
+					foil,
+					<code class="bg-base-300 px-1 rounded">*E*</code> is etched.
 				</p>
-
-				<div class="overflow-x-auto">
-					<table class="table table-sm">
-						<thead>
-							<tr>
-								<th>Marker</th>
-								<th>Treatment</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr>
-								<td class="font-mono">4</td>
-								<td>Regular (nonfoil, or first available)</td>
-							</tr>
-							<tr>
-								<td class="font-mono">4!</td>
-								<td>Foil (any foil variant)</td>
-							</tr>
-							<tr>
-								<td class="font-mono">4!!</td>
-								<td>Etched</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
+				<pre class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">1 Ashnod's Altar
+1 Ashnod's Altar (BRR) 67 *F*
+1 Gravecrawler (2X2) 438 *E*</pre>
 			</div>
 
 			<div>
-				<h3 class="font-semibold mb-2">Examples</h3>
-				<pre class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap"># Regular cards
-4 !"Lightning Bolt"
-2 e:2xm cn:117
+				<h3 class="font-semibold mb-2">Zones (deck import)</h3>
+				<p class="text-sm text-base-content/70 mb-3">
+					Section headers — <span class="font-medium">Commander</span>,
+					<span class="font-medium">Deck</span>/<span class="font-medium">Mainboard</span>,
+					<span class="font-medium">Sideboard</span>, <span class="font-medium">Maybeboard</span>
+					— set the zone for following lines. Exports without headers use blank lines: the first block
+					is the main deck, later blocks are the sideboard. Re-zone anything (e.g. a commander) from the
+					deck page.
+				</p>
+				<pre class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">Commander
+1 Teysa Karlov
 
-# Foil cards (uses actual foil type)
-4! e:who cn:1056
-1! !"Sol Ring" e:cmr
-
-# Etched cards
-1!! e:cmr cn:361
-
-# No quantity = 1 copy
-!"Black Lotus"</pre>
+Deck
+1 Sol Ring</pre>
 			</div>
 		</div>
 
 		<div class="mt-4 pt-4 border-t border-base-300">
+			<h3 class="font-semibold mb-2">Scryfall syntax</h3>
 			<p class="text-sm text-base-content/70">
-				Uses <a
+				You can also use <a
 					href="https://scryfall.com/docs/syntax"
 					target="_blank"
 					rel="noopener"
-					class="link link-primary">Scryfall search syntax</a
-				>. Common filters: <code class="bg-base-300 px-1 rounded">e:SET</code> (set),
-				<code class="bg-base-300 px-1 rounded">cn:NUM</code> (collector number),
-				<code class="bg-base-300 px-1 rounded">!"Exact Name"</code> (exact match).
+					class="link link-primary">Scryfall search syntax</a>
+				with a leading quantity and treatment marker (<code class="bg-base-300 px-1 rounded"
+					>!</code>
+				foil,
+				<code class="bg-base-300 px-1 rounded">!!</code> etched), e.g.
+				<code class="bg-base-300 px-1 rounded">4! e:who cn:1056</code> or
+				<code class="bg-base-300 px-1 rounded">2 e:2xm cn:117</code>.
 			</p>
-		</div>
-
-		<div class="mt-4 pt-4 border-t border-base-300">
-			<h3 class="font-semibold mb-2">ManaBox export</h3>
-			<p class="text-sm text-base-content/70 mb-3">
-				Lines from a <span class="font-medium">ManaBox text export</span> are detected by their
-				<code class="bg-base-300 px-1 rounded">(SET)</code> code and collector number, and converted
-				automatically. A trailing <code class="bg-base-300 px-1 rounded">*F*</code> marks a foil. The
-				selected card language is appended to every line.
-			</p>
-			<pre
-				class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">1 Lightning Bolt (2ED) 161    →  1 e:2ED cn:161
-2 Counterspell (EMA) 43 *F*   →  2! e:EMA cn:43</pre>
 		</div>
 	</div>
 </div>
+
+<!-- Create Deck Modal -->
+<Modal open={showCreateDeckModal} onClose={() => (showCreateDeckModal = false)} title="Create Deck">
+	<div class="space-y-4">
+		<FormField
+			label="Name"
+			id="import-new-deck-name"
+			name="name"
+			placeholder="e.g., Teysa Triggers"
+			bind:value={newDeckName}
+			helper="A descriptive name for this deck"
+			required />
+
+		<FormField
+			label="Description"
+			id="import-new-deck-description"
+			name="description"
+			helper="Optional description">
+			<textarea
+				id="import-new-deck-description"
+				name="description"
+				bind:value={newDeckDescription}
+				class="textarea textarea-bordered w-full"
+				rows="3"></textarea>
+		</FormField>
+	</div>
+
+	<div class="modal-action">
+		<button
+			type="button"
+			onclick={() => (showCreateDeckModal = false)}
+			disabled={creatingDeck}
+			class="btn bg-base-100">
+			Cancel
+		</button>
+		<button
+			type="button"
+			onclick={handleCreateDeck}
+			disabled={creatingDeck || !newDeckName.trim()}
+			class="btn btn-primary">
+			{#if creatingDeck}
+				<span class="loading loading-spinner loading-sm"></span>
+				Creating...
+			{:else}
+				Create
+			{/if}
+		</button>
+	</div>
+</Modal>

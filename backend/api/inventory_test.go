@@ -27,7 +27,7 @@ func setupInventoryTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.StorageLocation{}, &models.Inventory{}); err != nil {
+	if err := db.AutoMigrate(&models.StorageLocation{}, &models.Inventory{}, &models.Deck{}, &models.DeckItem{}); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
@@ -762,6 +762,8 @@ func setupInventoryTestAppWithRules(t *testing.T) (*fiber.App, *gorm.DB) {
 		&models.Inventory{},
 		&models.Card{},
 		&models.SortingRule{},
+		&models.Deck{},
+		&models.DeckItem{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
@@ -1256,6 +1258,8 @@ func setupFullInventoryTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		&models.Inventory{},
 		&models.Card{},
 		&models.SortingRule{},
+		&models.Deck{},
+		&models.DeckItem{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}

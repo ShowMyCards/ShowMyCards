@@ -1,0 +1,91 @@
+1 Teysa Karlov (CMM) 688 *F*
+1 Afterlife Insurance (CLU) 23
+1 Agadeem's Awakening / Agadeem, the Undercrypt (ZNR) 336 *F*
+1 Al Bhed Salvagers (FIN) 88 *F*
+1 Anafenza, Unyielding Lineage (TDM) 327 *F*
+1 Anguished Unmaking (PSOI) 242 *F*
+1 Anointed Procession (AKH) 2 *F*
+1 Arcane Signet (LCC) 104 *F*
+1 Ashnod's Altar (BRR) 67 *F*
+1 Athreos, God of Passage (SLD) 76 *F*
+1 Balin's Tomb (LTC) 357 *F*
+1 Bartolomé del Presidio (LCI) 301 *F*
+1 Bastion of Remembrance (CMM) 138 *F*
+1 Bitterblossom (WOT) 27 *F*
+1 Blasphemous Edict (FDN) 317 *F*
+1 Bleachbone Verge (DFT) 371 *F*
+1 Blood Artist (2X2) 352 *F*
+1 Boggart Trawler / Boggart Bog (MH3) 243 *F*
+1 Bojuka Bog (WWK) 132 *F*
+1 Bolas's Citadel (PWAR) 79 *F*
+1 Brightclimb Pathway / Grimclimb Pathway (ZNR) 285 *F*
+1 Caves of Koilos (DMU) 378 *F*
+1 Command Tower (CMM) 659 *F*
+1 Cruel Celebrant (WAR) 188 *F*
+1 Damn (MH2) 80 *F*
+1 Dark Ritual (STA) 26 *F*
+1 Deadly Dispute (P30A) 29 *F*
+1 Demonic Tutor (STA) 27 *F*
+1 Diabolic Intent (LTC) 526 *F*
+1 Doomed Traveler (2X2) 9 *F*
+1 Drivnod, Carnage Dominus (ONE) 437 *F*
+1 Eiganjo, Seat of the Empire (NEO) 502 *F*
+1 Elas il-Kor, Sadistic Pilgrim (DMU) 198 *F*
+1 Elenda, the Dusk Rose (2X2) 377 *F*
+1 Elspeth, Storm Slayer (TDM) 398 *F*
+1 Enlightened Tutor (DMR) 412 *F*
+1 Esper Sentinel (MH2) 12 *F*
+1 Fabled Passage (BLB) 367 *F*
+1 Fetid Heath (EXP) 31 *F*
+1 Fountainport (BLB) 253 *F*
+1 Godless Shrine (RVR) 294 *F*
+1 Grave Pact (CMM) 639 *F*
+1 Gravecrawler (2X2) 438 *E*
+1 Grim Haruspex (KTK) 73 *F*
+1 Guide of Souls (MH3) 29 *F*
+1 Heliod, Sun-Crowned (THB) 18 *F*
+1 Isolated Chapel (DMR) 397 *F*
+1 Judge Magister Gabranth (FIN) 495 *F*
+1 Liliana, Dreadhorde General (FDN) 359 *F*
+1 Luminous Broodmoth (IKO) 21 *F*
+1 Marionette Apprentice (MH3) 100 *F*
+1 Marsh Flats (MH2) 437 *E*
+1 Ministrant of Obligation (CMM) 43 *F*
+1 Mondrak, Glory Dominus (ONE) 346 *F*
+1 Ocelot Pride (MH3) 322 *F*
+1 Orcish Bowmasters (LTR) 433 *F*
+1 Path to Exile (CMM) 49 *F*
+1 Phyrexian Altar (2X2) 396 *F*
+1 Phyrexian Tower (MH3) 355 *F*
+1 Pitiless Plunderer (SPG) 5 *F*
+4 Plains (DMU) 277 *F*
+1 Prismatic Vista (SPG) 38 *F*
+1 Reassembling Skeleton (FDN) 182 *F*
+1 Sephiroth, Fabled SOLDIER / Sephiroth, One-Winged Angel (FIN) 451 *F*
+1 Shadowy Backstreet (MKM) 330 *F*
+1 Shattered Sanctum (VOW) 283 *F*
+1 Skullclamp (V09) 12 *F*
+1 Smothering Tithe (2X2) 342 *F*
+1 Sol Ring (CMM) 703 *F*
+1 Sothera, the Supervoid (PEOE) 115s *F*
+7 Swamp (DMU) 279 *F*
+1 Swords to Plowshares (DMR) 31 *F*
+1 Syr Vondam, Sunstar Exemplar (EOE) 231 *F*
+1 Takenuma, Abandoned Mire (NEO) 505 *F*
+1 Teferi's Protection (SLD) 1691 *F*
+1 Teysa, Orzhov Scion (GK2) 28 *F*
+1 The Dead Marshes (LTC) 375 *F*
+1 The Meathook Massacre (PMID) 112p *F*
+1 The One Ring (LTR) 246 *F*
+1 Toxic Deluge (CMM) 523 *E*
+1 Umbral Collar Zealot (EOE) 395 *F*
+1 Vampiric Tutor (CMR) 156 *F*
+1 Vault of Champions (CMM) 667 *F*
+1 Village Rites (STA) 35 *F*
+1 Viscera Seer (M11) 120 *F*
+1 Voice of Victory (PTDM) 33p *F*
+1 Walking Ballista (SLD) 58 *F*
+1 Warren Soultrader (MH3) 332 *F*
+1 Witch Enchanter / Witch-Blessed Meadow (MH3) 239 *F*
+1 Yawgmoth, Thran Physician (DMR) 315 *F*
+1 Zulaport Cutthroat (A25) 117 *F*

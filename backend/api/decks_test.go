@@ -39,6 +39,7 @@ func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewDeckHandler(db)
 
 	app.Get("/api/decks", handler.List)
+	app.Get("/api/decks/for-card/:scryfall_id", handler.DecksForCard)
 	app.Get("/api/decks/:id", handler.Get)
 	app.Post("/api/decks", handler.Create)
 	app.Put("/api/decks/:id", handler.Update)
@@ -899,5 +900,55 @@ func TestDeckDeleteItem_NotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestDecksForCard(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+
+	// Card "printP" with Oracle "oracleO".
+	createDeckTestCard(t, db, "printP", "oracleO", "Sol Ring", "cmm", "rare")
+	deck := createTestDeck(t, db, "My Deck")
+
+	items := []models.DeckItem{
+		{DeckID: deck.ID, OracleID: "oracleO", ScryfallID: "", Zone: models.ZoneMain, DesiredQuantity: 1},        // any-printing → included
+		{DeckID: deck.ID, OracleID: "oracleO", ScryfallID: "printP", Zone: models.ZoneSide, DesiredQuantity: 2},  // pinned to this printing → included
+		{DeckID: deck.ID, OracleID: "oracleO", ScryfallID: "printQ", Zone: models.ZoneMaybe, DesiredQuantity: 1}, // pinned to a different printing → excluded
+	}
+	for i := range items {
+		if err := db.Create(&items[i]).Error; err != nil {
+			t.Fatalf("failed to seed deck item: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/decks/for-card/printP", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var usage []DeckCardUsage
+	if err := json.NewDecoder(resp.Body).Decode(&usage); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+
+	if len(usage) != 2 {
+		t.Fatalf("expected 2 usages (any-printing + this printing), got %d: %+v", len(usage), usage)
+	}
+	zones := map[models.DeckZone]bool{}
+	for _, u := range usage {
+		zones[u.Zone] = true
+		if u.DeckName != "My Deck" {
+			t.Errorf("expected deck name 'My Deck', got %q", u.DeckName)
+		}
+	}
+	if !zones[models.ZoneMain] || !zones[models.ZoneSide] {
+		t.Errorf("expected main + side usages, got %+v", zones)
+	}
+	if zones[models.ZoneMaybe] {
+		t.Errorf("item pinned to a different printing should be excluded")
 	}
 }

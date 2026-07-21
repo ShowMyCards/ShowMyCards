@@ -1,4 +1,4 @@
-import { BACKEND_URL, type InventoryCardsResponse, type EnhancedCardResult } from '$lib';
+import { BACKEND_URL, type InventoryCardsResponse, type InventoryCard } from '$lib';
 import {
 	handleAddInventory,
 	handleDeleteInventory,
@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 			throw new Error('Failed to fetch unassigned cards');
 		}
 		const firstPageData: InventoryCardsResponse = await firstPageResponse.json();
-		const allCards: EnhancedCardResult[] = firstPageData.data || [];
+		const allCards: InventoryCard[] = firstPageData.data || [];
 		const totalPages = firstPageData.total_pages || 1;
 
 		// Fetch remaining pages in parallel

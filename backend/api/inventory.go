@@ -18,6 +18,7 @@ import (
 type InventoryHandler struct {
 	db          *gorm.DB
 	autoSortSvc *services.AutoSortService
+	allocation  *services.AllocationService
 }
 
 // NewInventoryHandler creates a new inventory handler
@@ -25,6 +26,7 @@ func NewInventoryHandler(db *gorm.DB, autoSortSvc *services.AutoSortService) *In
 	return &InventoryHandler{
 		db:          db,
 		autoSortSvc: autoSortSvc,
+		allocation:  services.NewAllocationService(db),
 	}
 }
 
@@ -267,14 +269,35 @@ func (h *InventoryHandler) Delete(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// DeckAvailability summarises how many of a card's owned copies are committed to
+// decks. All three counts are Oracle-level (shared across the card's printings):
+// Owned is total owned, Decked is copies locked by demand-zone deck items
+// (owned − free), and Free is copies not committed to any deck. Finish is not yet
+// part of this calculation (an M1 limitation, see the allocation service).
+// tygo:export
+type DeckAvailability struct {
+	Owned  int `json:"owned"`
+	Decked int `json:"decked"`
+	Free   int `json:"free"`
+}
+
+// InventoryCard is an inventory card result enriched with its deck-availability
+// summary. The deck block is inventory-specific and kept off the search-shared
+// EnhancedCardResult.
+// tygo:export
+type InventoryCard struct {
+	EnhancedCardResult `tstype:",extends"`
+	Deck               DeckAvailability `json:"deck"`
+}
+
 // InventoryCardsResponse represents paginated card results with inventory data
 // tygo:export
 type InventoryCardsResponse struct {
-	Data       []EnhancedCardResult `json:"data"`
-	Page       int                  `json:"page"`
-	PageSize   int                  `json:"page_size"`
-	TotalCards int                  `json:"total_cards"`
-	TotalPages int                  `json:"total_pages"`
+	Data       []InventoryCard `json:"data"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"page_size"`
+	TotalCards int             `json:"total_cards"`
+	TotalPages int             `json:"total_pages"`
 }
 
 // buildEnhancedCardResult creates an EnhancedCardResult from a Scryfall card and inventory items.
@@ -302,6 +325,15 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 	params := utils.ParsePaginationParams(c, utils.DefaultPageSize, DefaultCardsPageSize)
 
 	locationID := c.Query("storage_location_id")
+	deckAvailable := c.Query("deck_available") == "true"
+
+	// Per-Oracle deck availability (owned / decked / free) enriches every card and
+	// powers the "available for deck building" filter.
+	availability, err := h.allocation.ComputeAvailability(c.RequestCtx())
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to compute deck availability", "allocation service failed", err)
+	}
 
 	// Build query
 	query := h.db.WithContext(c.RequestCtx()).Model(&models.Inventory{})
@@ -312,6 +344,18 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
 		}
 		query = query.Where("storage_location_id = ?", locationID)
+	}
+
+	// Constrain to Oracles with at least one free copy when the filter is on. An
+	// empty set yields an empty IN clause (no rows), i.e. "every copy is decked".
+	if deckAvailable {
+		freeOracleIDs := make([]string, 0, len(availability.Oracle))
+		for oracleID, oa := range availability.Oracle {
+			if oa.Free >= 1 {
+				freeOracleIDs = append(freeOracleIDs, oracleID)
+			}
+		}
+		query = query.Where("oracle_id IN ?", freeOracleIDs)
 	}
 
 	// Count total
@@ -371,11 +415,25 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 	}
 	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), ptrs)
 
+	// Attach per-Oracle deck availability (owned / decked / free) to every card.
+	cards := make([]InventoryCard, len(enhancedResults))
+	for i := range enhancedResults {
+		oa := availability.OracleAvailabilityFor(enhancedResults[i].OracleID)
+		cards[i] = InventoryCard{
+			EnhancedCardResult: enhancedResults[i],
+			Deck: DeckAvailability{
+				Owned:  oa.Owned,
+				Decked: oa.Owned - oa.Free,
+				Free:   oa.Free,
+			},
+		}
+	}
+
 	// Calculate total pages
 	totalPages := utils.CalculateTotalPages(total, params.PageSize)
 
 	return c.JSON(InventoryCardsResponse{
-		Data:       enhancedResults,
+		Data:       cards,
 		Page:       params.Page,
 		PageSize:   params.PageSize,
 		TotalCards: int(total),

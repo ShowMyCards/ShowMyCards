@@ -204,6 +204,86 @@ func GetEnglishPricesByPrint(db *gorm.DB, keys []PrintKey) (map[string]scryfall.
 	return result, nil
 }
 
+// GetScryfallCardsByPrints resolves printings by (set_code, collector_number) in
+// the given language, returning parsed cards keyed by "set|collector_number".
+//
+// The collector number is matched literally against the stored value, so promo /
+// stamp suffixes (e.g. "33p", "115s") — which Scryfall's cn: search normalises
+// away, causing live lookups to miss — resolve correctly here. Set codes are
+// lower-cased by the caller to match Scryfall's stored form. Backed by
+// idx_cards_print_lookup.
+func GetScryfallCardsByPrints(db *gorm.DB, keys []PrintKey, lang string) (map[string]scryfall.Card, error) {
+	result := make(map[string]scryfall.Card)
+	if len(keys) == 0 {
+		return result, nil
+	}
+	if lang == "" {
+		lang = "en"
+	}
+
+	// Dedupe input pairs for the IN clause.
+	seen := make(map[string]bool, len(keys))
+	pairs := make([][]any, 0, len(keys))
+	for _, k := range keys {
+		if seen[k.String()] {
+			continue
+		}
+		seen[k.String()] = true
+		pairs = append(pairs, []any{k.SetCode, k.CollectorNumber})
+	}
+
+	var cards []Card
+	if err := db.Where("lang = ? AND (set_code, collector_number) IN ?", lang, pairs).
+		Find(&cards).Error; err != nil {
+		return nil, fmt.Errorf("fetching cards by print: %w", err)
+	}
+
+	for _, c := range cards {
+		sc, err := c.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", c.ScryfallID, "error", err)
+			continue
+		}
+		key := PrintKey{SetCode: sc.Set, CollectorNumber: sc.CollectorNumber}
+		if _, ok := result[key.String()]; !ok {
+			result[key.String()] = sc
+		}
+	}
+	return result, nil
+}
+
+// GetScryfallCardsByNames resolves cards by exact name in the given language,
+// returning one representative printing per name keyed by the lower-cased name.
+// Names that do not match exactly (e.g. double-faced front names, or differing
+// case/punctuation) are simply absent, so callers fall back to Scryfall for those.
+func GetScryfallCardsByNames(db *gorm.DB, names []string, lang string) (map[string]scryfall.Card, error) {
+	result := make(map[string]scryfall.Card)
+	if len(names) == 0 {
+		return result, nil
+	}
+	if lang == "" {
+		lang = "en"
+	}
+
+	var cards []Card
+	if err := db.Where("lang = ? AND name IN ?", lang, names).Find(&cards).Error; err != nil {
+		return nil, fmt.Errorf("fetching cards by name: %w", err)
+	}
+
+	for _, c := range cards {
+		sc, err := c.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", c.ScryfallID, "error", err)
+			continue
+		}
+		key := strings.ToLower(sc.Name)
+		if _, ok := result[key]; !ok {
+			result[key] = sc
+		}
+	}
+	return result, nil
+}
+
 // GetScryfallCardsByIDs fetches cards by their Scryfall IDs, unmarshals them,
 // and returns a map of Scryfall ID to parsed scryfall.Card.
 // Cards that fail to unmarshal are logged and skipped.

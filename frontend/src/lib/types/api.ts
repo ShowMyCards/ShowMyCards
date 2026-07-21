@@ -207,6 +207,19 @@ export interface UpdateDeckRequest {
 	description: string;
 }
 /**
+ * DeckCardUsage describes one deck item that uses a given card, for the card
+ * detail "in decks" section.
+ * tygo:export
+ */
+export interface DeckCardUsage {
+	deck_id: number /* uint */;
+	deck_name: string;
+	zone: import('./models').DeckZone;
+	desired_quantity: number /* int */;
+	scryfall_id: string; // "" = any printing
+	treatment: string;
+}
+/**
  * EnrichedDeckItem represents a deck item enriched with card data and
  * availability information.
  * Owned is the Oracle-level owned count. UnderOwned is true when this item's
@@ -236,6 +249,20 @@ export interface EnrichedDeckItem {
 	collector_number?: string;
 	rarity?: string;
 	finishes?: string[];
+	/**
+	 * Display fields for deck-view grouping, sorting and rendering (mana pips /
+	 * card images). Derived from the same representative card, no extra queries.
+	 */
+	cmc?: number /* float64 */;
+	type_line?: string;
+	mana_cost?: string;
+	image_uri?: string;
+	/**
+	 * PrintingID is the Scryfall id of the printing shown for this item — the
+	 * pinned printing, or a representative printing for any-printing items — used
+	 * to link to the card detail page.
+	 */
+	printing_id?: string;
 	/**
 	 * Availability (populated by the allocation service in 1b).
 	 */
@@ -328,11 +355,33 @@ export interface UpdateInventoryRequest {
 	clear_storage?: boolean;
 }
 /**
+ * DeckAvailability summarises how many of a card's owned copies are committed to
+ * decks. All three counts are Oracle-level (shared across the card's printings):
+ * Owned is total owned, Decked is copies locked by demand-zone deck items
+ * (owned − free), and Free is copies not committed to any deck. Finish is not yet
+ * part of this calculation (an M1 limitation, see the allocation service).
+ * tygo:export
+ */
+export interface DeckAvailability {
+	owned: number /* int */;
+	decked: number /* int */;
+	free: number /* int */;
+}
+/**
+ * InventoryCard is an inventory card result enriched with its deck-availability
+ * summary. The deck block is inventory-specific and kept off the search-shared
+ * EnhancedCardResult.
+ * tygo:export
+ */
+export interface InventoryCard extends EnhancedCardResult {
+	deck: DeckAvailability;
+}
+/**
  * InventoryCardsResponse represents paginated card results with inventory data
  * tygo:export
  */
 export interface InventoryCardsResponse {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 	page: number /* int */;
 	page_size: number /* int */;
 	total_cards: number /* int */;
@@ -544,6 +593,50 @@ export interface CreateItemsBatchRequest {
 export interface UpdateListItemRequest {
 	desired_quantity?: number /* int */;
 	collected_quantity?: number /* int */;
+}
+
+//////////
+// source: resolve.go
+
+/**
+ * MaxResolveItems bounds a single resolve batch.
+ */
+export const MaxResolveItems = 1000;
+/**
+ * ResolveItem is a single decklist line to resolve against the locally-ingested
+ * Scryfall bulk data. Provide Set + CollectorNumber to pin a specific printing,
+ * or Name to resolve any printing of a card.
+ * tygo:export
+ */
+export interface ResolveItem {
+	set?: string;
+	collector_number?: string;
+	name?: string;
+}
+/**
+ * ResolveRequest is a batch of lines to resolve locally.
+ * tygo:export
+ */
+export interface ResolveRequest {
+	items: ResolveItem[];
+	language?: string;
+}
+/**
+ * ResolveResult is the outcome for one requested item, aligned by index with the
+ * request. Found is false when the card is not in the local database, in which
+ * case the caller should fall back to the live Scryfall search for that line.
+ * tygo:export
+ */
+export interface ResolveResult {
+	found: boolean;
+	card?: CardResult;
+}
+/**
+ * ResolveResponse holds per-item results in request order.
+ * tygo:export
+ */
+export interface ResolveResponse {
+	results: ResolveResult[];
 }
 
 //////////
