@@ -2,6 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '$lib';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Deck, DeckItemsResponse } from '$lib';
+import { upsertDeckItems } from '$lib/server/deck-items';
 
 const emptyItems: DeckItemsResponse = {
 	deck_id: 0,
@@ -111,74 +112,13 @@ export const actions: Actions = {
 		}
 
 		try {
-			type IncomingItem = {
-				oracle_id: string;
-				scryfall_id: string;
-				treatment: string;
-				desired_quantity: number;
-				zone: string;
-			};
-			const items: IncomingItem[] = JSON.parse(itemsJson);
+			const items = JSON.parse(itemsJson);
 
-			// Upsert semantics: a deck item is unique on
-			// (deck_id, oracle_id, scryfall_id, treatment, zone), so re-adding an
-			// identical card would collide on that index. Instead, increment the
-			// existing row's desired_quantity and only batch-create genuinely new
-			// rows. This matches the FR98 "append/upsert on re-import" behaviour and
-			// avoids the backend's raw constraint error surfacing to the user.
-			const existingRes = await fetch(`${BACKEND_URL}/api/decks/${id}/items`);
-			const existing = existingRes.ok
-				? await existingRes.json()
-				: { command: [], main: [], side: [], maybe: [] };
-			const allExisting: Array<IncomingItem & { id: number }> = [
-				...(existing.command ?? []),
-				...(existing.main ?? []),
-				...(existing.side ?? []),
-				...(existing.maybe ?? [])
-			];
-
-			const toCreate: IncomingItem[] = [];
-			for (const item of items) {
-				const match = allExisting.find(
-					(e) =>
-						e.oracle_id === item.oracle_id &&
-						e.scryfall_id === item.scryfall_id &&
-						e.treatment === item.treatment &&
-						e.zone === item.zone
-				);
-
-				if (match) {
-					const putRes = await fetch(`${BACKEND_URL}/api/decks/${id}/items/${match.id}`, {
-						method: 'PUT',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							desired_quantity: match.desired_quantity + item.desired_quantity
-						})
-					});
-					if (!putRes.ok) {
-						const errorData = await putRes.json().catch(() => ({}));
-						return fail(putRes.status, { error: errorData.error || 'Failed to add card' });
-					}
-				} else {
-					toCreate.push(item);
-				}
-			}
-
-			if (toCreate.length > 0) {
-				const response = await fetch(`${BACKEND_URL}/api/decks/${id}/items/batch`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ items: toCreate })
-				});
-
-				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({}));
-					const message =
-						response.status === 409
-							? 'That card is already in this deck and zone'
-							: errorData.error || 'Failed to add card';
-					return fail(response.status, { error: message });
-				}
+			// Upsert (increment matching rows, create the rest) — shared with the
+			// bulk import flow. See upsertDeckItems for the rationale.
+			const result = await upsertDeckItems(fetch, id, items);
+			if (!result.ok) {
+				return fail(result.status, { error: result.error });
 			}
 
 			return { success: true, action: 'add' };

@@ -547,6 +547,50 @@ export interface UpdateListItemRequest {
 }
 
 //////////
+// source: resolve.go
+
+/**
+ * MaxResolveItems bounds a single resolve batch.
+ */
+export const MaxResolveItems = 1000;
+/**
+ * ResolveItem is a single decklist line to resolve against the locally-ingested
+ * Scryfall bulk data. Provide Set + CollectorNumber to pin a specific printing,
+ * or Name to resolve any printing of a card.
+ * tygo:export
+ */
+export interface ResolveItem {
+	set?: string;
+	collector_number?: string;
+	name?: string;
+}
+/**
+ * ResolveRequest is a batch of lines to resolve locally.
+ * tygo:export
+ */
+export interface ResolveRequest {
+	items: ResolveItem[];
+	language?: string;
+}
+/**
+ * ResolveResult is the outcome for one requested item, aligned by index with the
+ * request. Found is false when the card is not in the local database, in which
+ * case the caller should fall back to the live Scryfall search for that line.
+ * tygo:export
+ */
+export interface ResolveResult {
+	found: boolean;
+	card?: CardResult;
+}
+/**
+ * ResolveResponse holds per-item results in request order.
+ * tygo:export
+ */
+export interface ResolveResponse {
+	results: ResolveResult[];
+}
+
+//////////
 // source: scheduler.go
 
 /**

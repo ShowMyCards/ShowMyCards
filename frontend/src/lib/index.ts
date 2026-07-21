@@ -177,6 +177,9 @@ export type {
 	UpdateDeckItemRequest
 } from './types/api';
 
+// Re-export local card-resolution API types
+export type { ResolveItem, ResolveResult, ResolveResponse } from './types/api';
+
 // Re-export scheduler and dashboard types from API
 export type { ScheduledTaskInfo, DashboardStats } from './types/api';
 
