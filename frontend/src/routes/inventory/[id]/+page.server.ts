@@ -2,7 +2,7 @@ import {
 	BACKEND_URL,
 	type InventoryCardsResponse,
 	type StorageLocationWithCount,
-	type EnhancedCardResult
+	type InventoryCard
 } from '$lib';
 import {
 	handleAddInventory,
@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			throw new Error('Failed to fetch cards');
 		}
 		const firstPageData: InventoryCardsResponse = await firstPageResponse.json();
-		const allCards: EnhancedCardResult[] = firstPageData.data || [];
+		const allCards: InventoryCard[] = firstPageData.data || [];
 		const totalPages = firstPageData.total_pages || 1;
 
 		// Fetch remaining pages in parallel

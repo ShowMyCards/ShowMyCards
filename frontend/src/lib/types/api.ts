@@ -328,11 +328,33 @@ export interface UpdateInventoryRequest {
 	clear_storage?: boolean;
 }
 /**
+ * DeckAvailability summarises how many of a card's owned copies are committed to
+ * decks. All three counts are Oracle-level (shared across the card's printings):
+ * Owned is total owned, Decked is copies locked by demand-zone deck items
+ * (owned − free), and Free is copies not committed to any deck. Finish is not yet
+ * part of this calculation (an M1 limitation, see the allocation service).
+ * tygo:export
+ */
+export interface DeckAvailability {
+	owned: number /* int */;
+	decked: number /* int */;
+	free: number /* int */;
+}
+/**
+ * InventoryCard is an inventory card result enriched with its deck-availability
+ * summary. The deck block is inventory-specific and kept off the search-shared
+ * EnhancedCardResult.
+ * tygo:export
+ */
+export interface InventoryCard extends EnhancedCardResult {
+	deck: DeckAvailability;
+}
+/**
  * InventoryCardsResponse represents paginated card results with inventory data
  * tygo:export
  */
 export interface InventoryCardsResponse {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 	page: number /* int */;
 	page_size: number /* int */;
 	total_cards: number /* int */;
