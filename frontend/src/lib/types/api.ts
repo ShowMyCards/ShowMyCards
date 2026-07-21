@@ -207,6 +207,19 @@ export interface UpdateDeckRequest {
 	description: string;
 }
 /**
+ * DeckCardUsage describes one deck item that uses a given card, for the card
+ * detail "in decks" section.
+ * tygo:export
+ */
+export interface DeckCardUsage {
+	deck_id: number /* uint */;
+	deck_name: string;
+	zone: import('./models').DeckZone;
+	desired_quantity: number /* int */;
+	scryfall_id: string; // "" = any printing
+	treatment: string;
+}
+/**
  * EnrichedDeckItem represents a deck item enriched with card data and
  * availability information.
  * Owned is the Oracle-level owned count. UnderOwned is true when this item's
@@ -236,6 +249,20 @@ export interface EnrichedDeckItem {
 	collector_number?: string;
 	rarity?: string;
 	finishes?: string[];
+	/**
+	 * Display fields for deck-view grouping, sorting and rendering (mana pips /
+	 * card images). Derived from the same representative card, no extra queries.
+	 */
+	cmc?: number /* float64 */;
+	type_line?: string;
+	mana_cost?: string;
+	image_uri?: string;
+	/**
+	 * PrintingID is the Scryfall id of the printing shown for this item — the
+	 * pinned printing, or a representative printing for any-printing items — used
+	 * to link to the card detail page.
+	 */
+	printing_id?: string;
 	/**
 	 * Availability (populated by the allocation service in 1b).
 	 */

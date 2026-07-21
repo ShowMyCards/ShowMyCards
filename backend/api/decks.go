@@ -243,6 +243,60 @@ func (h *DeckHandler) Delete(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// DeckCardUsage describes one deck item that uses a given card, for the card
+// detail "in decks" section.
+//
+// tygo:export
+type DeckCardUsage struct {
+	DeckID          uint            `json:"deck_id"`
+	DeckName        string          `json:"deck_name"`
+	Zone            models.DeckZone `json:"zone"`
+	DesiredQuantity int             `json:"desired_quantity"`
+	ScryfallID      string          `json:"scryfall_id"` // "" = any printing
+	Treatment       string          `json:"treatment"`
+}
+
+// DecksForCard lists deck items that use the given printing: items of the same
+// Oracle that are either any-printing or pinned to exactly this printing. Items
+// pinned to a different printing of the same Oracle are excluded, since this
+// specific printing does not apply to them.
+func (h *DeckHandler) DecksForCard(c fiber.Ctx) error {
+	scryfallID := c.Params("scryfall_id")
+	if scryfallID == "" {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "scryfall_id is required")
+	}
+
+	// Resolve the printing's Oracle ID from the local card database.
+	cardMap, err := models.GetCardsByIDs(h.db.WithContext(c.RequestCtx()), []string{scryfallID})
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to look up card", "card query failed", err)
+	}
+	card, ok := cardMap[scryfallID]
+	if !ok || card.OracleID == "" {
+		return c.JSON([]DeckCardUsage{})
+	}
+
+	var usage []DeckCardUsage
+	if err := h.db.WithContext(c.RequestCtx()).
+		Table("deck_items").
+		Select("deck_items.deck_id, decks.name AS deck_name, deck_items.zone, "+
+			"deck_items.desired_quantity, deck_items.scryfall_id, deck_items.treatment").
+		Joins("JOIN decks ON decks.id = deck_items.deck_id").
+		Where("deck_items.oracle_id = ? AND (deck_items.scryfall_id = '' OR deck_items.scryfall_id = ?)",
+			card.OracleID, scryfallID).
+		Order("decks.name, deck_items.zone").
+		Scan(&usage).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch deck usage", "deck usage query failed", err)
+	}
+
+	if usage == nil {
+		usage = []DeckCardUsage{}
+	}
+	return c.JSON(usage)
+}
+
 // EnrichedDeckItem represents a deck item enriched with card data and
 // availability information.
 //
@@ -271,6 +325,16 @@ type EnrichedDeckItem struct {
 	CollectorNumber string   `json:"collector_number,omitempty"`
 	Rarity          string   `json:"rarity,omitempty"`
 	Finishes        []string `json:"finishes,omitempty"`
+	// Display fields for deck-view grouping, sorting and rendering (mana pips /
+	// card images). Derived from the same representative card, no extra queries.
+	Cmc      float64 `json:"cmc,omitempty"`
+	TypeLine string  `json:"type_line,omitempty"`
+	ManaCost string  `json:"mana_cost,omitempty"`
+	ImageURI string  `json:"image_uri,omitempty"`
+	// PrintingID is the Scryfall id of the printing shown for this item — the
+	// pinned printing, or a representative printing for any-printing items — used
+	// to link to the card detail page.
+	PrintingID string `json:"printing_id,omitempty"`
 	// Availability (populated by the allocation service in 1b).
 	Owned         int  `json:"owned"`
 	UnderOwned    bool `json:"under_owned"`
@@ -381,6 +445,28 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 // enriched from their exact printing; any-printing items are enriched from a
 // representative printing of the Oracle. Missing card data is left empty rather
 // than failing the request.
+// applyCardDataToDeckItem copies display and identity fields from a representative
+// Scryfall card onto an enriched deck item.
+func applyCardDataToDeckItem(e *EnrichedDeckItem, card scryfall.Card) {
+	e.Name = card.Name
+	e.SetName = card.SetName
+	e.SetCode = card.Set
+	e.CollectorNumber = card.CollectorNumber
+	e.Rarity = string(card.Rarity)
+	e.Finishes = utils.ConvertEnumSliceToStrings(card.Finishes)
+	e.PrintingID = card.ID
+	e.Cmc = card.CMC
+	e.TypeLine = card.TypeLine
+	e.ManaCost = card.ManaCost
+	// Double-faced cards carry the mana cost on the front face, not the parent.
+	if e.ManaCost == "" && len(card.CardFaces) > 0 {
+		e.ManaCost = card.CardFaces[0].ManaCost
+	}
+	if uri := utils.ExtractCardImageURI(card); uri != nil {
+		e.ImageURI = *uri
+	}
+}
+
 func (h *DeckHandler) enrichDeckItems(ctx context.Context, items []models.DeckItem, availability services.AvailabilityMap, deckDemandByOracle map[string]int) []EnrichedDeckItem {
 	// Bulk-fetch pinned printings by Scryfall ID.
 	pinnedIDs := make([]string, 0, len(items))
@@ -413,20 +499,10 @@ func (h *DeckHandler) enrichDeckItems(ctx context.Context, items []models.DeckIt
 
 		if item.ScryfallID != "" {
 			if card, ok := scryfallCardMap[item.ScryfallID]; ok {
-				e.Name = card.Name
-				e.SetName = card.SetName
-				e.SetCode = card.Set
-				e.CollectorNumber = card.CollectorNumber
-				e.Rarity = string(card.Rarity)
-				e.Finishes = utils.ConvertEnumSliceToStrings(card.Finishes)
+				applyCardDataToDeckItem(&e, card)
 			}
 		} else if card, ok := oracleCardMap[item.OracleID]; ok {
-			e.Name = card.Name
-			e.SetName = card.SetName
-			e.SetCode = card.Set
-			e.CollectorNumber = card.CollectorNumber
-			e.Rarity = string(card.Rarity)
-			e.Finishes = utils.ConvertEnumSliceToStrings(card.Finishes)
+			applyCardDataToDeckItem(&e, card)
 		}
 
 		// Availability is computed at the Oracle level. Treatment is not part of

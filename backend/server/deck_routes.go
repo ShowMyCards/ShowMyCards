@@ -13,6 +13,7 @@ func DeckRoutes(app *fiber.App, db *gorm.DB) {
 
 	decks := app.Group("/api/decks")
 	decks.Get("/", handler.List)
+	decks.Get("/for-card/:scryfall_id", handler.DecksForCard)
 	decks.Get("/:id", handler.Get)
 	decks.Post("/", handler.Create)
 	decks.Put("/:id", handler.Update)

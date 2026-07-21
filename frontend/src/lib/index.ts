@@ -60,7 +60,9 @@ export { default as SortableRuleRow } from './components/SortableRuleRow.svelte'
 export { default as ScheduledTaskCard } from './components/ScheduledTaskCard.svelte';
 export { default as ListCard } from './components/ListCard.svelte';
 export { default as DeckCard } from './components/DeckCard.svelte';
-export { default as DeckItemRow } from './components/DeckItemRow.svelte';
+export { default as DeckView } from './components/DeckView.svelte';
+export { default as DeckCardActions } from './components/DeckCardActions.svelte';
+export { default as ManaCost } from './components/ManaCost.svelte';
 export { default as DeckAddResultCard } from './components/DeckAddResultCard.svelte';
 export { default as ListStatsBar } from './components/ListStatsBar.svelte';
 export { default as ListCardGrid } from './components/ListCardGrid.svelte';
@@ -176,7 +178,8 @@ export type {
 	DeckItemsResponse,
 	CreateDeckItemRequest,
 	CreateDeckItemsBatchRequest,
-	UpdateDeckItemRequest
+	UpdateDeckItemRequest,
+	DeckCardUsage
 } from './types/api';
 
 // Re-export local card-resolution API types

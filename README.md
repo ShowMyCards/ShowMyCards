@@ -58,5 +58,12 @@ If you don't want to self host the UI, or want to build your own UI, you can; al
 
 I'm also considering building a native mobile app in the future too.
 
+## Acknowledgements
+
+- Mana symbols are rendered with the [Mana font][Mana] by Andrew Gioia, licensed
+  under [SIL OFL 1.1](https://scripts.sil.org/OFL) (the accompanying CSS is MIT).
+- Card data and imagery come from [Scryfall].
+
 [ShowMyCards]: https://showmy.cards
 [Scryfall]: https://scryfall.com
+[Mana]: https://mana.andrewgioia.com

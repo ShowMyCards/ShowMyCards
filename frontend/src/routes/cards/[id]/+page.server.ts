@@ -1,4 +1,4 @@
-import { BACKEND_URL, type EnhancedCardResult } from '$lib';
+import { BACKEND_URL, type EnhancedCardResult, type DeckCardUsage } from '$lib';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
@@ -37,9 +37,22 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			}
 		}
 
+		// Fetch which decks use this printing (any-printing or pinned to it). A
+		// failure here must not break the card page, so degrade to an empty list.
+		let deckUsage: DeckCardUsage[] = [];
+		try {
+			const decksResponse = await fetch(`${BACKEND_URL}/api/decks/for-card/${id}`);
+			if (decksResponse.ok) {
+				deckUsage = await decksResponse.json();
+			}
+		} catch {
+			// Ignore errors fetching deck usage.
+		}
+
 		return {
 			card,
-			otherPrintings
+			otherPrintings,
+			deckUsage
 		};
 	} catch (e) {
 		if (e && typeof e === 'object' && 'status' in e) {

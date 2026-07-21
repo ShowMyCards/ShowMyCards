@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { PageHeader, getCardTreatmentName, getDisplayName } from '$lib';
+	import { PageHeader, getCardTreatmentName, getDisplayName, type DeckCardUsage } from '$lib';
 	import { resolve } from '$app/paths';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -12,6 +12,35 @@
 
 	const card = $derived(data.card);
 	const otherPrintings = $derived(data.otherPrintings);
+	const deckUsage = $derived<DeckCardUsage[]>(data.deckUsage ?? []);
+
+	const ZONE_LABELS: Record<string, string> = {
+		command: 'Command',
+		main: 'Main',
+		side: 'Side',
+		maybe: 'Maybe'
+	};
+
+	// Group the deck usage rows by deck so each deck is listed once with its zones.
+	const decksUsing = $derived.by(() => {
+		const byDeck = new SvelteMap<
+			number,
+			{ deck_id: number; deck_name: string; entries: DeckCardUsage[] }
+		>();
+		for (const usage of deckUsage) {
+			const existing = byDeck.get(usage.deck_id);
+			if (existing) {
+				existing.entries.push(usage);
+			} else {
+				byDeck.set(usage.deck_id, {
+					deck_id: usage.deck_id,
+					deck_name: usage.deck_name,
+					entries: [usage]
+				});
+			}
+		}
+		return [...byDeck.values()];
+	});
 
 	/**
 	 * Back navigation target.
@@ -210,6 +239,36 @@
 					{/if}
 				</div>
 			</div>
+
+			<!-- In Decks -->
+			{#if decksUsing.length > 0}
+				<div class="card bg-base-200 shadow-lg mb-6">
+					<div class="card-body">
+						<h3 class="card-title text-lg">In Decks ({decksUsing.length})</h3>
+						<ul class="space-y-2">
+							{#each decksUsing as deck (deck.deck_id)}
+								<li class="flex flex-wrap items-center justify-between gap-2">
+									<a href={resolve(`/decks/${deck.deck_id}`)} class="link link-hover font-medium">
+										{deck.deck_name}
+									</a>
+									<div class="flex flex-wrap gap-1">
+										{#each deck.entries as entry (entry.zone + entry.scryfall_id + entry.treatment)}
+											<span
+												class="badge badge-sm"
+												title={entry.scryfall_id
+													? 'Pinned to this printing'
+													: 'Any printing of this card'}>
+												{ZONE_LABELS[entry.zone] ?? entry.zone} ×{entry.desired_quantity}
+												{#if entry.scryfall_id}· this printing{/if}
+											</span>
+										{/each}
+									</div>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Other Printings -->
 			{#if otherPrintings.length > 0}

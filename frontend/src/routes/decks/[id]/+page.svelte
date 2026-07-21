@@ -8,13 +8,14 @@
 		EmptyState,
 		Modal,
 		FormField,
-		DeckItemRow,
+		DeckView,
 		DeckAddResultCard,
 		notifications,
 		getActionError,
 		type ScryfallCard,
 		type EnrichedDeckItem
 	} from '$lib';
+	import type { DeckGroupMode, DeckSortMode } from '$lib/utils/deck-grouping';
 	import { ArrowLeft, Pencil, Trash2, Search, Info } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -92,6 +93,30 @@
 	function spansZonesFor(item: EnrichedDeckItem): boolean {
 		return Object.keys(rollup.zones[item.oracle_id] ?? {}).length > 1;
 	}
+	function getRollup(item: EnrichedDeckItem) {
+		return { deckWants: deckWantsFor(item), spansZones: spansZonesFor(item) };
+	}
+
+	// View options (persisted to localStorage). Group only applies to the main deck.
+	let deckView = $state<'text' | 'grid' | 'stacks'>('text');
+	let deckGroup = $state<DeckGroupMode>('type');
+	let deckSort = $state<DeckSortMode>('manaValue');
+
+	$effect(() => {
+		if (!browser) return;
+		const v = localStorage.getItem('smc-deck-view');
+		if (v === 'text' || v === 'grid' || v === 'stacks') deckView = v;
+		const g = localStorage.getItem('smc-deck-group');
+		if (g === 'none' || g === 'type' || g === 'manaValue') deckGroup = g;
+		const s = localStorage.getItem('smc-deck-sort');
+		if (s === 'name' || s === 'manaValue') deckSort = s;
+	});
+	$effect(() => {
+		if (!browser) return;
+		localStorage.setItem('smc-deck-view', deckView);
+		localStorage.setItem('smc-deck-group', deckGroup);
+		localStorage.setItem('smc-deck-sort', deckSort);
+	});
 
 	const ZONE_SECTIONS = [
 		{ key: 'command' as const, title: 'Command' },
@@ -99,6 +124,10 @@
 		{ key: 'side' as const, title: 'Side' },
 		{ key: 'maybe' as const, title: 'Maybe' }
 	];
+
+	function zoneCardCount(list: EnrichedDeckItem[]): number {
+		return list.reduce((sum, item) => sum + item.desired_quantity, 0);
+	}
 </script>
 
 <svelte:head>
@@ -149,30 +178,56 @@
 			</span>
 		</div>
 
+		<!-- View controls -->
+		{#if totalItems > 0}
+			<div class="mb-4 flex flex-wrap items-end gap-3">
+				<label class="flex flex-col gap-1 text-xs">
+					<span class="opacity-70">View</span>
+					<select bind:value={deckView} class="select select-bordered select-sm">
+						<option value="text">Text</option>
+						<option value="grid">Visual Grid</option>
+						<option value="stacks">Visual Stacks</option>
+					</select>
+				</label>
+				<label class="flex flex-col gap-1 text-xs">
+					<span class="opacity-70">Group (main deck)</span>
+					<select bind:value={deckGroup} class="select select-bordered select-sm">
+						<option value="none">None</option>
+						<option value="type">Type</option>
+						<option value="manaValue">Mana Value</option>
+					</select>
+				</label>
+				<label class="flex flex-col gap-1 text-xs">
+					<span class="opacity-70">Sort</span>
+					<select bind:value={deckSort} class="select select-bordered select-sm">
+						<option value="name">Name</option>
+						<option value="manaValue">Mana Value</option>
+					</select>
+				</label>
+			</div>
+		{/if}
+
 		<!-- Zone sections -->
 		{#if totalItems === 0}
 			<EmptyState message="No cards in this deck yet">
 				<p class="text-sm opacity-70">Use the search below to add cards.</p>
 			</EmptyState>
 		{:else}
-			<div class="space-y-6 mb-8">
+			<div class="mb-8 space-y-6">
 				{#each ZONE_SECTIONS as section (section.key)}
 					{@const items = data.items[section.key]}
 					{#if items.length > 0}
 						<section>
-							<h2 class="font-semibold text-lg mb-1">
+							<h2 class="mb-2 text-lg font-semibold">
 								{section.title}
-								<span class="opacity-50 text-sm font-normal">({items.length})</span>
+								<span class="text-sm font-normal opacity-50">({zoneCardCount(items)})</span>
 							</h2>
-							<div class="rounded-box border border-base-300 bg-base-100 px-4">
-								{#each items as item (item.id)}
-									<DeckItemRow
-										{item}
-										deckWants={deckWantsFor(item)}
-										spansZones={spansZonesFor(item)}
-										showAvailability={rollup.showIds.includes(item.id)} />
-								{/each}
-							</div>
+							<DeckView
+								{items}
+								view={deckView}
+								group={section.key === 'main' ? deckGroup : 'none'}
+								sort={deckSort}
+								{getRollup} />
 						</section>
 					{/if}
 				{/each}
