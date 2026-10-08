@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
-	import { PageHeader, StatsCard, notifications } from '$lib';
+	import { PageHeader, StatsCard, currency, notifications } from '$lib';
 	import type { PageData } from './$types';
 	import {
 		Search,
@@ -14,6 +14,23 @@
 	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
+	const values = $derived(
+		currency.current === 'eur'
+			? {
+					collection: data.stats.total_collection_value_eur,
+					collected: data.stats.total_collected_from_lists_eur,
+					remaining: data.stats.total_remaining_lists_value_eur
+				}
+			: {
+					collection: data.stats.total_collection_value,
+					collected: data.stats.total_collected_from_lists,
+					remaining: data.stats.total_remaining_lists_value
+				}
+	);
+
+	function formatValue(value: number): string {
+		return `${currency.symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+	}
 
 	// Display load error via notifications store (browser only)
 	let hasShownLoadError = false;
@@ -34,7 +51,7 @@
 		},
 		{
 			title: 'Collection Value',
-			value: `$${(data?.stats?.total_collection_value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			value: formatValue(values.collection),
 			description: 'Total inventory value',
 			valueClass: 'text-success'
 		},
@@ -52,13 +69,13 @@
 		},
 		{
 			title: 'Collected Value',
-			value: `$${(data?.stats?.total_collected_from_lists ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			value: formatValue(values.collected),
 			description: 'From wishlists',
 			valueClass: 'text-info'
 		},
 		{
 			title: 'Remaining Value',
-			value: `$${(data?.stats?.total_remaining_lists_value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			value: formatValue(values.remaining),
 			description: 'Still needed',
 			valueClass: 'text-warning'
 		},

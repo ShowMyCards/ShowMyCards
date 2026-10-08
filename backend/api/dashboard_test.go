@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http/httptest"
 	"testing"
 
@@ -11,6 +12,58 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+func TestDashboard_CurrencyValues(t *testing.T) {
+	app, db := setupDashboardTestApp(t)
+	card := models.Card{
+		ScryfallID: "priced-card", OracleID: "priced-oracle",
+		RawJSON: `{"id":"priced-card","oracle_id":"priced-oracle","prices":{
+			"usd":"10.00","usd_foil":"20.00","usd_etched":"30.00",
+			"eur":"4.00","eur_foil":"7.00"
+		}}`,
+	}
+	if err := db.Create(&card).Error; err != nil {
+		t.Fatal(err)
+	}
+	list := models.List{Name: "Wishlist"}
+	if err := db.Create(&list).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, treatment := range []string{"nonfoil", "foil", "etched"} {
+		if err := db.Create(&models.Inventory{
+			ScryfallID: card.ScryfallID, OracleID: card.OracleID, Treatment: treatment, Quantity: 2,
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Create(&models.ListItem{
+			ListID: list.ID, ScryfallID: card.ScryfallID, OracleID: card.OracleID,
+			Treatment: treatment, DesiredQuantity: 4, CollectedQuantity: 1,
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/dashboard", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	var stats map[string]float64
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		t.Fatal(err)
+	}
+	for field, want := range map[string]float64{
+		"total_collection_value": 120, "total_collected_from_lists": 60, "total_remaining_lists_value": 180,
+		"total_collection_value_eur": 36, "total_collected_from_lists_eur": 18, "total_remaining_lists_value_eur": 54,
+	} {
+		if got, ok := stats[field]; !ok || math.Abs(got-want) > 0.001 {
+			t.Errorf("%s: expected %.2f, got %.2f (present: %t)", field, want, got, ok)
+		}
+	}
+}
 
 func setupDashboardTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	t.Helper()

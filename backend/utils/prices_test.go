@@ -6,6 +6,32 @@ import (
 	scryfall "github.com/BlueMonday/go-scryfall"
 )
 
+func TestParseEURPriceFromScryfall(t *testing.T) {
+	tests := []struct {
+		name      string
+		prices    scryfall.Prices
+		treatment string
+		want      float64
+	}{
+		{"nonfoil uses EUR", scryfall.Prices{USD: "10", EUR: "4", EURFoil: "7"}, "nonfoil", 4},
+		{"foil uses EUR foil", scryfall.Prices{USDFoil: "20", EUR: "4", EURFoil: "7"}, "foil", 7},
+		{"etched uses EUR foil", scryfall.Prices{USDEtched: "30", EUR: "4", EURFoil: "7"}, "etched", 7},
+		{"other treatments use EUR foil", scryfall.Prices{EUR: "4", EURFoil: "7"}, "glossy", 7},
+		{"missing foil falls back within EUR", scryfall.Prices{USDFoil: "20", EUR: "4"}, "foil", 4},
+		{"malformed foil falls back within EUR", scryfall.Prices{EUR: "4", EURFoil: "N/A"}, "foil", 4},
+		{"missing EUR never uses USD", scryfall.Prices{USD: "10"}, "nonfoil", 0},
+		{"missing EUR foil never uses USD foil", scryfall.Prices{USD: "10", USDFoil: "20"}, "foil", 0},
+		{"missing prices", scryfall.Prices{}, "nonfoil", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ParseEURPriceFromScryfall(tt.prices, tt.treatment); got != tt.want {
+				t.Errorf("expected %.2f, got %.2f", tt.want, got)
+			}
+		})
+	}
+}
+
 func TestParsePriceFromScryfall(t *testing.T) {
 	tests := []struct {
 		name      string

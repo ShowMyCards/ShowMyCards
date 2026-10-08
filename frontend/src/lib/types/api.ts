@@ -67,9 +67,12 @@ export interface DashboardHandler {}
 export interface DashboardStats {
 	total_inventory_cards: number /* int64 */; // Sum of inventory.quantity
 	total_wishlist_cards: number /* int64 */; // Sum of list_item.collected_quantity
-	total_collection_value: number /* float64 */; // Value from inventory
-	total_collected_from_lists: number /* float64 */; // Value of cards collected from lists
-	total_remaining_lists_value: number /* float64 */; // Value of cards still needed from lists
+	total_collection_value: number /* float64 */; // USD value from inventory
+	total_collected_from_lists: number /* float64 */; // USD value of cards collected from lists
+	total_remaining_lists_value: number /* float64 */; // USD value of cards still needed from lists
+	total_collection_value_eur: number /* float64 */; // EUR value from inventory
+	total_collected_from_lists_eur: number /* float64 */; // EUR value of cards collected from lists
+	total_remaining_lists_value_eur: number /* float64 */; // EUR value of cards still needed from lists
 	total_storage_locations: number /* int64 */;
 	total_lists: number /* int64 */;
 	unassigned_cards: number /* int64 */;
