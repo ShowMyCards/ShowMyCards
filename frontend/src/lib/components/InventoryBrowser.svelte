@@ -4,6 +4,7 @@
 	import {
 		CardResultCard,
 		EmptyState,
+		Notification,
 		Pagination,
 		BulkActionsBar,
 		SplitMoveModal,
@@ -15,12 +16,15 @@
 		getDisplayName,
 		notifications,
 		selection,
+		currency,
 		usePersistedViewMode,
 		type EnhancedCardResult,
 		type Inventory,
 		type StorageLocation
 	} from '$lib';
 	import SetIcon from '$lib/components/SetIcon.svelte';
+	import CardInventoryLocations from './CardInventoryLocations.svelte';
+	import { getInventoryUnitPrice, sortInventoryCardsByPrice } from '$lib/utils/card-prices';
 	import { FolderInput } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
@@ -30,6 +34,9 @@
 		allLocations: StorageLocation[];
 		error?: string;
 		emptyMessage?: string;
+		readOnly?: boolean;
+		showLocations?: boolean;
+		showPriceSort?: boolean;
 		header: Snippet;
 	}
 
@@ -38,6 +45,9 @@
 		allLocations,
 		error: loadError,
 		emptyMessage = 'No cards found',
+		readOnly = false,
+		showLocations = false,
+		showPriceSort = false,
 		header
 	}: Props = $props();
 
@@ -69,6 +79,7 @@
 
 	// Client-side filtering state
 	let filterText = $state('');
+	let sortOrder = $state<'recent' | 'price-desc' | 'price-asc'>('recent');
 	const PAGE_SIZE = 24;
 	let currentPage = $state(1);
 
@@ -84,7 +95,7 @@
 	// Display load error if present (browser only)
 	let hasShownLoadError = $state(false);
 	$effect(() => {
-		if (!browser || hasShownLoadError) return;
+		if (!browser || readOnly || hasShownLoadError) return;
 		if (loadError) {
 			hasShownLoadError = true;
 			notifications.error(loadError);
@@ -109,25 +120,41 @@
 			filtered = filtered.filter((card) => {
 				const name = `${card.name ?? ''} ${card.printed_name ?? ''}`.toLowerCase();
 				const setName = (card.set_name || '').toLowerCase();
-				const treatmentName = getCardTreatmentName(
-					card.finishes,
-					card.frame_effects ?? [],
-					card.finishes[0] || 'nonfoil',
-					card.promo_types ?? []
-				).toLowerCase();
+				const treatments = readOnly
+					? card.inventory.this_printing.map((inv) => inv.treatment || 'nonfoil')
+					: [card.finishes[0] || 'nonfoil'];
+				const matchesTreatment = treatments.some((treatment) =>
+					getCardTreatmentName(
+						card.finishes,
+						card.frame_effects ?? [],
+						treatment,
+						card.promo_types ?? []
+					)
+						.toLowerCase()
+						.includes(search)
+				);
 
-				return name.includes(search) || setName.includes(search) || treatmentName.includes(search);
+				return name.includes(search) || setName.includes(search) || matchesTreatment;
 			});
 		}
 
 		return filtered;
 	}
 
-	// Filtered and paginated cards
+	// Sort the complete filtered collection before taking the current page.
 	const filteredCards = $derived(filterCards(cards));
+	const sortedCards = $derived(
+		showPriceSort && sortOrder !== 'recent'
+			? sortInventoryCardsByPrice(
+					filteredCards,
+					currency.current,
+					sortOrder === 'price-asc' ? 'asc' : 'desc'
+				)
+			: filteredCards
+	);
 	const totalFilteredPages = $derived(Math.ceil(filteredCards.length / PAGE_SIZE) || 1);
 	const paginatedCards = $derived(
-		filteredCards.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+		sortedCards.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 	);
 
 	function handleRemove(cardId: string) {
@@ -139,11 +166,12 @@
 		invalidateAll();
 	}
 
-	/**
-	 * Get the primary treatment for display in table view
-	 */
-	function getPrimaryTreatment(card: EnhancedCardResult): string {
-		return card.finishes[0] || 'nonfoil';
+	/** Available finishes describe the printing; inventory records describe what is owned. */
+	function getOwnedTreatments(card: EnhancedCardResult): string[] {
+		return card.inventory.this_printing
+			.filter((inv) => inv.quantity > 0)
+			.map((inv) => inv.treatment || 'nonfoil')
+			.filter((treatment, index, treatments) => treatments.indexOf(treatment) === index);
 	}
 </script>
 
@@ -151,28 +179,53 @@
 	{@render header()}
 
 	<!-- Filter bar -->
-	<div class="flex flex-col gap-4 mb-4">
-		<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-			<CardFilter
-				searchText={filterText}
-				onSearchChange={handleSearchChange}
-				showStatusFilter={false}
-				placeholder="Filter by name, set, or treatment..." />
-			<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+	{#if !(readOnly && loadError)}
+		<div class="flex flex-col gap-4 mb-4">
+			<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+				<CardFilter
+					searchText={filterText}
+					onSearchChange={handleSearchChange}
+					showStatusFilter={false}
+					placeholder="Filter by name, set, or treatment..." />
+				<div class="flex flex-wrap gap-3 items-center">
+					{#if showPriceSort}
+						<label for="inventory-sort" class="text-sm">Sort by</label>
+						<select
+							id="inventory-sort"
+							class="select select-sm w-auto"
+							bind:value={sortOrder}
+							onchange={() => (currentPage = 1)}>
+							<option value="recent">Recently added</option>
+							<option value="price-desc">Price: highest first</option>
+							<option value="price-asc">Price: lowest first</option>
+						</select>
+					{/if}
+					<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+				</div>
+			</div>
+			<div class="text-sm opacity-70">
+				{#if filterText}
+					Showing {filteredCards.length} of {cards.length} {readOnly ? 'printings' : 'cards'}
+				{:else}
+					{cards.length}
+					{readOnly
+						? cards.length === 1
+							? 'printing'
+							: 'printings'
+						: cards.length === 1
+							? 'card'
+							: 'cards'}
+				{/if}
+				{#if totalFilteredPages > 1}
+					(page {currentPage} of {totalFilteredPages})
+				{/if}
+			</div>
 		</div>
-		<div class="text-sm opacity-70">
-			{#if filterText}
-				Showing {filteredCards.length} of {cards.length} cards
-			{:else}
-				{cards.length} {cards.length === 1 ? 'card' : 'cards'}
-			{/if}
-			{#if totalFilteredPages > 1}
-				(page {currentPage} of {totalFilteredPages})
-			{/if}
-		</div>
-	</div>
+	{/if}
 
-	{#if cards.length === 0}
+	{#if readOnly && loadError}
+		<Notification type="error">{loadError}</Notification>
+	{:else if cards.length === 0}
 		<EmptyState message={emptyMessage}>
 			<a href={resolve('/search')} class="btn btn-primary">Search for Cards</a>
 		</EmptyState>
@@ -195,9 +248,13 @@
 			{#each paginatedCards as card (`${card.id}-${card.inventory.total_quantity}`)}
 				<CardResultCard
 					{card}
+					{readOnly}
+					{showLocations}
 					onremove={handleRemove}
-					selectable
-					onSplitMove={(inv, available) => (moveTarget = { inv, available })} />
+					selectable={!readOnly}
+					onSplitMove={readOnly
+						? undefined
+						: (inv, available) => (moveTarget = { inv, available })} />
 			{/each}
 		</div>
 	{:else}
@@ -206,55 +263,61 @@
 			<table class="table table-zebra">
 				<thead>
 					<tr>
-						<th>
-							<input
-								type="checkbox"
-								class="checkbox checkbox-accent checkbox-sm"
-								aria-label="Select all cards on this page"
-								checked={paginatedCards.every((c) =>
-									c.inventory.this_printing.every((inv) => selection.isSelected(inv.id))
-								)}
-								onchange={(e) => {
-									const allIds = paginatedCards.flatMap((c) =>
-										c.inventory.this_printing.map((inv) => inv.id)
-									);
-									if (e.currentTarget.checked) {
-										selection.selectMany(allIds);
-									} else {
-										selection.deselectMany(allIds);
-									}
-								}} />
-						</th>
-						<th>Card Name</th>
-						<th>Set</th>
-						<th>#</th>
-						<th>Language</th>
-						<th>Treatment(s)</th>
-						<th>Qty</th>
-						<th>Actions</th>
+						{#if !readOnly}
+							<th scope="col">
+								<input
+									type="checkbox"
+									class="checkbox checkbox-accent checkbox-sm"
+									aria-label="Select all cards on this page"
+									checked={paginatedCards.every((c) =>
+										c.inventory.this_printing.every((inv) => selection.isSelected(inv.id))
+									)}
+									onchange={(e) => {
+										const allIds = paginatedCards.flatMap((c) =>
+											c.inventory.this_printing.map((inv) => inv.id)
+										);
+										if (e.currentTarget.checked) {
+											selection.selectMany(allIds);
+										} else {
+											selection.deselectMany(allIds);
+										}
+									}} />
+							</th>
+						{/if}
+						<th scope="col">Card Name</th>
+						<th scope="col">Set</th>
+						<th scope="col">#</th>
+						<th scope="col">Language</th>
+						<th scope="col">Treatment(s)</th>
+						<th scope="col">Qty</th>
+						{#if showPriceSort}<th scope="col">Price</th>{/if}
+						{#if showLocations}<th scope="col">Storage Locations</th>{/if}
+						{#if !readOnly}<th scope="col">Actions</th>{/if}
 					</tr>
 				</thead>
 				<tbody>
 					{#each paginatedCards as card (card.id)}
-						{@const primaryTreatment = getPrimaryTreatment(card)}
-						{@const isFoil = isFoilTreatment(primaryTreatment)}
+						{@const ownedTreatments = getOwnedTreatments(card)}
+						{@const isFoil = ownedTreatments.some(isFoilTreatment)}
 						{@const totalQty = card.inventory.total_quantity}
 						{@const inventoryIds = card.inventory.this_printing.map((inv) => inv.id)}
 						{@const isSelected = inventoryIds.every((id) => selection.isSelected(id))}
 						<tr class="hover:bg-base-300">
-							<td>
-								<input
-									type="checkbox"
-									class="checkbox checkbox-accent checkbox-sm"
-									checked={isSelected}
-									onchange={() => {
-										if (isSelected) {
-											selection.deselectMany(inventoryIds);
-										} else {
-											selection.selectMany(inventoryIds);
-										}
-									}} />
-							</td>
+							{#if !readOnly}
+								<td>
+									<input
+										type="checkbox"
+										class="checkbox checkbox-accent checkbox-sm"
+										checked={isSelected}
+										onchange={() => {
+											if (isSelected) {
+												selection.deselectMany(inventoryIds);
+											} else {
+												selection.selectMany(inventoryIds);
+											}
+										}} />
+								</td>
+							{/if}
 							<td>
 								<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
 									{getDisplayName(card)}
@@ -274,9 +337,9 @@
 							<td class="text-sm uppercase">{card.language}</td>
 							<td>
 								<div class="flex flex-wrap gap-1">
-									{#each card.finishes as finish (finish)}
+									{#each ownedTreatments as treatment (treatment)}
 										<TreatmentBadge
-											treatment={finish}
+											{treatment}
 											finishes={card.finishes}
 											frameEffects={card.frame_effects ?? []}
 											promoTypes={card.promo_types ?? []}
@@ -287,20 +350,31 @@
 							<td>
 								<span class="badge badge-primary">{totalQty}</span>
 							</td>
-							<td>
-								<div class="flex flex-wrap gap-1">
-									{#each treatmentGroups(card.inventory.this_printing) as group (group.rep.id)}
-										<button
-											class="btn btn-ghost btn-xs"
-											onclick={() => (moveTarget = { inv: group.rep, available: group.total })}
-											title="Move copies to another location"
-											aria-label="Move copies to another location">
-											<FolderInput class="h-4 w-4" />
-											Move
-										</button>
-									{/each}
-								</div>
-							</td>
+							{#if showPriceSort}
+								{@const price = getInventoryUnitPrice(card, currency.current)}
+								<td class="whitespace-nowrap">
+									{price === undefined ? '—' : `${currency.symbol}${price.toFixed(2)}`}
+								</td>
+							{/if}
+							{#if showLocations}
+								<td><CardInventoryLocations inventory={card.inventory.this_printing} /></td>
+							{/if}
+							{#if !readOnly}
+								<td>
+									<div class="flex flex-wrap gap-1">
+										{#each treatmentGroups(card.inventory.this_printing) as group (group.rep.id)}
+											<button
+												class="btn btn-ghost btn-xs"
+												onclick={() => (moveTarget = { inv: group.rep, available: group.total })}
+												title="Move copies to another location"
+												aria-label="Move copies to another location">
+												<FolderInput class="h-4 w-4" />
+												Move
+											</button>
+										{/each}
+									</div>
+								</td>
+							{/if}
 						</tr>
 					{/each}
 				</tbody>
@@ -315,14 +389,16 @@
 		</div>
 	{/if}
 
-	<BulkActionsBar locations={allLocations} onComplete={handleBulkComplete} />
+	{#if !readOnly}
+		<BulkActionsBar locations={allLocations} onComplete={handleBulkComplete} />
 
-	<SplitMoveModal
-		open={!!moveTarget}
-		inventory={moveTarget?.inv ?? null}
-		availableQuantity={moveTarget?.available ?? 0}
-		currentLocationId={moveTarget?.inv.storage_location_id}
-		locations={allLocations}
-		onClose={() => (moveTarget = null)}
-		onComplete={handleBulkComplete} />
+		<SplitMoveModal
+			open={!!moveTarget}
+			inventory={moveTarget?.inv ?? null}
+			availableQuantity={moveTarget?.available ?? 0}
+			currentLocationId={moveTarget?.inv.storage_location_id}
+			locations={allLocations}
+			onClose={() => (moveTarget = null)}
+			onComplete={handleBulkComplete} />
+	{/if}
 </div>
