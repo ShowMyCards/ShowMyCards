@@ -21,6 +21,9 @@ export const load: PageServerLoad = async ({ fetch }) => {
 				total_collection_value: 0,
 				total_collected_from_lists: 0,
 				total_remaining_lists_value: 0,
+				total_collection_value_eur: 0,
+				total_collected_from_lists_eur: 0,
+				total_remaining_lists_value_eur: 0,
 				total_storage_locations: 0,
 				total_lists: 0,
 				unassigned_cards: 0
