@@ -69,6 +69,7 @@ All configuration is via environment variables. No `.env` files are required for
 | `ALLOWED_ORIGINS` | Backend | `http://localhost:5173` | Comma-separated origins allowed to call the API (CORS). Set this to the URL users access the frontend from. Use `*` to allow all origins. |
 | `PUBLIC_BACKEND_URL` | Frontend | `http://localhost:3000` | URL the frontend uses to reach the backend API |
 | `ORIGIN` | Frontend | — | The origin of the frontend itself (required in production by SvelteKit) |
+| `BODY_SIZE_LIMIT` | Frontend | `512K` (`50M` in the Docker image) | Maximum request body size the SvelteKit server accepts (`K`/`M`/`G` suffixes). Must cover the largest backup you restore. The backend independently caps request bodies at 50 MB. |
 
 When deploying behind a reverse proxy or on a custom domain, you'll typically need to set `ALLOWED_ORIGINS` to match the frontend's origin. For example, if users access the frontend at `https://cards.example.com`, set `ALLOWED_ORIGINS=https://cards.example.com` on the backend.
 
