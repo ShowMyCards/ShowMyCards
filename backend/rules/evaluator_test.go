@@ -905,3 +905,42 @@ func TestValidateExpression_IsColorHelper(t *testing.T) {
 		t.Errorf("expected isColor with 5 colors to be valid, got error: %v", err)
 	}
 }
+
+func TestEvaluateExpression_SetCodeIsCaseInsensitive(t *testing.T) {
+	db := setupTestDB(t)
+	evaluator := NewEvaluator(db)
+
+	// Scryfall returns lowercase set codes
+	cardData := map[string]interface{}{"set": "c20", "set_name": "Commander 2020"}
+
+	tests := []struct {
+		expression string
+		expected   bool
+	}{
+		{`set == "C20"`, true},
+		{`set == "c20"`, true},
+		{`set == "C20" && set != "mh3"`, true},
+		{`"c20" == set`, true},
+		{`set in ["LTE", "MH3", "C20"]`, true},
+		{`set in ["lte", "mh3", "c20"]`, true},
+		{`set not in ["lte", "c20"]`, false},
+		{`set == "MH3"`, false},
+		{`set != "c20"`, false},
+		{`set_name == "Commander 2020"`, true}, // other fields stay case-sensitive
+		{`set_name == "COMMANDER 2020"`, false},
+	}
+
+	for _, tt := range tests {
+		result, err := evaluator.EvaluateExpression(tt.expression, cardData)
+		if err != nil {
+			t.Fatalf("%s: evaluation failed: %v", tt.expression, err)
+		}
+		if result != tt.expected {
+			t.Errorf("%s: expected %v, got %v", tt.expression, tt.expected, result)
+		}
+	}
+
+	if cardData["set"] != "c20" {
+		t.Errorf("expected caller's card data to be untouched, got set %v", cardData["set"])
+	}
+}
