@@ -669,11 +669,12 @@ export interface SchedulerHandler {}
  */
 export interface SearchHandler {}
 /**
- * SearchResponse wraps search results with pagination metadata
+ * SearchResponse wraps search results with pagination metadata. Each result
+ * carries its inventory data and per-Oracle deck availability.
  * tygo:export
  */
 export interface SearchResponse {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 	page: number /* int */;
 	total_cards: number /* int */;
 	has_more: boolean;

@@ -19,7 +19,8 @@
 		notifications,
 		usePersistedViewMode,
 		SCRYFALL_LANGUAGES,
-		type EnhancedCardResult
+		type EnhancedCardResult,
+		type InventoryCard
 	} from '$lib';
 	import { Search, Lightbulb, SlidersHorizontal } from '@lucide/svelte';
 	import SearchBuilderModal from '$lib/components/SearchBuilderModal.svelte';
@@ -30,7 +31,7 @@
 	let searching = $state(false);
 	let showSearchBuilder = $state(false);
 	let removedCardIds = $state(new Set<string>());
-	let cards = $state<EnhancedCardResult[]>([]);
+	let cards = $state<InventoryCard[]>([]);
 	let suggestions = $state<string[]>([]);
 	let inputRef = $state<HTMLInputElement | null>(null);
 	// do NOT switch to $derived — selectedLang must survive
@@ -50,7 +51,7 @@
 
 	// Client-side filtering state
 	let filterText = $state('');
-	let collectionFilter = $state<'all' | 'collection' | 'not-in-collection'>('all');
+	let collectionFilter = $state<'all' | 'collection' | 'not-in-collection' | 'available'>('all');
 	const PAGE_SIZE = 24;
 	let currentPage = $state(1);
 
@@ -120,13 +121,16 @@
 	/**
 	 * Filter cards by search text (name, set, treatment)
 	 */
-	function filterCards(cardsList: EnhancedCardResult[]): EnhancedCardResult[] {
+	function filterCards(cardsList: InventoryCard[]): InventoryCard[] {
 		let filtered = cardsList.filter((c) => !removedCardIds.has(c.id));
 
 		if (collectionFilter === 'collection') {
 			filtered = filtered.filter((card) => card.inventory.total_quantity > 0);
 		} else if (collectionFilter === 'not-in-collection') {
 			filtered = filtered.filter((card) => card.inventory.total_quantity === 0);
+		} else if (collectionFilter === 'available') {
+			// At least one owned copy not committed to any deck (Oracle-level).
+			filtered = filtered.filter((card) => card.deck.free > 0);
 		}
 
 		if (filterText.trim()) {
@@ -295,6 +299,17 @@
 							}}>
 							Not in collection
 						</button>
+						<button
+							class="btn btn-sm join-item {collectionFilter === 'available'
+								? 'btn-neutral'
+								: 'btn-ghost'}"
+							title="Owned cards with at least one copy not committed to any deck"
+							onclick={() => {
+								collectionFilter = 'available';
+								currentPage = 1;
+							}}>
+							Available for deck building
+						</button>
 					</div>
 				</div>
 				<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
@@ -322,6 +337,7 @@
 					{#each paginatedCards as card (card.id)}
 						<CardResultCard
 							{card}
+							deck={card.deck.owned > 0 ? card.deck : undefined}
 							onremove={handleRemove}
 							storageLocations={data.storageLocations} />
 					{/each}
