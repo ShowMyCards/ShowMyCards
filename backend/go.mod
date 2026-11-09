@@ -2,6 +2,10 @@ module backend
 
 go 1.26.5
 
+// TODO remove once the changes are merged to the upstream repo
+// https://github.com/BlueMonday/go-scryfall/pull/47
+replace github.com/BlueMonday/go-scryfall => github.com/tobiasbayer/go-scryfall v0.11.0
+
 require (
 	github.com/BlueMonday/go-scryfall v0.9.1
 	github.com/TwiN/gocache/v2 v2.4.0

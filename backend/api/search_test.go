@@ -60,12 +60,8 @@ func (h *testSearchHandler) Search(c fiber.Ctx) error {
 
 	cards := make([]EnhancedCardResult, len(result.Cards))
 	for i, card := range result.Cards {
-		cardResult := BuildCardResult(card)
-		if card.ImageURIs != nil && card.ImageURIs.PNG != "" {
-			cardResult.ImageURI = &card.ImageURIs.PNG
-		}
 		cards[i] = EnhancedCardResult{
-			CardResult: cardResult,
+			CardResult: BuildCardResult(card),
 			Inventory: CardInventoryData{
 				ThisPrinting:   []models.Inventory{},
 				OtherPrintings: []models.Inventory{},
@@ -265,7 +261,7 @@ func TestSearch_APIError(t *testing.T) {
 }
 
 func TestSearch_CardWithImage(t *testing.T) {
-	imageURL := "https://example.com/card.png"
+	imageURL := "https://example.com/grid/card.webp"
 	mock := &mockScryfallClient{
 		searchFunc: func(ctx context.Context, query string, page int) (mockSearchResult, error) {
 			return mockSearchResult{
@@ -275,7 +271,8 @@ func TestSearch_CardWithImage(t *testing.T) {
 						OracleID: "oracle-1",
 						Name:     "Test Card",
 						ImageURIs: &scryfall.ImageURIs{
-							PNG: imageURL,
+							Grid: imageURL,
+							PNG:  "https://example.com/png/card.png",
 						},
 					},
 				},
