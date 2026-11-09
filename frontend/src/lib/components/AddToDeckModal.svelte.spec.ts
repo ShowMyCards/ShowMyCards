@@ -51,7 +51,7 @@ describe('AddToDeckModal', () => {
 		const onClose = vi.fn();
 		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose });
 
-		await page.getByLabelText('Deck').selectOptions('9');
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
 		await page.getByRole('radio', { name: 'Side' }).click();
 		await page.getByLabelText('Quantity').fill('2');
 		await page.getByRole('button', { name: 'Add to deck' }).click();
@@ -73,7 +73,7 @@ describe('AddToDeckModal', () => {
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await expect.element(page.getByLabelText('Deck')).toHaveValue('9');
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
 	});
 
 	it('offers a copies toggle in bulk mode and adds one of each', async () => {
