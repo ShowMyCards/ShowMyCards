@@ -28,6 +28,7 @@ export { bannersApi } from './api/resources/banners';
 export { settingsApi } from './api/resources/settings';
 export { searchApi } from './api/resources/search';
 export { dataApi } from './api/resources/data';
+export { decksApi } from './api/resources/decks';
 
 // Composables
 export { useFormState } from './composables/useFormState.svelte';
@@ -64,6 +65,7 @@ export { default as DeckView } from './components/DeckView.svelte';
 export { default as DeckCardActions } from './components/DeckCardActions.svelte';
 export { default as ManaCost } from './components/ManaCost.svelte';
 export { default as DeckAddResultCard } from './components/DeckAddResultCard.svelte';
+export { default as AddToDeckModal } from './components/AddToDeckModal.svelte';
 export { default as ListStatsBar } from './components/ListStatsBar.svelte';
 export { default as ListCardGrid } from './components/ListCardGrid.svelte';
 export { default as ListCardTable } from './components/ListCardTable.svelte';
@@ -205,3 +207,5 @@ export type { CardWithTreatment, GroupedCardsResult } from './utils/search-resul
 export { audio } from './utils/audio';
 export { getActionError, getActionMessage } from './utils/form-actions';
 export { scryfallImageUrl } from './utils/scryfall-image';
+export { buildDeckItems } from './utils/deck-add';
+export type { AddToDeckCard, BuildDeckItemsOptions } from './utils/deck-add';

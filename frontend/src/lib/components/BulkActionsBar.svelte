@@ -1,13 +1,23 @@
 <script lang="ts">
-	import { selection, inventoryApi, notifications, type StorageLocation } from '$lib';
-	import { X, FolderInput, Trash2, RefreshCw } from '@lucide/svelte';
+	import {
+		selection,
+		inventoryApi,
+		notifications,
+		type InventoryCard,
+		type StorageLocation
+	} from '$lib';
+	import type { AddToDeckCard } from '$lib/utils/deck-add';
+	import { X, FolderInput, Trash2, RefreshCw, LayersPlus } from '@lucide/svelte';
+	import AddToDeckModal from './AddToDeckModal.svelte';
 
 	interface Props {
 		locations: StorageLocation[];
+		/** Cards behind the selected inventory rows; enables "Add to deck". */
+		cards?: InventoryCard[];
 		onComplete?: () => void;
 	}
 
-	let { locations, onComplete }: Props = $props();
+	let { locations, cards, onComplete }: Props = $props();
 
 	let isMoving = $state(false);
 	let isDeleting = $state(false);
@@ -16,6 +26,33 @@
 	let selectedLocation = $state<number | undefined>(undefined);
 
 	const selectedCount = $derived(selection.count);
+
+	let showDeckModal = $state(false);
+
+	// Selected inventory rows, rolled up per printing, for the "Add to deck" dialog.
+	const selectedDeckCards = $derived.by((): AddToDeckCard[] => {
+		if (!cards || selectedCount === 0) return [];
+		const result: AddToDeckCard[] = [];
+		for (const card of cards) {
+			const copies = card.inventory.this_printing
+				.filter((inv) => selection.isSelected(inv.id))
+				.reduce((sum, inv) => sum + inv.quantity, 0);
+			if (copies > 0) {
+				result.push({
+					oracle_id: card.oracle_id,
+					scryfall_id: card.id,
+					name: card.name,
+					copies
+				});
+			}
+		}
+		return result;
+	});
+
+	function handleAddedToDeck() {
+		selection.clear();
+		onComplete?.();
+	}
 
 	async function handleMove() {
 		if (selectedCount === 0) return;
@@ -137,6 +174,16 @@
 					</button>
 				{/if}
 
+				{#if cards}
+					<button
+						class="btn btn-outline btn-sm"
+						onclick={() => (showDeckModal = true)}
+						disabled={isMoving || isDeleting || isResorting || selectedDeckCards.length === 0}>
+						<LayersPlus class="h-4 w-4" />
+						Add to deck…
+					</button>
+				{/if}
+
 				<button
 					class="btn btn-outline btn-sm"
 					onclick={handleResort}
@@ -163,4 +210,13 @@
 			</div>
 		</div>
 	</div>
+{/if}
+
+{#if showDeckModal}
+	<AddToDeckModal
+		open
+		bulk
+		cards={selectedDeckCards}
+		onClose={() => (showDeckModal = false)}
+		onAdded={handleAddedToDeck} />
 {/if}
