@@ -1,8 +1,10 @@
 import { page } from 'vitest/browser';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { EnhancedCardResult } from '$lib';
 import CardResultCard from './CardResultCard.svelte';
+
+vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn() }));
 
 function makeCard(overrides: Partial<EnhancedCardResult> = {}): EnhancedCardResult {
 	return {
@@ -37,5 +39,19 @@ describe('CardResultCard deck availability indicator', () => {
 	it('renders no deck indicator when no deck summary is provided', async () => {
 		render(CardResultCard, { card: makeCard() });
 		expect(page.getByText('free for decks').query()).toBeNull();
+	});
+});
+
+describe('CardResultCard add to deck', () => {
+	it('opens the add-to-deck dialog from the image overlay button', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]', { status: 200 }));
+		render(CardResultCard, { card: makeCard() });
+
+		expect(page.getByRole('heading', { name: 'Add to deck' }).query()).toBeNull();
+		await page.getByRole('button', { name: 'Add Sol Ring to deck' }).click();
+
+		await expect.element(page.getByRole('heading', { name: 'Add to deck' })).toBeInTheDocument();
+		await expect.element(page.getByText('Commander Masters').nth(1)).toBeInTheDocument();
+		vi.restoreAllMocks();
 	});
 });

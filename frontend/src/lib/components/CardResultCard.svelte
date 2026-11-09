@@ -10,12 +10,14 @@
 		selection,
 		audio
 	} from '$lib';
-	import { FolderInput } from '@lucide/svelte';
+	import { FolderInput, LayersPlus } from '@lucide/svelte';
+	import AddToDeckModal from './AddToDeckModal.svelte';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import { deserialize } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
@@ -52,6 +54,15 @@
 
 	let adding = $state(false);
 	let removing = $state(false);
+
+	// "Add to deck" dialog, mounted only while open so closed tiles stay light.
+	let showDeckModal = $state(false);
+
+	// Refresh the "free for decks" indicator when this tile shows one; other views
+	// (e.g. search) have nothing deck-related to reload.
+	function handleAddedToDeck() {
+		if (deck) invalidateAll();
+	}
 
 	// Printing conflict modal state
 	let showConflictModal = $state(false);
@@ -340,7 +351,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="card bg-base-200 p-2 shadow-lg hover:shadow-xl transition-all relative"
+	class="group card bg-base-200 p-2 shadow-lg hover:shadow-xl transition-all relative"
 	class:ring-2={isKeyboardTarget || isSelected}
 	class:ring-primary={isKeyboardTarget && !isSelected}
 	class:ring-accent={isSelected}
@@ -357,6 +368,15 @@
 				onchange={handleSelectionChange} />
 		</div>
 	{/if}
+	<!-- Add to deck: revealed on hover/focus with a fine pointer, always shown on touch -->
+	<button
+		type="button"
+		class="btn btn-circle btn-sm absolute top-3 right-3 z-10 border-base-300 bg-base-100/85 shadow backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+		title="Add to deck"
+		aria-label="Add {card.name} to deck"
+		onclick={() => (showDeckModal = true)}>
+		<LayersPlus class="h-4 w-4" />
+	</button>
 	<!-- Clickable image to card details -->
 	<a href={resolve(`/cards/${card.id}`)} class="block">
 		{#if card.image_uri}
@@ -471,6 +491,23 @@
 		</div>
 	</div>
 </div>
+
+{#if showDeckModal}
+	<AddToDeckModal
+		open
+		cards={[
+			{
+				oracle_id: card.oracle_id,
+				scryfall_id: card.id,
+				name: getDisplayName(card),
+				set_name: card.set_name,
+				image_uri: card.image_uri,
+				copies: 1
+			}
+		]}
+		onClose={() => (showDeckModal = false)}
+		onAdded={handleAddedToDeck} />
+{/if}
 
 <PrintingConflictModal
 	open={showConflictModal}
