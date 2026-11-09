@@ -1,6 +1,7 @@
 package scryfall
 
 import (
+	"backend/version"
 	"context"
 	"log/slog"
 	"time"
@@ -45,13 +46,25 @@ type Client struct {
 
 // NewClient creates a new Scryfall client with caching
 func NewClient() (*Client, error) {
-	limiter := ratelimit.New(ScryfallRPS, ratelimit.WithoutSlack)
-	api, err := scryfall.NewClient(scryfall.WithLimiter(limiter))
+	api, err := newAPI()
 	if err != nil {
 		return nil, err
 	}
 
 	return newClientWithAPI(api), nil
+}
+
+// newAPI builds the underlying go-scryfall client with our rate limiter and
+// User-Agent. Scryfall rejects generic library User-Agents (the go-scryfall
+// default is "go-scryfall/<version>"), so we must identify ShowMyCards.
+// Extra options are appended last (tests use this to set a stub base URL).
+func newAPI(extra ...scryfall.ClientOption) (*scryfall.Client, error) {
+	limiter := ratelimit.New(ScryfallRPS, ratelimit.WithoutSlack)
+	opts := append([]scryfall.ClientOption{
+		scryfall.WithLimiter(limiter),
+		scryfall.WithUserAgent(version.UserAgent()),
+	}, extra...)
+	return scryfall.NewClient(opts...)
 }
 
 // newClientWithAPI creates a client with a specific API implementation (for testing)
