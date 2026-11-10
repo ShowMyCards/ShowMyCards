@@ -1,3 +1,5 @@
+github.com/BlueMonday/go-scryfall v0.11.0 h1:nWDzhRnv7eFUl0TDtmU0j4jxYyL0A3cdZqboFW/xuJY=
+github.com/BlueMonday/go-scryfall v0.11.0/go.mod h1:guxMCLC6GnOXIAk6zcpkAtJzTnOfV6glcJgx4ztPQ9o=
 github.com/TwiN/gocache/v2 v2.4.0 h1:BZ/TqvhipDQE23MFFTjC0MiI1qZ7GEVtSdOFVVXyr18=
 github.com/TwiN/gocache/v2 v2.4.0/go.mod h1:Cl1c0qNlQlXzJhTpAARVqpQDSuGDM5RhtzPYAM1x17g=
 github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=
@@ -44,8 +46,6 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/tinylib/msgp v1.6.4 h1:mOwYbyYDLPj35mkA2BjjYejgJk9BuHxDdvRnb6v2ZcQ=
 github.com/tinylib/msgp v1.6.4/go.mod h1:RSp0LW9oSxFut3KzESt5Voq4GVWyS+PSulT77roAqEA=
-github.com/tobiasbayer/go-scryfall v0.11.0 h1:w0NHeH/gIEbvNg4ghYO8wkuLPC4OcI3GfVbyZF2juF8=
-github.com/tobiasbayer/go-scryfall v0.11.0/go.mod h1:guxMCLC6GnOXIAk6zcpkAtJzTnOfV6glcJgx4ztPQ9o=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.71.0 h1:tepR7H+Guh9VUqxxcPggYi8R3lGUu2Rsdh+z7/FCY3k=
