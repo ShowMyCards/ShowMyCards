@@ -53,7 +53,15 @@
 						<span class="badge badge-warning badge-sm">
 							Short {deck.aggregate_shortfall}
 						</span>
-					{:else if deck.total_cards_demand > 0}
+					{/if}
+					{#if deck.aggregate_over_committed > 0}
+						<span class="opacity-50">•</span>
+						<span
+							class="badge badge-info badge-sm"
+							title="Cards in this deck that other decks also want. You don't own enough copies for all of them.">
+							Shared {deck.aggregate_over_committed}
+						</span>
+					{:else if deck.aggregate_shortfall === 0 && deck.total_cards_demand > 0}
 						<span class="opacity-50">•</span>
 						<span class="badge badge-success badge-sm">Fully owned</span>
 					{/if}

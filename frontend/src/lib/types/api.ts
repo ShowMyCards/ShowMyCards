@@ -175,8 +175,12 @@ export interface DeckHandler {}
  * DeckSummary represents a deck with summary statistics.
  * AggregateShortfall is the under-owned shortfall — the number of cards the deck
  * wants that the user does not physically own (Σ max(0, desired − owned_O) over
- * the deck's demand-zone items). It is independent of other decks; the
- * cross-deck over-commitment signal lives on the deck-detail items endpoint.
+ * the deck's demand-zone items). It is independent of other decks.
+ * AggregateOverCommitted is the cross-deck signal: the number of distinct cards
+ * the deck could cover on its own but that are wanted by other decks too, so the
+ * owned copies cannot satisfy every deck at once. A card that is already
+ * under-owned counts toward the shortfall instead, never here. Both signals are
+ * shown to the user; neither picks a winning deck.
  * See FR98/IMPLEMENTATION_PLAN.md §2.
  * tygo:export
  */
@@ -189,6 +193,7 @@ export interface DeckSummary {
 	total_items: number /* int */;
 	total_cards_demand: number /* int */;
 	aggregate_shortfall: number /* int */;
+	aggregate_over_committed: number /* int */;
 }
 /**
  * CreateDeckRequest represents the request body for creating a deck.
@@ -274,8 +279,10 @@ export interface EnrichedDeckItem {
  * DeckItemsResponse represents the items in a deck, grouped by zone, with
  * aggregate availability information.
  * AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
- * owned_O) over demand-zone items). Maybe-board items are returned but never
- * contribute to the shortfall.
+ * owned_O) over demand-zone items). AggregateOverCommitted is the number of
+ * distinct demand-zone cards the deck covers alone but that other decks want too
+ * (see DeckSummary). Maybe-board items are returned but never contribute to
+ * either.
  * tygo:export
  */
 export interface DeckItemsResponse {
@@ -285,6 +292,7 @@ export interface DeckItemsResponse {
 	side: EnrichedDeckItem[];
 	maybe: EnrichedDeckItem[];
 	aggregate_shortfall: number /* int */;
+	aggregate_over_committed: number /* int */;
 }
 /**
  * CreateDeckItemRequest represents a single item to add to a deck.
