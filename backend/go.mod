@@ -3,7 +3,7 @@ module backend
 go 1.26.5
 
 require (
-	github.com/BlueMonday/go-scryfall v0.9.1
+	github.com/BlueMonday/go-scryfall v0.11.0
 	github.com/TwiN/gocache/v2 v2.4.0
 	github.com/expr-lang/expr v1.17.8
 	github.com/gofiber/fiber/v3 v3.3.0

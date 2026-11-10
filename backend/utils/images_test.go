@@ -6,54 +6,79 @@ import (
 	scryfall "github.com/BlueMonday/go-scryfall"
 )
 
-func TestExtractCardImageURI_StandardCard_WithPNG(t *testing.T) {
-	card := scryfall.Card{
-		ImageURIs: &scryfall.ImageURIs{
-			PNG:    "https://example.com/card.png",
-			Normal: "https://example.com/card_normal.jpg",
+const (
+	gridURI   = "https://example.com/grid/card.webp"
+	jpegURI   = "https://example.com/normal/card.jpg"
+	normalURI = "https://example.com/normal/card_legacy.jpg"
+	pngURI    = "https://example.com/png/card.png"
+)
+
+func TestExtractCardImageURI_StandardCard(t *testing.T) {
+	tests := []struct {
+		name string
+		uris scryfall.ImageURIs
+		want string
+	}{
+		{
+			name: "prefers grid over all other versions",
+			uris: scryfall.ImageURIs{Grid: gridURI, JPEG: jpegURI, Normal: normalURI, PNG: pngURI},
+			want: gridURI,
+		},
+		{
+			name: "falls back to jpeg without grid",
+			uris: scryfall.ImageURIs{JPEG: jpegURI, Normal: normalURI, PNG: pngURI},
+			want: jpegURI,
+		},
+		{
+			name: "falls back to normal for rows stored before the new keys",
+			uris: scryfall.ImageURIs{Normal: normalURI, PNG: pngURI},
+			want: normalURI,
 		},
 	}
 
-	result := ExtractCardImageURI(card)
-	if result == nil {
-		t.Fatal("expected image URI, got nil")
-	}
-	if *result != "https://example.com/card.png" {
-		t.Errorf("expected PNG URI, got %s", *result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uris := tt.uris
+			result := ExtractCardImageURI(scryfall.Card{ImageURIs: &uris})
+			if result == nil {
+				t.Fatal("expected image URI, got nil")
+			}
+			if *result != tt.want {
+				t.Errorf("expected %s, got %s", tt.want, *result)
+			}
+		})
 	}
 }
 
-func TestExtractCardImageURI_StandardCard_WithoutPNG(t *testing.T) {
+// PNG must never be returned: Scryfall does not allow hotlinking it, and the
+// browser loads the returned URL directly.
+func TestExtractCardImageURI_NeverReturnsPNG(t *testing.T) {
 	card := scryfall.Card{
-		ImageURIs: &scryfall.ImageURIs{
-			PNG:    "",
-			Normal: "https://example.com/card_normal.jpg",
-		},
+		ImageURIs: &scryfall.ImageURIs{PNG: pngURI},
 	}
 
 	result := ExtractCardImageURI(card)
-	if result == nil {
-		t.Fatal("expected image URI, got nil")
-	}
-	if *result != "https://example.com/card_normal.jpg" {
-		t.Errorf("expected Normal URI, got %s", *result)
+	if result != nil {
+		t.Errorf("expected nil, got %s", *result)
 	}
 }
 
-func TestExtractCardImageURI_DoubleFaced_WithPNG(t *testing.T) {
+func TestExtractCardImageURI_DoubleFaced_UsesFrontFace(t *testing.T) {
 	card := scryfall.Card{
 		ImageURIs: nil, // Double-faced cards have nil ImageURIs
 		CardFaces: []scryfall.CardFace{
 			{
 				ImageURIs: scryfall.ImageURIs{
-					PNG:    "https://example.com/front.png",
-					Normal: "https://example.com/front_normal.jpg",
+					Grid: "https://example.com/grid/front.webp",
+					JPEG: "https://example.com/normal/front.jpg",
+					PNG:  "https://example.com/png/front.png",
 				},
 			},
 			{
 				ImageURIs: scryfall.ImageURIs{
-					PNG:    "https://example.com/back.png",
-					Normal: "https://example.com/back_normal.jpg",
+					Grid: "https://example.com/grid/back.webp",
+					JPEG: "https://example.com/normal/back.jpg",
+					PNG:  "https://example.com/png/back.png",
 				},
 			},
 		},
@@ -63,19 +88,19 @@ func TestExtractCardImageURI_DoubleFaced_WithPNG(t *testing.T) {
 	if result == nil {
 		t.Fatal("expected image URI, got nil")
 	}
-	if *result != "https://example.com/front.png" {
-		t.Errorf("expected front face PNG URI, got %s", *result)
+	if *result != "https://example.com/grid/front.webp" {
+		t.Errorf("expected front face grid URI, got %s", *result)
 	}
 }
 
-func TestExtractCardImageURI_DoubleFaced_WithoutPNG(t *testing.T) {
+func TestExtractCardImageURI_DoubleFaced_FallsBackToNormal(t *testing.T) {
 	card := scryfall.Card{
 		ImageURIs: nil,
 		CardFaces: []scryfall.CardFace{
 			{
 				ImageURIs: scryfall.ImageURIs{
-					PNG:    "",
-					Normal: "https://example.com/front_normal.jpg",
+					Normal: "https://example.com/normal/front.jpg",
+					PNG:    "https://example.com/png/front.png",
 				},
 			},
 		},
@@ -85,17 +110,33 @@ func TestExtractCardImageURI_DoubleFaced_WithoutPNG(t *testing.T) {
 	if result == nil {
 		t.Fatal("expected image URI, got nil")
 	}
-	if *result != "https://example.com/front_normal.jpg" {
-		t.Errorf("expected front face Normal URI, got %s", *result)
+	if *result != "https://example.com/normal/front.jpg" {
+		t.Errorf("expected front face normal URI, got %s", *result)
+	}
+}
+
+// A card with a non-nil but empty top-level ImageURIs still falls back to
+// its front face.
+func TestExtractCardImageURI_EmptyTopLevel_FallsBackToFrontFace(t *testing.T) {
+	card := scryfall.Card{
+		ImageURIs: &scryfall.ImageURIs{},
+		CardFaces: []scryfall.CardFace{
+			{ImageURIs: scryfall.ImageURIs{Grid: "https://example.com/grid/front.webp"}},
+		},
+	}
+
+	result := ExtractCardImageURI(card)
+	if result == nil {
+		t.Fatal("expected image URI, got nil")
+	}
+	if *result != "https://example.com/grid/front.webp" {
+		t.Errorf("expected front face grid URI, got %s", *result)
 	}
 }
 
 func TestExtractCardImageURI_NoImages(t *testing.T) {
 	card := scryfall.Card{
-		ImageURIs: &scryfall.ImageURIs{
-			PNG:    "",
-			Normal: "",
-		},
+		ImageURIs: &scryfall.ImageURIs{},
 	}
 
 	result := ExtractCardImageURI(card)
@@ -132,12 +173,7 @@ func TestExtractCardImageURI_DoubleFaced_EmptyFaceImages(t *testing.T) {
 	card := scryfall.Card{
 		ImageURIs: nil,
 		CardFaces: []scryfall.CardFace{
-			{
-				ImageURIs: scryfall.ImageURIs{
-					PNG:    "",
-					Normal: "",
-				},
-			},
+			{ImageURIs: scryfall.ImageURIs{}},
 		},
 	}
 
