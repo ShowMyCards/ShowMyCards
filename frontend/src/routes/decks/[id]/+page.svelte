@@ -154,13 +154,29 @@
 			{/snippet}
 		</PageHeader>
 
-		<!-- Aggregate shortfall summary -->
-		<div class="alert mb-4" class:alert-warning={data.items.aggregate_shortfall > 0}>
-			{#if data.items.aggregate_shortfall > 0}
-				<span>
-					This deck needs <span class="font-semibold">{data.items.aggregate_shortfall}</span>
-					more card{data.items.aggregate_shortfall === 1 ? '' : 's'} than you own.
-				</span>
+		<!-- Aggregate shortfall / shared-cards summary -->
+		<div
+			class="alert mb-4"
+			class:alert-warning={data.items.aggregate_shortfall > 0}
+			class:alert-info={data.items.aggregate_shortfall === 0 &&
+				data.items.aggregate_over_committed > 0}>
+			{#if data.items.aggregate_shortfall > 0 || data.items.aggregate_over_committed > 0}
+				<div class="flex flex-col gap-1">
+					{#if data.items.aggregate_shortfall > 0}
+						<span>
+							This deck needs <span class="font-semibold">{data.items.aggregate_shortfall}</span>
+							more card{data.items.aggregate_shortfall === 1 ? '' : 's'} than you own.
+						</span>
+					{/if}
+					{#if data.items.aggregate_over_committed > 0}
+						<span>
+							{#if data.items.aggregate_shortfall === 0}You own every card in this deck, but{/if}
+							<span class="font-semibold">{data.items.aggregate_over_committed}</span>
+							card{data.items.aggregate_over_committed === 1 ? ' is' : 's are'}
+							also wanted by other decks. You don't have enough copies for all of them.
+						</span>
+					{/if}
+				</div>
 			{:else if totalItems > 0}
 				<span>You own everything this deck needs.</span>
 			{:else}

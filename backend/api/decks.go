@@ -33,20 +33,46 @@ func NewDeckHandler(db *gorm.DB) *DeckHandler {
 //
 // AggregateShortfall is the under-owned shortfall — the number of cards the deck
 // wants that the user does not physically own (Σ max(0, desired − owned_O) over
-// the deck's demand-zone items). It is independent of other decks; the
-// cross-deck over-commitment signal lives on the deck-detail items endpoint.
+// the deck's demand-zone items). It is independent of other decks.
+//
+// AggregateOverCommitted is the cross-deck signal: the number of distinct cards
+// the deck could cover on its own but that are wanted by other decks too, so the
+// owned copies cannot satisfy every deck at once. A card that is already
+// under-owned counts toward the shortfall instead, never here. Both signals are
+// shown to the user; neither picks a winning deck.
 // See FR98/IMPLEMENTATION_PLAN.md §2.
 //
 // tygo:export
 type DeckSummary struct {
-	ID                 uint   `json:"id"`
-	CreatedAt          string `json:"created_at"`
-	UpdatedAt          string `json:"updated_at"`
-	Name               string `json:"name"`
-	Description        string `json:"description"`
-	TotalItems         int    `json:"total_items"`
-	TotalCardsDemand   int    `json:"total_cards_demand"`
-	AggregateShortfall int    `json:"aggregate_shortfall"`
+	ID                     uint   `json:"id"`
+	CreatedAt              string `json:"created_at"`
+	UpdatedAt              string `json:"updated_at"`
+	Name                   string `json:"name"`
+	Description            string `json:"description"`
+	TotalItems             int    `json:"total_items"`
+	TotalCardsDemand       int    `json:"total_cards_demand"`
+	AggregateShortfall     int    `json:"aggregate_shortfall"`
+	AggregateOverCommitted int    `json:"aggregate_over_committed"`
+}
+
+// deckDemandTotals measures a deck's per-Oracle demand against the owned pool and
+// the cross-deck allocation. shortfall is Σ max(0, demand − owned) over the
+// Oracles; overCommitted counts the Oracles the deck covers alone
+// (demand ≤ owned) that the allocation service flags as over-committed across
+// decks. The two are disjoint, mirroring the per-item under_owned/over_committed
+// flags in enrichDeckItems. demandByOracle must contain demand-zone rows only, so
+// maybe-board cards never count.
+func deckDemandTotals(demandByOracle map[string]int, availability services.AvailabilityMap) (shortfall, overCommitted int) {
+	for oracleID, demand := range demandByOracle {
+		a := availability.OracleAvailabilityFor(oracleID)
+		switch {
+		case demand > a.Owned:
+			shortfall += demand - a.Owned
+		case a.OverCommitted:
+			overCommitted++
+		}
+	}
+	return shortfall, overCommitted
 }
 
 // List returns all decks with summary statistics.
@@ -80,22 +106,18 @@ func (h *DeckHandler) List(c fiber.Ctx) error {
 			demandByOracle[item.OracleID] += item.DesiredQuantity
 		}
 
-		shortfall := 0
-		for oracleID, demand := range demandByOracle {
-			if owned := availability.OracleAvailabilityFor(oracleID).Owned; demand > owned {
-				shortfall += demand - owned
-			}
-		}
+		shortfall, overCommitted := deckDemandTotals(demandByOracle, availability)
 
 		summaries[i] = DeckSummary{
-			ID:                 deck.ID,
-			CreatedAt:          deck.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:          deck.UpdatedAt.Format(time.RFC3339),
-			Name:               deck.Name,
-			Description:        deck.Description,
-			TotalItems:         len(deck.Items),
-			TotalCardsDemand:   totalDemand,
-			AggregateShortfall: shortfall,
+			ID:                     deck.ID,
+			CreatedAt:              deck.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:              deck.UpdatedAt.Format(time.RFC3339),
+			Name:                   deck.Name,
+			Description:            deck.Description,
+			TotalItems:             len(deck.Items),
+			TotalCardsDemand:       totalDemand,
+			AggregateShortfall:     shortfall,
+			AggregateOverCommitted: overCommitted,
 		}
 	}
 
@@ -345,17 +367,20 @@ type EnrichedDeckItem struct {
 // aggregate availability information.
 //
 // AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
-// owned_O) over demand-zone items). Maybe-board items are returned but never
-// contribute to the shortfall.
+// owned_O) over demand-zone items). AggregateOverCommitted is the number of
+// distinct demand-zone cards the deck covers alone but that other decks want too
+// (see DeckSummary). Maybe-board items are returned but never contribute to
+// either.
 //
 // tygo:export
 type DeckItemsResponse struct {
-	DeckID             uint               `json:"deck_id"`
-	Command            []EnrichedDeckItem `json:"command"`
-	Main               []EnrichedDeckItem `json:"main"`
-	Side               []EnrichedDeckItem `json:"side"`
-	Maybe              []EnrichedDeckItem `json:"maybe"`
-	AggregateShortfall int                `json:"aggregate_shortfall"`
+	DeckID                 uint               `json:"deck_id"`
+	Command                []EnrichedDeckItem `json:"command"`
+	Main                   []EnrichedDeckItem `json:"main"`
+	Side                   []EnrichedDeckItem `json:"side"`
+	Maybe                  []EnrichedDeckItem `json:"maybe"`
+	AggregateShortfall     int                `json:"aggregate_shortfall"`
+	AggregateOverCommitted int                `json:"aggregate_over_committed"`
 }
 
 // ListItems returns the items in a deck, grouped by zone, enriched with card
@@ -429,13 +454,10 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 	}
 
 	// Aggregate shortfall = Σ over distinct demand-zone Oracles of
-	// max(0, deckDemand − owned). Computed per Oracle (not per row) so a card
-	// split across zones is counted once against the owned pool.
-	for oracleID, demand := range deckDemandByOracle {
-		if owned := availability.OracleAvailabilityFor(oracleID).Owned; demand > owned {
-			resp.AggregateShortfall += demand - owned
-		}
-	}
+	// max(0, deckDemand − owned); aggregate over-committed counts the Oracles the
+	// deck covers alone but other decks want too. Computed per Oracle (not per row)
+	// so a card split across zones is counted once against the owned pool.
+	resp.AggregateShortfall, resp.AggregateOverCommitted = deckDemandTotals(deckDemandByOracle, availability)
 
 	return c.JSON(resp)
 }
