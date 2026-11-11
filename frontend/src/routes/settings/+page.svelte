@@ -64,7 +64,13 @@
 				return;
 			}
 			// Validate top-level shape: arrays where expected
-			const arrayFields = ['storage_locations', 'sorting_rules', 'inventory', 'lists'] as const;
+			const arrayFields = [
+				'storage_locations',
+				'sorting_rules',
+				'inventory',
+				'lists',
+				'decks'
+			] as const;
 			for (const field of arrayFields) {
 				if (parsed[field] !== undefined && !Array.isArray(parsed[field])) {
 					importError = `Invalid export file: "${field}" must be an array.`;
@@ -266,8 +272,8 @@
 			<div class="card-body">
 				<h2 class="card-title mb-2">Data Management</h2>
 				<p class="text-sm opacity-70 mb-4">
-					Export your collection as a JSON file for backup or migration. Import a previously
-					exported file to restore or merge data.
+					Export your collection, lists, and decks as a JSON file for backup or migration. Import a
+					previously exported file to restore or merge data.
 				</p>
 
 				<div class="flex flex-wrap gap-3">
@@ -299,7 +305,8 @@
 						importPreview.storage_locations?.length ||
 						importPreview.sorting_rules?.length ||
 						importPreview.inventory?.length ||
-						importPreview.lists?.length
+						importPreview.lists?.length ||
+						importPreview.decks?.length
 					)}
 					<div class="alert {hasData ? 'alert-info' : 'alert-warning'} mt-4">
 						<div>
@@ -338,6 +345,14 @@
 											)} items total)
 										</li>
 									{/if}
+									{#if importPreview.decks?.length}
+										<li>
+											{importPreview.decks.length} deck{importPreview.decks.length !== 1 ? 's' : ''} ({importPreview.decks.reduce(
+												(sum, d) => sum + (d.items?.length ?? 0),
+												0
+											)} items total)
+										</li>
+									{/if}
 								</ul>
 								<p class="text-sm opacity-70 mt-2">
 									Imported data will be added alongside your existing collection.
@@ -361,8 +376,8 @@
 							{:else}
 								<p class="font-semibold">This export file contains no data.</p>
 								<p class="text-sm opacity-70 mt-1">
-									The file is a valid export but has no storage locations, inventory, lists, or
-									sorting rules to import.
+									The file is a valid export but has no storage locations, inventory, lists, decks,
+									or sorting rules to import.
 								</p>
 								<div class="mt-3">
 									<button class="btn btn-ghost btn-sm" onclick={cancelImport}>Dismiss</button>
@@ -409,6 +424,19 @@
 								{#if importResult.list_items_created}
 									<li>
 										{importResult.list_items_created} list item{importResult.list_items_created !==
+										1
+											? 's'
+											: ''} created
+									</li>
+								{/if}
+								{#if importResult.decks_created}
+									<li>
+										{importResult.decks_created} deck{importResult.decks_created !== 1 ? 's' : ''} created
+									</li>
+								{/if}
+								{#if importResult.deck_items_created}
+									<li>
+										{importResult.deck_items_created} deck item{importResult.deck_items_created !==
 										1
 											? 's'
 											: ''} created
