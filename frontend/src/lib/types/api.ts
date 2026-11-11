@@ -82,7 +82,7 @@ export interface DashboardStats {
  * CurrentExportVersion is the latest export format version.
  * Bump this when the export schema changes and add a migration function.
  */
-export const CurrentExportVersion = 1;
+export const CurrentExportVersion = 2;
 /**
  * DataHandler handles data import and export endpoints
  */
@@ -98,6 +98,7 @@ export interface ExportData {
 	sorting_rules: ExportSortingRule[];
 	inventory: ExportInventoryItem[];
 	lists: ExportList[];
+	decks: ExportDeck[];
 }
 /**
  * ExportStorageLocation represents a storage location in export format
@@ -152,6 +153,29 @@ export interface ExportListItem {
 	collected_quantity: number /* int */;
 }
 /**
+ * ExportDeck represents a deck with its items in export format
+ * tygo:export
+ */
+export interface ExportDeck {
+	ref_id: number /* uint */;
+	name: string;
+	description?: string;
+	items: ExportDeckItem[];
+}
+/**
+ * ExportDeckItem represents a deck item in export format. Cards are referenced
+ * by their natural keys (oracle_id, plus an optional pinned scryfall_id and
+ * treatment), so no ID remapping is needed beyond the parent deck.
+ * tygo:export
+ */
+export interface ExportDeckItem {
+	oracle_id: string;
+	scryfall_id: string; // empty = any printing
+	treatment: string; // empty = any finish
+	zone: import('./models').DeckZone;
+	desired_quantity: number /* int */;
+}
+/**
  * ImportResponse represents the result of an import operation
  * tygo:export
  */
@@ -161,6 +185,8 @@ export interface ImportResponse {
 	inventory_items_created: number /* int */;
 	lists_created: number /* int */;
 	list_items_created: number /* int */;
+	decks_created: number /* int */;
+	deck_items_created: number /* int */;
 	warnings?: string[];
 }
 
