@@ -353,9 +353,15 @@
 		action="?/deleteDeck"
 		use:enhance={() => {
 			isDeleting = true;
-			return async ({ result }) => {
+			return async ({ result, update }) => {
+				if (result.type === 'redirect') {
+					// Deck deleted; the action redirects to /decks. A custom enhance
+					// callback replaces the default handling, so follow it here.
+					await update();
+					notifications.success('Deck deleted successfully!');
+					return;
+				}
 				isDeleting = false;
-				// A successful delete redirects (303) to /decks; enhance follows it.
 				if (result.type === 'failure') {
 					notifications.error(getActionError(result.data, 'Failed to delete deck'));
 				}
