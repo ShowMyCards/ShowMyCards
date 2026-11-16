@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CardResultCard, type EnhancedCardResult, type StorageLocation } from '$lib';
+	import { CardResultCard, type EnhancedCardResult, type StorageLocation } from '#lib';
 	import type { DisplayableCard } from '../types';
 
 	interface Props {

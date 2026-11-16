@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { PageHeader, getCardTreatmentName, getDisplayName } from '$lib';
+	import { PageHeader, getCardTreatmentName, getDisplayName } from '#lib';
 	import { resolve } from '$app/paths';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { ArrowLeft, ExternalLink } from '@lucide/svelte';
-	import PriceLozenge from '$lib/components/PriceLozenge.svelte';
+	import PriceLozenge from '#lib/components/PriceLozenge.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	let { data }: { data: PageData } = $props();
@@ -27,12 +27,14 @@
 	 * navigation from another /cards/ page). When nothing has been captured we
 	 * fall back to the search page, preserving the previous behaviour.
 	 */
-	const FALLBACK_BACK = { href: resolve('/search'), label: 'Back to Search' };
-	const BACK_STORAGE_KEY = 'smc-card-back-target';
+	const FALLBACK_BACK = { href: resolve('search'), label: 'Back to Search' };
 
+	const BACK_STORAGE_KEY = 'smc-card-back-target';
 	let backPath = $state<string | null>(null);
 
 	afterNavigate((navigation) => {
+		if (navigation.shallow && navigation.type === 'goto') return;
+
 		const from = navigation.from?.url;
 		if (from && !from.pathname.startsWith('/cards/')) {
 			// Arrived from a non-card page: this is the origin to return to.
@@ -174,9 +176,7 @@
 									<div class="stat-title">{treatmentName}</div>
 									<div class="stat-value text-2xl">{quantity}</div>
 									{#if card.prices}
-										<div class="stat-desc">
-											<PriceLozenge {treatment} prices={card.prices} />
-										</div>
+										<div class="stat-desc"><PriceLozenge {treatment} prices={card.prices} /></div>
 									{/if}
 								</div>
 							{/each}
@@ -223,7 +223,7 @@
 									0
 								)}
 								<a
-									href={resolve(`/cards/${printing.id}`)}
+									href={resolve(`cards/${printing.id}`)}
 									class="card bg-base-100 hover:bg-base-300 transition-colors cursor-pointer">
 									{#if printing.image_uri}
 										<figure class="px-2 pt-2">

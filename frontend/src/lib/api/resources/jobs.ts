@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { Job } from '$lib';
+import type { Job } from '#lib';
 
 /**
  * Query parameters for listing jobs
@@ -15,7 +15,7 @@ export interface ListJobsParams {
  *
  * @example
  * ```ts
- * import { jobsApi } from '$lib/api';
+ * import { jobsApi } from '#lib/api/index.ts';
  *
  * // List all jobs
  * const jobs = await jobsApi.list();

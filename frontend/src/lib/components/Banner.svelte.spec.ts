@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { Banner as BannerData } from '$lib';
+import type { Banner as BannerData } from '#lib';
 import Banner from './Banner.svelte';
 
 function makeBanner(overrides: Partial<BannerData> = {}): BannerData {

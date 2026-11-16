@@ -7,7 +7,7 @@
 		notifications,
 		getActionError,
 		type EnrichedListItem
-	} from '$lib';
+	} from '#lib';
 	import { Plus, Minus, X } from '@lucide/svelte';
 	import SetIcon from './SetIcon.svelte';
 

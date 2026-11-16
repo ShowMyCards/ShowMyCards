@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"gorm.io/driver/sqlite"
@@ -355,6 +356,56 @@ func TestCard_FromScryfallCard_RoundTrip(t *testing.T) {
 	}
 	if result.Set != original.Set {
 		t.Errorf("expected Set '%s', got '%s'", original.Set, result.Set)
+	}
+}
+
+// TestCard_FromScryfallCard_PreservesImageFields guards the bulk-import path:
+// cards are decoded into scryfall.Card and re-serialised into raw_json, so an
+// image key the struct does not model is silently dropped. The WebP image
+// URIs and image_updated_at must survive the round trip.
+func TestCard_FromScryfallCard_PreservesImageFields(t *testing.T) {
+	const (
+		thumb = "https://cards.scryfall.io/thumb/front/a/b/img-id.webp?1783936459"
+		grid  = "https://cards.scryfall.io/grid/front/a/b/img-id.webp?1783936459"
+		jpeg  = "https://cards.scryfall.io/normal/front/a/b/img-id.jpg?1783936459"
+	)
+	apiJSON := `{"object":"card","id":"img-id","oracle_id":"img-oracle","name":"Image Card","set":"tst",` +
+		`"image_updated_at":"2026-07-13T09:54:19Z",` +
+		`"image_uris":{"thumb":"` + thumb + `","grid":"` + grid + `","jpeg":"` + jpeg + `"}}`
+
+	var original scryfall.Card
+	if err := json.Unmarshal([]byte(apiJSON), &original); err != nil {
+		t.Fatalf("failed to decode Scryfall JSON: %v", err)
+	}
+
+	card, err := FromScryfallCard(original)
+	if err != nil {
+		t.Fatalf("FromScryfallCard failed: %v", err)
+	}
+	result, err := card.ToScryfallCard()
+	if err != nil {
+		t.Fatalf("ToScryfallCard failed: %v", err)
+	}
+
+	if result.ImageURIs == nil {
+		t.Fatal("expected image_uris to survive the round trip, got nil")
+	}
+	if result.ImageURIs.Thumb != thumb {
+		t.Errorf("expected thumb %q, got %q", thumb, result.ImageURIs.Thumb)
+	}
+	if result.ImageURIs.Grid != grid {
+		t.Errorf("expected grid %q, got %q", grid, result.ImageURIs.Grid)
+	}
+	if result.ImageURIs.JPEG != jpeg {
+		t.Errorf("expected jpeg %q, got %q", jpeg, result.ImageURIs.JPEG)
+	}
+
+	wantUpdated := time.Date(2026, 7, 13, 9, 54, 19, 0, time.UTC)
+	if result.ImageUpdatedAt == nil {
+		t.Fatal("expected image_updated_at to survive the round trip, got nil")
+	}
+	if !result.ImageUpdatedAt.Equal(wantUpdated) {
+		t.Errorf("expected image_updated_at %v, got %v", wantUpdated, result.ImageUpdatedAt.Time)
 	}
 }
 

@@ -1,13 +1,24 @@
-import type { HandleClientError } from '@sveltejs/kit';
+import type { HandleClientError } from '@sveltejs/kit/hooks';
 
 /**
  * Global client-side error handler
  * Catches unhandled errors and provides better error reporting
  */
-export const handleError: HandleClientError = ({ error, event, status, message }) => {
+export const handleError: HandleClientError = ({ kind, error, event }) => {
+	// Errors thrown deliberately with `error(status, message)` already carry a
+	// message written for the user. Return nothing so SvelteKit keeps it.
+	// (SvelteKit 2 never passed these to handleError; SvelteKit 3 does.)
+	if (kind === 'app') return;
+
+	// Framework errors (e.g. 404 for an unknown route) carry a status and a
+	// safe message; anything else is an unexpected exception, reported as 500.
+	const status = kind === 'framework' ? error.status : 500;
+	const message = kind === 'framework' ? error.message : 'Internal Error';
+
 	// Log error to console in development
 	if (import.meta.env.DEV) {
 		console.error('Client error:', {
+			kind,
 			error,
 			event: event.url.pathname,
 			status,

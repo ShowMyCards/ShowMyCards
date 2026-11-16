@@ -1,12 +1,53 @@
 package scryfall
 
 import (
+	"backend/version"
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/BlueMonday/go-scryfall"
 )
+
+// roundTripFunc lets a plain function act as an http.RoundTripper, so tests
+// can inspect outbound requests without opening a network listener.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// TestNewAPI_SendsShowMyCardsUserAgent guards against regressing to the
+// go-scryfall default User-Agent, which Scryfall rejects as generic.
+func TestNewAPI_SendsShowMyCardsUserAgent(t *testing.T) {
+	var gotUA string
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		gotUA = r.Header.Get("User-Agent")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"object":"card","id":"test-id"}`)),
+			Request:    r,
+		}, nil
+	})
+
+	api, err := newAPI(scryfall.WithHTTPClient(&http.Client{Transport: transport}))
+	if err != nil {
+		t.Fatalf("newAPI: %v", err)
+	}
+
+	if _, err := api.GetCard(context.Background(), "test-id"); err != nil {
+		t.Fatalf("GetCard: %v", err)
+	}
+
+	if gotUA != version.UserAgent() {
+		t.Errorf("User-Agent = %q, want %q", gotUA, version.UserAgent())
+	}
+	if !strings.HasPrefix(gotUA, "ShowMyCards/") {
+		t.Errorf("User-Agent = %q, want prefix %q", gotUA, "ShowMyCards/")
+	}
+}
 
 // mockAPI implements ScryfallAPI for testing
 type mockAPI struct {

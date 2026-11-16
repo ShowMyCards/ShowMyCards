@@ -48,11 +48,23 @@ export interface ScryfallCard {
 	finishes: string[];
 	frame_effects?: string[];
 	image_uris?: {
-		small?: string;
-		normal?: string;
-		large?: string;
+		thumb?: string;
+		grid?: string;
+		display?: string;
+		crop?: string;
+		art?: string;
+		jpeg?: string;
+		/** Not hotlinkable after 2027-01-01; use a WebP version for display. */
 		png?: string;
+		/** @deprecated Removed by Scryfall after 2027-01-01. Use `thumb`. */
+		small?: string;
+		/** @deprecated Renamed by Scryfall to `jpeg`. Use `grid` or `jpeg`. */
+		normal?: string;
+		/** @deprecated Removed by Scryfall after 2027-01-01. Use `display`. */
+		large?: string;
+		/** @deprecated Removed by Scryfall after 2027-01-01. Use `art`. */
 		art_crop?: string;
+		/** @deprecated Removed by Scryfall after 2027-01-01. Use `crop`. */
 		border_crop?: string;
 	};
 	card_faces?: Array<{

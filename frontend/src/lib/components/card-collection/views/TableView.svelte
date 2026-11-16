@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { selection, getCardTreatmentName, scryfallImageUrl } from '$lib';
+	import { selection, getCardTreatmentName, scryfallImageUrl } from '#lib';
 	import { resolve } from '$app/paths';
 	import CardPreview from '../../CardPreview.svelte';
 	import SetIcon from '../../SetIcon.svelte';
@@ -134,10 +134,8 @@
 							{:else if column.key === 'name'}
 								<CardPreview src={imageUrl} alt={item.name} isFoil={itemIsFoil}>
 									<a
-										href={resolve(`/cards/${item.scryfallId}`)}
-										class="font-semibold hover:text-primary transition-colors">
-										{item.name}
-									</a>
+										href={resolve(`cards/${item.scryfallId}`)}
+										class="font-semibold hover:text-primary transition-colors">{item.name}</a>
 								</CardPreview>
 							{:else if column.key === 'set'}
 								<div class="flex items-center gap-2">

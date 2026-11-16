@@ -11,7 +11,7 @@
 		getActionMessage,
 		type JobType,
 		type JobStatus
-	} from '$lib';
+	} from '#lib';
 	import SettingActions from './SettingActions.svelte';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -88,8 +88,8 @@
 
 		<p class="text-sm opacity-70 mb-4">
 			Manually trigger a bulk data import. This will download the latest card data from Scryfall and
-			replace existing data. <a href={resolve('/jobs')} class="link link-primary"
-				>View import history</a>
+			replace existing data.
+			<a href={resolve('jobs')} class="link link-primary">View import history</a>
 		</p>
 
 		<SettingActions>

@@ -2,7 +2,7 @@
  * Shared server-side form action handlers for inventory add, update, and delete.
  * Used by search, import, inventory/[id], inventory/unassigned, and inventory/recent pages.
  */
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import { fail } from '@sveltejs/kit';
 
 /**
