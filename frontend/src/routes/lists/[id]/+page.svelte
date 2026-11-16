@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { invalidateAll } from '$app/navigation';
+	import { browser } from '$app/env';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { deserialize, enhance } from '$app/forms';
 	import type { PageData, ActionData } from './$types';
@@ -20,7 +20,7 @@
 		usePersistedViewMode,
 		type ScryfallCard,
 		type EnrichedListItem
-	} from '$lib';
+	} from '#lib';
 	import { ArrowLeft, Search } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -148,7 +148,7 @@
 					itemsToAdd.push({
 						scryfall_id: card.id,
 						oracle_id: card.oracle_id,
-						treatment: treatment,
+						treatment,
 						desired_quantity: 1
 					});
 				}
@@ -186,7 +186,7 @@
 
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
-				await invalidateAll();
+				await refreshAll();
 			} else {
 				notifications.error('Failed to add items. Please try again.');
 			}
@@ -206,10 +206,8 @@
 	{#if data.list}
 		<PageHeader title={data.list.name} description={data.list.description}>
 			{#snippet actions()}
-				<a href={resolve('/lists')} class="btn bg-base-100 btn-sm">
-					<ArrowLeft class="w-4 h-4" />
-					Back
-				</a>
+				<a href={resolve('lists')} class="btn bg-base-100 btn-sm"
+					><ArrowLeft class="w-4 h-4" /> Back</a>
 			{/snippet}
 		</PageHeader>
 
@@ -314,8 +312,7 @@
 			</div>
 		</div>
 	{:else}
-		<EmptyState message="List not found">
-			<a href={resolve('/lists')} class="btn btn-primary">Back to Lists</a>
-		</EmptyState>
+		<EmptyState message="List not found"
+			><a href={resolve('lists')} class="btn btn-primary">Back to Lists</a></EmptyState>
 	{/if}
 </div>

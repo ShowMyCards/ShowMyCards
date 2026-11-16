@@ -1,4 +1,4 @@
-import { BACKEND_URL, type DashboardStats } from '$lib';
+import { BACKEND_URL, type DashboardStats } from '#lib';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch }) => {

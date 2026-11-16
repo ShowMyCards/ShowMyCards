@@ -1,4 +1,4 @@
-import type { MenuItem } from '$lib/types/navigation';
+import type { MenuItem } from '#lib/types/navigation.ts';
 import {
 	LayoutDashboard,
 	Cog,

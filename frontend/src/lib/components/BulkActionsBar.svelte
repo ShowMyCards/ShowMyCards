@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { selection, inventoryApi, notifications, type StorageLocation } from '$lib';
+	import { selection, inventoryApi, notifications, type StorageLocation } from '#lib';
 	import { X, FolderInput, Trash2, RefreshCw } from '@lucide/svelte';
 
 	interface Props {

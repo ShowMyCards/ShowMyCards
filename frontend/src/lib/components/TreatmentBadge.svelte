@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { getCardTreatmentName } from '$lib/utils/card-treatment';
-	import { isFoilTreatment } from '$lib/components/card-collection';
+	import { getCardTreatmentName } from '#lib/utils/card-treatment.ts';
+	import { isFoilTreatment } from '#lib/components/card-collection/index.ts';
 
 	interface Props {
 		/** The treatment/finish value (e.g., 'foil', 'nonfoil', 'etched') */

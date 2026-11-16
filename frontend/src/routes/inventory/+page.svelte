@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { afterNavigate, invalidateAll } from '$app/navigation';
+	import { browser } from '$app/env';
+	import { afterNavigate, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { PageData } from './$types';
-	import { PageHeader, Notification, EmptyState, ResortModal } from '$lib';
+	import { PageHeader, Notification, EmptyState, ResortModal } from '#lib';
 	import { Box, BookOpen, Grid2x2, Package, AlertCircle, RefreshCw } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -11,14 +11,16 @@
 	let showResortModal = $state(false);
 
 	// Always reload data when navigating to this page
-	afterNavigate(() => {
+	afterNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		if (browser) {
-			invalidateAll();
+			refreshAll();
 		}
 	});
 
 	function handleResortComplete() {
-		invalidateAll();
+		refreshAll();
 	}
 </script>
 
@@ -29,12 +31,12 @@
 <div class="container mx-auto px-4 py-8 max-w-7xl">
 	<PageHeader
 		title="Inventory Browser"
-		description="Browse your card collection by storage location">
+		description="Browse all your cards or explore a storage location">
 		{#snippet actions()}
-			<button class="btn btn-outline btn-sm" onclick={() => (showResortModal = true)}>
-				<RefreshCw class="w-4 h-4" />
-				Re-sort All
-			</button>
+			<a href={resolve('inventory/all')} class="btn btn-primary btn-sm"
+				><Grid2x2 class="w-4 h-4" /> All Cards</a>
+			<button class="btn btn-outline btn-sm" onclick={() => (showResortModal = true)}
+				><RefreshCw class="w-4 h-4" /> Re-sort All</button>
 		{/snippet}
 	</PageHeader>
 
@@ -45,12 +47,10 @@
 	{/if}
 
 	{#if data.locations.length === 0 && data.unassignedCount === 0}
-		<EmptyState message="No inventory found">
-			<a href={resolve('/search')} class="btn btn-primary">
-				<Package class="w-4 h-4" />
-				Search for Cards
-			</a>
-		</EmptyState>
+		<EmptyState message="No inventory found"
+			><a href={resolve('search')} class="btn btn-primary"
+				><Package class="w-4 h-4" /> Search for Cards</a
+			></EmptyState>
 	{:else}
 		<div class="card bg-base-200 shadow-lg">
 			<div class="card-body p-0">
@@ -73,10 +73,8 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a href={resolve('/inventory/unassigned')} class="btn btn-primary btn-sm">
-									<Grid2x2 class="w-4 h-4" />
-									Browse
-								</a>
+								<a href={resolve('inventory/unassigned')} class="btn btn-primary btn-sm"
+									><Grid2x2 class="w-4 h-4" /> Browse</a>
 							</div>
 						</div>
 					{/if}
@@ -105,10 +103,8 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a href={resolve(`/inventory/${location.id}`)} class="btn btn-primary btn-sm">
-									<Grid2x2 class="w-4 h-4" />
-									Browse
-								</a>
+								<a href={resolve(`inventory/${location.id}`)} class="btn btn-primary btn-sm"
+									><Grid2x2 class="w-4 h-4" /> Browse</a>
 							</div>
 						</div>
 					{/each}

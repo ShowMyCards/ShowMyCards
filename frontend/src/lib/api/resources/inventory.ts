@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { Inventory, InventoryCardsResponse } from '$lib';
+import type { Inventory, InventoryCardsResponse } from '#lib';
 import type {
 	BatchMoveRequest,
 	BatchMoveResponse,
@@ -9,7 +9,7 @@ import type {
 	ResortResponse,
 	SplitMoveRequest,
 	SplitMoveResponse
-} from '$lib/types/api';
+} from '#lib/types/api.ts';
 
 /**
  * Request type for creating inventory
@@ -46,7 +46,7 @@ export interface ListInventoryParams {
  *
  * @example
  * ```ts
- * import { inventoryApi } from '$lib/api';
+ * import { inventoryApi } from '#lib/api/index.ts';
  *
  * // List all inventory items
  * const items = await inventoryApi.list();

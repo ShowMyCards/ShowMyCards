@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { PageHeader, InventoryBrowser } from '$lib';
+	import { PageHeader, InventoryBrowser } from '#lib';
 	import { resolve } from '$app/paths';
 	import { ArrowLeft } from '@lucide/svelte';
 
@@ -21,10 +21,8 @@
 			title="Unassigned Cards"
 			description={`Cards without a storage location • ${data.totalCards} card${data.totalCards === 1 ? '' : 's'}`}>
 			{#snippet actions()}
-				<a href={resolve('/inventory')} class="btn bg-base-100 btn-sm">
-					<ArrowLeft class="w-4 h-4" />
-					Back to Locations
-				</a>
+				<a href={resolve('inventory')} class="btn bg-base-100 btn-sm"
+					><ArrowLeft class="w-4 h-4" /> Back to Locations</a>
 			{/snippet}
 		</PageHeader>
 	{/snippet}

@@ -45,6 +45,7 @@ func TestRawJSONToRuleData_FullCard(t *testing.T) {
 		"name": "Lightning Bolt",
 		"set": "lea",
 		"set_name": "Limited Edition Alpha",
+		"set_type": "core",
 		"rarity": "common",
 		"type_line": "Instant",
 		"oracle_text": "Lightning Bolt deals 3 damage to any target.",
@@ -94,6 +95,9 @@ func TestRawJSONToRuleData_FullCard(t *testing.T) {
 	}
 	if cardData["set"] != "lea" {
 		t.Errorf("expected set 'lea', got '%v'", cardData["set"])
+	}
+	if cardData["set_type"] != "core" {
+		t.Errorf("expected set_type 'core', got '%v'", cardData["set_type"])
 	}
 	if cardData["rarity"] != "common" {
 		t.Errorf("expected rarity 'common', got '%v'", cardData["rarity"])
@@ -167,6 +171,9 @@ func TestRawJSONToRuleData_MissingFields(t *testing.T) {
 	// String defaults
 	if cardData["set"] != "" {
 		t.Errorf("expected set '', got '%v'", cardData["set"])
+	}
+	if cardData["set_type"] != "" {
+		t.Errorf("expected set_type '', got '%v'", cardData["set_type"])
 	}
 	if cardData["rarity"] != "" {
 		t.Errorf("expected rarity '', got '%v'", cardData["rarity"])
@@ -452,5 +459,20 @@ func TestScryfallCardToRuleData_PriceParsing(t *testing.T) {
 	}
 	if prices["eur"] != 3.0 {
 		t.Errorf("expected eur 3.0, got %v", prices["eur"])
+	}
+}
+
+func TestRawJSONToRuleData_SetTypeRuleEvaluates(t *testing.T) {
+	cardData, err := RawJSONToRuleData(`{"name": "Lunar Mystic", "set": "c20", "set_type": "commander"}`, "nonfoil")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result, err := NewEvaluator(nil).EvaluateExpression(`set_type == "commander"`, cardData)
+	if err != nil {
+		t.Fatalf("evaluation failed: %v", err)
+	}
+	if !result {
+		t.Error("expected set_type rule to match")
 	}
 }

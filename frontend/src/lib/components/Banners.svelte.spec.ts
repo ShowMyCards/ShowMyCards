@@ -1,11 +1,11 @@
 import { page } from 'vitest/browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { Banner } from '$lib';
+import type { Banner } from '#lib';
 
 const listMock = vi.hoisted(() => vi.fn());
 
-vi.mock('$lib/api/resources/banners', () => ({
+vi.mock('#lib/api/resources/banners.ts', () => ({
 	bannersApi: { list: listMock }
 }));
 

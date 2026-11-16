@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Page from './+page.svelte';
 import type { PageData } from './$types';
-import { currency } from '$lib/stores/currency.svelte';
+import { currency } from '#lib/stores/currency.svelte.ts';
 
 // +page.svelte expects the shape returned by its server load. Rendering the
 // component in isolation means supplying it directly.
