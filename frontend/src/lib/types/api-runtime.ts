@@ -47,9 +47,9 @@ export interface InventoryCardsResponse extends Omit<Generated.InventoryCardsRes
 	data: InventoryCard[];
 }
 
-// Override SearchResponse to use runtime EnhancedCardResult
+// Override SearchResponse to use runtime InventoryCard (results carry deck availability)
 export interface SearchResponse extends Omit<Generated.SearchResponse, 'data'> {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 }
 
 // Re-export other generated types as-is

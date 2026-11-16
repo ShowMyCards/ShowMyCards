@@ -21,6 +21,7 @@ type SearchHandler struct {
 	client          *scryfall.Client
 	db              *gorm.DB
 	settingsService *services.SettingsService
+	allocation      *services.AllocationService
 }
 
 // NewSearchHandler creates a new search handler
@@ -29,16 +30,18 @@ func NewSearchHandler(client *scryfall.Client, db *gorm.DB, settingsService *ser
 		client:          client,
 		db:              db,
 		settingsService: settingsService,
+		allocation:      services.NewAllocationService(db),
 	}
 }
 
-// SearchResponse wraps search results with pagination metadata
+// SearchResponse wraps search results with pagination metadata. Each result
+// carries its inventory data and per-Oracle deck availability.
 // tygo:export
 type SearchResponse struct {
-	Data       []EnhancedCardResult `json:"data"`
-	Page       int                  `json:"page"`
-	TotalCards int                  `json:"total_cards"`
-	HasMore    bool                 `json:"has_more"`
+	Data       []InventoryCard `json:"data"`
+	Page       int             `json:"page"`
+	TotalCards int             `json:"total_cards"`
+	HasMore    bool            `json:"has_more"`
 }
 
 // CardPrices represents card pricing information
@@ -209,8 +212,27 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 	}
 	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), ptrs)
 
+	// Attach per-Oracle deck availability (owned / decked / free) to every card.
+	availability, err := h.allocation.ComputeAvailability(c.RequestCtx())
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to compute deck availability", "allocation service failed", err)
+	}
+	results := make([]InventoryCard, len(cards))
+	for i := range cards {
+		oa := availability.OracleAvailabilityFor(cards[i].OracleID)
+		results[i] = InventoryCard{
+			EnhancedCardResult: cards[i],
+			Deck: DeckAvailability{
+				Owned:  oa.Owned,
+				Decked: oa.Owned - oa.Free,
+				Free:   oa.Free,
+			},
+		}
+	}
+
 	response := SearchResponse{
-		Data:       cards,
+		Data:       results,
 		Page:       result.Page,
 		TotalCards: result.TotalCards,
 		HasMore:    result.HasMore,
