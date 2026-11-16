@@ -16,7 +16,7 @@ import (
 
 // CurrentExportVersion is the latest export format version.
 // Bump this when the export schema changes and add a migration function.
-const CurrentExportVersion = 1
+const CurrentExportVersion = 2
 
 // DataHandler handles data import and export endpoints
 type DataHandler struct {
@@ -31,12 +31,13 @@ func NewDataHandler(db *gorm.DB) *DataHandler {
 // ExportData represents the full application data export
 // tygo:export
 type ExportData struct {
-	Version          int                    `json:"version"`
-	ExportedAt       string                 `json:"exported_at"`
+	Version          int                     `json:"version"`
+	ExportedAt       string                  `json:"exported_at"`
 	StorageLocations []ExportStorageLocation `json:"storage_locations"`
 	SortingRules     []ExportSortingRule     `json:"sorting_rules"`
 	Inventory        []ExportInventoryItem   `json:"inventory"`
 	Lists            []ExportList            `json:"lists"`
+	Decks            []ExportDeck            `json:"decks"`
 }
 
 // ExportStorageLocation represents a storage location in export format
@@ -86,6 +87,27 @@ type ExportListItem struct {
 	CollectedQuantity int    `json:"collected_quantity"`
 }
 
+// ExportDeck represents a deck with its items in export format
+// tygo:export
+type ExportDeck struct {
+	RefID       uint             `json:"ref_id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description,omitempty"`
+	Items       []ExportDeckItem `json:"items"`
+}
+
+// ExportDeckItem represents a deck item in export format. Cards are referenced
+// by their natural keys (oracle_id, plus an optional pinned scryfall_id and
+// treatment), so no ID remapping is needed beyond the parent deck.
+// tygo:export
+type ExportDeckItem struct {
+	OracleID        string          `json:"oracle_id"`
+	ScryfallID      string          `json:"scryfall_id"` // empty = any printing
+	Treatment       string          `json:"treatment"`   // empty = any finish
+	Zone            models.DeckZone `json:"zone"`
+	DesiredQuantity int             `json:"desired_quantity"`
+}
+
 // ImportResponse represents the result of an import operation
 // tygo:export
 type ImportResponse struct {
@@ -94,6 +116,8 @@ type ImportResponse struct {
 	InventoryItemsCreated   int      `json:"inventory_items_created"`
 	ListsCreated            int      `json:"lists_created"`
 	ListItemsCreated        int      `json:"list_items_created"`
+	DecksCreated            int      `json:"decks_created"`
+	DeckItemsCreated        int      `json:"deck_items_created"`
 	Warnings                []string `json:"warnings,omitempty"`
 }
 
@@ -106,6 +130,7 @@ func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 	var sortingRules []models.SortingRule
 	var inventory []models.Inventory
 	var lists []models.List
+	var decks []models.Deck
 
 	err := h.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Find(&storageLocations).Error; err != nil {
@@ -119,6 +144,9 @@ func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 		}
 		if err := tx.Preload("Items").Find(&lists).Error; err != nil {
 			return fmt.Errorf("lists: %w", err)
+		}
+		if err := tx.Preload("Items").Find(&decks).Error; err != nil {
+			return fmt.Errorf("decks: %w", err)
 		}
 		return nil
 	})
@@ -179,6 +207,26 @@ func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 		}
 	}
 
+	exportDecks := make([]ExportDeck, len(decks))
+	for i, deck := range decks {
+		items := make([]ExportDeckItem, len(deck.Items))
+		for j, item := range deck.Items {
+			items[j] = ExportDeckItem{
+				OracleID:        item.OracleID,
+				ScryfallID:      item.ScryfallID,
+				Treatment:       item.Treatment,
+				Zone:            item.Zone,
+				DesiredQuantity: item.DesiredQuantity,
+			}
+		}
+		exportDecks[i] = ExportDeck{
+			RefID:       deck.ID,
+			Name:        deck.Name,
+			Description: deck.Description,
+			Items:       items,
+		}
+	}
+
 	return ExportData{
 		Version:          CurrentExportVersion,
 		ExportedAt:       time.Now().UTC().Format(time.RFC3339),
@@ -186,6 +234,7 @@ func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 		SortingRules:     exportRules,
 		Inventory:        exportInventory,
 		Lists:            exportLists,
+		Decks:            exportDecks,
 	}, nil
 }
 
@@ -366,6 +415,42 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 			response.InventoryItemsCreated++
 		}
 
+		// 5. Decks + Items — items nested under their parent deck. Items
+		// reference cards by oracle/scryfall ID, never by inventory row, so
+		// only the parent deck ID needs remapping.
+		for _, deck := range data.Decks {
+			newDeck := models.Deck{
+				Name:        deck.Name,
+				Description: deck.Description,
+			}
+			if err := tx.Create(&newDeck).Error; err != nil {
+				return fmt.Errorf("failed to create deck %q: %w", deck.Name, err)
+			}
+			response.DecksCreated++
+
+			for _, item := range deck.Items {
+				newItem := models.DeckItem{
+					DeckID:          newDeck.ID,
+					OracleID:        item.OracleID,
+					ScryfallID:      item.ScryfallID,
+					Treatment:       item.Treatment,
+					Zone:            item.Zone,
+					DesiredQuantity: item.DesiredQuantity,
+				}
+				if err := tx.Create(&newItem).Error; err != nil {
+					if isDuplicateError(err) {
+						response.Warnings = append(response.Warnings,
+							fmt.Sprintf("skipped duplicate deck item %s (zone: %s) in deck %q",
+								item.OracleID, item.Zone, deck.Name))
+						continue
+					}
+					return fmt.Errorf("failed to create deck item %s in deck %q: %w",
+						item.OracleID, deck.Name, err)
+				}
+				response.DeckItemsCreated++
+			}
+		}
+
 		return nil
 	})
 
@@ -387,7 +472,18 @@ func isDuplicateError(err error) bool {
 
 // migrations maps each version to a function that migrates data to the next version.
 // When bumping CurrentExportVersion, add a migration here.
-var migrations = map[int]func(map[string]any) error{}
+var migrations = map[int]func(map[string]any) error{
+	1: migrateV1ToV2,
+}
+
+// migrateV1ToV2 adds the decks collection introduced in version 2. Version 1
+// exports predate decks, so an empty collection is the faithful translation.
+func migrateV1ToV2(data map[string]any) error {
+	if _, ok := data["decks"]; !ok {
+		data["decks"] = []any{}
+	}
+	return nil
+}
 
 // applyMigrations runs sequential migration functions to bring data up to CurrentExportVersion
 func applyMigrations(data map[string]any, fromVersion int) error {

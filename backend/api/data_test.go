@@ -28,6 +28,8 @@ func setupDataTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		&models.SortingRule{},
 		&models.List{},
 		&models.ListItem{},
+		&models.Deck{},
+		&models.DeckItem{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
@@ -103,6 +105,44 @@ func seedTestData(t *testing.T, db *gorm.DB) {
 	if err := db.Create(&item).Error; err != nil {
 		t.Fatalf("failed to create list item: %v", err)
 	}
+
+	// Create deck with a pinned printing, an any-printing entry, and a
+	// maybe-board entry
+	deck := models.Deck{Name: "Ur-Dragon", Description: "Five-colour dragons"}
+	if err := db.Create(&deck).Error; err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+	deckItems := []models.DeckItem{
+		{DeckID: deck.ID, OracleID: "oracle-001", ScryfallID: "scry-001", Treatment: "nonfoil", Zone: models.ZoneMain, DesiredQuantity: 1},
+		{DeckID: deck.ID, OracleID: "oracle-002", Zone: models.ZoneCommand, DesiredQuantity: 1},
+		{DeckID: deck.ID, OracleID: "oracle-003", Zone: models.ZoneMaybe, DesiredQuantity: 2},
+	}
+	if err := db.Create(&deckItems).Error; err != nil {
+		t.Fatalf("failed to create deck items: %v", err)
+	}
+}
+
+// postImport sends body to the import endpoint and returns the status code
+// and decoded response (zero value when the status is not 200).
+func postImport(t *testing.T, app *fiber.App, body []byte) (int, ImportResponse) {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/data/import", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var result ImportResponse
+	if resp.StatusCode == http.StatusOK {
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+	}
+	return resp.StatusCode, result
 }
 
 // Export tests
@@ -143,6 +183,9 @@ func TestExport_Empty(t *testing.T) {
 	}
 	if len(result.SortingRules) != 0 {
 		t.Errorf("expected 0 sorting rules, got %d", len(result.SortingRules))
+	}
+	if len(result.Decks) != 0 {
+		t.Errorf("expected 0 decks, got %d", len(result.Decks))
 	}
 }
 
@@ -189,6 +232,36 @@ func TestExport_WithData(t *testing.T) {
 	}
 	if len(result.Lists[0].Items) != 1 {
 		t.Errorf("expected 1 list item, got %d", len(result.Lists[0].Items))
+	}
+
+	if len(result.Decks) != 1 {
+		t.Fatalf("expected 1 deck, got %d", len(result.Decks))
+	}
+	deck := result.Decks[0]
+	if deck.Name != "Ur-Dragon" || deck.Description != "Five-colour dragons" {
+		t.Errorf("unexpected deck name/description: %q / %q", deck.Name, deck.Description)
+	}
+	if deck.RefID == 0 {
+		t.Error("expected deck ref_id to be set")
+	}
+	if len(deck.Items) != 3 {
+		t.Fatalf("expected 3 deck items, got %d", len(deck.Items))
+	}
+	byOracle := make(map[string]ExportDeckItem, len(deck.Items))
+	for _, item := range deck.Items {
+		byOracle[item.OracleID] = item
+	}
+	pinned := byOracle["oracle-001"]
+	if pinned.ScryfallID != "scry-001" || pinned.Treatment != "nonfoil" || pinned.Zone != models.ZoneMain || pinned.DesiredQuantity != 1 {
+		t.Errorf("pinned deck item not exported faithfully: %+v", pinned)
+	}
+	anyPrinting := byOracle["oracle-002"]
+	if anyPrinting.ScryfallID != "" || anyPrinting.Treatment != "" || anyPrinting.Zone != models.ZoneCommand {
+		t.Errorf("any-printing deck item not exported faithfully: %+v", anyPrinting)
+	}
+	maybe := byOracle["oracle-003"]
+	if maybe.Zone != models.ZoneMaybe || maybe.DesiredQuantity != 2 {
+		t.Errorf("maybe-board deck item not exported faithfully: %+v", maybe)
 	}
 }
 
@@ -562,6 +635,179 @@ func TestImport_RoundTrip(t *testing.T) {
 	if len(importedList.Items) > 0 && importedList.Items[0].DesiredQuantity != 4 {
 		t.Errorf("expected desired_quantity 4, got %d", importedList.Items[0].DesiredQuantity)
 	}
+
+	if importResult.DecksCreated != 1 || importResult.DeckItemsCreated != 3 {
+		t.Errorf("expected 1 deck and 3 deck items created, got %d and %d",
+			importResult.DecksCreated, importResult.DeckItemsCreated)
+	}
+
+	var importedDeck models.Deck
+	if err := freshDB.Preload("Items").Where("name = ?", "Ur-Dragon").First(&importedDeck).Error; err != nil {
+		t.Fatalf("expected imported deck to exist: %v", err)
+	}
+	if importedDeck.Description != "Five-colour dragons" {
+		t.Errorf("expected deck description to round-trip, got %q", importedDeck.Description)
+	}
+	if len(importedDeck.Items) != 3 {
+		t.Fatalf("expected 3 deck items, got %d", len(importedDeck.Items))
+	}
+	for _, item := range importedDeck.Items {
+		if item.DeckID != importedDeck.ID {
+			t.Errorf("deck item %s linked to deck %d, expected %d", item.OracleID, item.DeckID, importedDeck.ID)
+		}
+		if item.OracleID == "oracle-001" && (item.ScryfallID != "scry-001" || item.Treatment != "nonfoil" || item.Zone != models.ZoneMain) {
+			t.Errorf("pinned deck item did not round-trip: %+v", item)
+		}
+		if item.OracleID == "oracle-003" && (item.Zone != models.ZoneMaybe || item.DesiredQuantity != 2) {
+			t.Errorf("maybe-board deck item did not round-trip: %+v", item)
+		}
+	}
+}
+
+func TestImport_Decks(t *testing.T) {
+	app, db := setupDataTestApp(t)
+
+	// An existing deck makes sure imported items are linked to the newly
+	// created deck rather than to the exported ref_id.
+	existing := models.Deck{Name: "Existing"}
+	if err := db.Create(&existing).Error; err != nil {
+		t.Fatalf("failed to create existing deck: %v", err)
+	}
+
+	importData := ExportData{
+		Version:    CurrentExportVersion,
+		ExportedAt: "2026-01-01T00:00:00Z",
+		Decks: []ExportDeck{
+			{
+				RefID: existing.ID, Name: "Imported Deck", Description: "From backup",
+				Items: []ExportDeckItem{
+					{OracleID: "oracle-100", ScryfallID: "scry-100", Treatment: "foil", Zone: models.ZoneCommand, DesiredQuantity: 1},
+					{OracleID: "oracle-101", Zone: models.ZoneSide, DesiredQuantity: 3},
+				},
+			},
+		},
+	}
+	body, _ := json.Marshal(importData)
+
+	status, result := postImport(t, app, body)
+	if status != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, status)
+	}
+	if result.DecksCreated != 1 {
+		t.Errorf("expected 1 deck created, got %d", result.DecksCreated)
+	}
+	if result.DeckItemsCreated != 2 {
+		t.Errorf("expected 2 deck items created, got %d", result.DeckItemsCreated)
+	}
+
+	var imported models.Deck
+	if err := db.Preload("Items").Where("name = ?", "Imported Deck").First(&imported).Error; err != nil {
+		t.Fatalf("expected imported deck to exist: %v", err)
+	}
+	if imported.ID == existing.ID {
+		t.Fatal("expected imported deck to get a new ID")
+	}
+	if len(imported.Items) != 2 {
+		t.Fatalf("expected 2 items on imported deck, got %d", len(imported.Items))
+	}
+
+	var existingItems int64
+	db.Model(&models.DeckItem{}).Where("deck_id = ?", existing.ID).Count(&existingItems)
+	if existingItems != 0 {
+		t.Errorf("expected no items attached to the pre-existing deck, got %d", existingItems)
+	}
+}
+
+func TestImport_DuplicateDeckItem(t *testing.T) {
+	app, db := setupDataTestApp(t)
+
+	dup := ExportDeckItem{OracleID: "oracle-100", Zone: models.ZoneMain, DesiredQuantity: 1}
+	importData := ExportData{
+		Version:    CurrentExportVersion,
+		ExportedAt: "2026-01-01T00:00:00Z",
+		Decks: []ExportDeck{
+			{RefID: 1, Name: "Dupes", Items: []ExportDeckItem{dup, dup}},
+		},
+	}
+	body, _ := json.Marshal(importData)
+
+	status, result := postImport(t, app, body)
+	if status != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, status)
+	}
+	if result.DeckItemsCreated != 1 {
+		t.Errorf("expected 1 deck item created, got %d", result.DeckItemsCreated)
+	}
+	if len(result.Warnings) != 1 {
+		t.Errorf("expected 1 warning for the duplicate, got %v", result.Warnings)
+	}
+
+	var count int64
+	db.Model(&models.DeckItem{}).Count(&count)
+	if count != 1 {
+		t.Errorf("expected 1 deck item in DB, got %d", count)
+	}
+}
+
+func TestImport_InvalidDeckItemRollsBack(t *testing.T) {
+	app, db := setupDataTestApp(t)
+
+	importData := ExportData{
+		Version:    CurrentExportVersion,
+		ExportedAt: "2026-01-01T00:00:00Z",
+		StorageLocations: []ExportStorageLocation{
+			{RefID: 1, Name: "Box", StorageType: models.Box},
+		},
+		Decks: []ExportDeck{
+			{RefID: 1, Name: "Bad", Items: []ExportDeckItem{
+				{OracleID: "oracle-100", Zone: "graveyard", DesiredQuantity: 1},
+			}},
+		},
+	}
+	body, _ := json.Marshal(importData)
+
+	status, _ := postImport(t, app, body)
+	if status != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, status)
+	}
+
+	var locCount, deckCount int64
+	db.Model(&models.StorageLocation{}).Count(&locCount)
+	db.Model(&models.Deck{}).Count(&deckCount)
+	if locCount != 0 || deckCount != 0 {
+		t.Errorf("expected full rollback, got %d storage locations and %d decks", locCount, deckCount)
+	}
+}
+
+func TestImport_V1WithoutDecks(t *testing.T) {
+	app, db := setupDataTestApp(t)
+
+	// A literal v1 document: no "decks" key at all.
+	body := []byte(`{
+		"version": 1,
+		"exported_at": "2026-01-01T00:00:00Z",
+		"storage_locations": [{"ref_id": 1, "name": "Box", "storage_type": "Box"}],
+		"sorting_rules": [],
+		"inventory": [{"scryfall_id": "scry-1", "oracle_id": "oracle-1", "treatment": "nonfoil", "quantity": 1, "storage_location_ref_id": 1}],
+		"lists": []
+	}`)
+
+	status, result := postImport(t, app, body)
+	if status != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, status)
+	}
+	if result.StorageLocationsCreated != 1 || result.InventoryItemsCreated != 1 {
+		t.Errorf("expected v1 data to import, got %+v", result)
+	}
+	if result.DecksCreated != 0 {
+		t.Errorf("expected 0 decks created from v1 export, got %d", result.DecksCreated)
+	}
+
+	var deckCount int64
+	db.Model(&models.Deck{}).Count(&deckCount)
+	if deckCount != 0 {
+		t.Errorf("expected 0 decks in DB, got %d", deckCount)
+	}
 }
 
 func TestImport_EmptyData(t *testing.T) {
@@ -660,6 +906,24 @@ func TestApplyMigrations_NoMigrationsNeeded(t *testing.T) {
 	err := applyMigrations(data, CurrentExportVersion)
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
+	}
+}
+
+func TestApplyMigrations_V1ToV2AddsDecks(t *testing.T) {
+	data := map[string]any{"version": float64(1), "lists": []any{}}
+	if err := applyMigrations(data, 1); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	decks, ok := data["decks"].([]any)
+	if !ok {
+		t.Fatalf("expected decks to be added as an empty array, got %#v", data["decks"])
+	}
+	if len(decks) != 0 {
+		t.Errorf("expected empty decks, got %d entries", len(decks))
+	}
+	if data["version"] != float64(CurrentExportVersion) {
+		t.Errorf("expected version %d after migration, got %v", CurrentExportVersion, data["version"])
 	}
 }
 
