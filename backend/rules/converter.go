@@ -17,6 +17,7 @@ func ScryfallCardToRuleData(card scryfall.Card, treatment string) (map[string]in
 	cardData["name"] = card.Name
 	cardData["set"] = card.Set
 	cardData["set_name"] = card.SetName
+	cardData["set_type"] = "" // scryfall.Card does not expose set_type
 	cardData["rarity"] = string(card.Rarity)
 	cardData["type_line"] = card.TypeLine
 	cardData["oracle_text"] = card.OracleText
@@ -113,6 +114,7 @@ func RawJSONToRuleData(rawJSON string, treatment string) (map[string]interface{}
 	cardData["name"] = getStringFromJSON(jsonData, "name")
 	cardData["set"] = getStringFromJSON(jsonData, "set")
 	cardData["set_name"] = getStringFromJSON(jsonData, "set_name")
+	cardData["set_type"] = getStringFromJSON(jsonData, "set_type")
 	cardData["rarity"] = getStringFromJSON(jsonData, "rarity")
 	cardData["type_line"] = getStringFromJSON(jsonData, "type_line")
 	cardData["oracle_text"] = getStringFromJSON(jsonData, "oracle_text")
