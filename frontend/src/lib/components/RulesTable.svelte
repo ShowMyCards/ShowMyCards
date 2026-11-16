@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TableCard, Pagination, SortableRuleRow, type SortingRule } from '$lib';
+	import { TableCard, Pagination, SortableRuleRow, type SortingRule } from '#lib';
 	import type { DragDropState } from '@thisux/sveltednd';
 
 	interface Props {

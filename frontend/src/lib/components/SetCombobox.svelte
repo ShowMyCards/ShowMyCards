@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Set as CardSet } from '$lib/types/models';
+	import type { Set as CardSet } from '#lib/types/models.ts';
 
 	type CardSetResponse = {
 		data: Pick<CardSet, 'code' | 'name'>[];

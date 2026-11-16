@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { GripVertical, Pencil, Trash2 } from '@lucide/svelte';
 	import { draggable, droppable, type DragDropState } from '@thisux/sveltednd';
-	import type { SortingRule } from '$lib';
+	import type { SortingRule } from '#lib';
 
 	interface Props {
 		rule: SortingRule;

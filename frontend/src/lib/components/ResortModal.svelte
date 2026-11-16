@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Modal, inventoryApi, notifications } from '$lib';
-	import type { ResortResponse } from '$lib/types/api';
+	import { Modal, inventoryApi, notifications } from '#lib';
+	import type { ResortResponse } from '#lib/types/api.ts';
 	import { RefreshCw, ArrowRight, CircleSlash } from '@lucide/svelte';
 
 	interface Props {

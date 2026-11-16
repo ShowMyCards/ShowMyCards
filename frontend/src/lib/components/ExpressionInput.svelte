@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { useExpressionValidation } from '$lib';
+	import { useExpressionValidation } from '#lib';
 
 	interface Props {
 		value: string;

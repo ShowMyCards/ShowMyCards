@@ -9,7 +9,7 @@
 		StorageLocationRow,
 		notifications,
 		getActionError
-	} from '$lib';
+	} from '#lib';
 	import type { PageData } from './$types';
 	import { Plus } from '@lucide/svelte';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Notification } from '$lib';
+	import { Notification } from '#lib';
 	import { resolve } from '$app/paths';
 	import { Home, ArrowLeft, RefreshCw, TriangleAlert } from '@lucide/svelte';
 

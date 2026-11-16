@@ -1,6 +1,6 @@
-import { BACKEND_URL, type SearchResponse } from '$lib';
-import { handleAddInventory } from '$lib/server/inventory-actions';
-import { loadStorageLocations } from '$lib/server/storage';
+import { BACKEND_URL, type SearchResponse } from '#lib';
+import { handleAddInventory } from '#lib/server/inventory-actions.ts';
+import { loadStorageLocations } from '#lib/server/storage.ts';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 

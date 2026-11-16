@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { StorageLocation } from '$lib';
+import type { StorageLocation } from '#lib';
 
 /**
  * Request type for creating a storage location
@@ -37,7 +37,7 @@ export interface PaginatedStorageResponse {
  *
  * @example
  * ```ts
- * import { storageApi } from '$lib/api';
+ * import { storageApi } from '#lib/api/index.ts';
  *
  * // List all storage locations
  * const response = await storageApi.list();

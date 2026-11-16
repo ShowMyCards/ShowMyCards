@@ -16,7 +16,7 @@
  *   "genuinely empty" (otherwise a backend outage silently renders as an empty
  *   collection).
  */
-import { BACKEND_URL, type StorageLocation, type StorageLocationWithCount } from '$lib';
+import { BACKEND_URL, type StorageLocation, type StorageLocationWithCount } from '#lib';
 
 // The backend caps page_size at MaxPageSize (100); request the max per page.
 const PAGE_SIZE = 100;

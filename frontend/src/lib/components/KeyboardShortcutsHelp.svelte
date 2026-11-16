@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { keyboard } from '$lib';
+	import { keyboard } from '#lib';
 	import { X, Keyboard } from '@lucide/svelte';
 
 	const shortcuts = keyboard.getShortcuts();

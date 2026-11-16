@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import { fail } from '@sveltejs/kit';
-import type { List, EnrichedListItem } from '$lib';
+import type { List, EnrichedListItem } from '#lib';
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
 	const { id } = params;

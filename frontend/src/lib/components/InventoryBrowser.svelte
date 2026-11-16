@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { invalidateAll } from '$app/navigation';
+	import { browser } from '$app/env';
+	import { refreshAll } from '$app/navigation';
 	import {
 		CardResultCard,
 		EmptyState,
@@ -19,8 +19,8 @@
 		type EnhancedCardResult,
 		type Inventory,
 		type StorageLocation
-	} from '$lib';
-	import SetIcon from '$lib/components/SetIcon.svelte';
+	} from '#lib';
+	import SetIcon from '#lib/components/SetIcon.svelte';
 	import { FolderInput } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
@@ -136,7 +136,7 @@
 	}
 
 	function handleBulkComplete() {
-		invalidateAll();
+		refreshAll();
 	}
 
 	/**
@@ -173,9 +173,8 @@
 	</div>
 
 	{#if cards.length === 0}
-		<EmptyState message={emptyMessage}>
-			<a href={resolve('/search')} class="btn btn-primary">Search for Cards</a>
-		</EmptyState>
+		<EmptyState message={emptyMessage}
+			><a href={resolve('search')} class="btn btn-primary">Search for Cards</a></EmptyState>
 	{:else if filteredCards.length === 0}
 		<EmptyState message="No cards match your filter">
 			<p class="text-sm opacity-70">Try adjusting your search criteria</p>
@@ -187,7 +186,7 @@
 				Key intentionally includes total_quantity, not just card.id. CardResultCard
 				captures card.inventory into local $state once on mount and never re-syncs from
 				the prop (it diverges via optimistic +/-). After a split-move calls
-				invalidateAll(), the reloaded card keeps the same id but a new quantity; keying
+				refreshAll(), the reloaded card keeps the same id but a new quantity; keying
 				on id alone would reuse the stale instance and show the pre-move quantity. The
 				quantity in the key forces a remount so the fresh data is read. Do not simplify
 				to (card.id) without first making CardResultCard reconcile from props.
@@ -256,9 +255,8 @@
 									}} />
 							</td>
 							<td>
-								<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
-									{getDisplayName(card)}
-								</a>
+								<a href={resolve(`cards/${card.id}`)} class="font-semibold hover:text-primary"
+									>{getDisplayName(card)}</a>
 							</td>
 							<td>
 								<div class="flex items-center gap-2">
@@ -267,6 +265,7 @@
 										setName={card.set_name}
 										rarity="common"
 										{isFoil} />
+
 									<span class="text-sm">{card.set_name}</span>
 								</div>
 							</td>
@@ -284,9 +283,9 @@
 									{/each}
 								</div>
 							</td>
-							<td>
-								<span class="badge badge-primary">{totalQty}</span>
-							</td>
+
+							<td><span class="badge badge-primary">{totalQty}</span></td>
+
 							<td>
 								<div class="flex flex-wrap gap-1">
 									{#each treatmentGroups(card.inventory.this_printing) as group (group.rep.id)}

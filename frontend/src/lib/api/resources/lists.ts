@@ -8,7 +8,7 @@ import type {
 	CreateListItemRequest,
 	UpdateListItemRequest,
 	CreateItemsBatchRequest
-} from '$lib';
+} from '#lib';
 
 /**
  * Response type for getting a list with enriched items
@@ -29,7 +29,7 @@ export interface ListWithItems {
  *
  * @example
  * ```ts
- * import { listsApi } from '$lib/api';
+ * import { listsApi } from '#lib/api/index.ts';
  *
  * // List all lists
  * const lists = await listsApi.list();

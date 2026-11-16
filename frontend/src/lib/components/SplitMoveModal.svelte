@@ -6,7 +6,7 @@
 		notifications,
 		type Inventory,
 		type StorageLocation
-	} from '$lib';
+	} from '#lib';
 
 	interface Props {
 		open: boolean;

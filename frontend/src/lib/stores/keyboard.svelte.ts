@@ -7,7 +7,7 @@
  * @example
  * ```svelte
  * <script>
- *   import { keyboard } from '$lib';
+ *   import { keyboard } from '#lib';
  *
  *   // In a CardResultCard component:
  *   const cardActions = {

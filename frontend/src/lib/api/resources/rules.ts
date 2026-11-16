@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { SortingRule, EvaluateRequest, EvaluateResponse } from '$lib';
+import type { SortingRule, EvaluateRequest, EvaluateResponse } from '#lib';
 
 /**
  * Request type for creating a sorting rule
@@ -69,7 +69,7 @@ export interface ListRulesParams {
  *
  * @example
  * ```ts
- * import { rulesApi } from '$lib/api';
+ * import { rulesApi } from '#lib/api/index.ts';
  *
  * // List all enabled rules
  * const rules = await rulesApi.list({ enabled: true });
