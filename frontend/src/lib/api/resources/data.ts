@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { ExportData, ImportResponse } from '$lib/types/api';
+import type { ExportData, ImportResponse } from '#lib/types/api.ts';
 
 /**
  * Data import/export API methods

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Modal, FormField, ExpressionInput, ExpressionHelper, type StorageLocation } from '$lib';
-	import type { useFormState, useExpressionValidation } from '$lib';
+	import { Modal, FormField, ExpressionInput, ExpressionHelper, type StorageLocation } from '#lib';
+	import type { useFormState, useExpressionValidation } from '#lib';
 
 	interface RuleFormValues extends Record<string, unknown> {
 		name: string;

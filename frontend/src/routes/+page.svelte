@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { resolve } from '$app/paths';
-	import { PageHeader, StatsCard, notifications } from '$lib';
+	import { PageHeader, StatsCard, notifications } from '#lib';
 	import type { PageData } from './$types';
 	import {
 		Search,
@@ -80,13 +80,11 @@
 		title="Dashboard"
 		description="Welcome to ShowMyCards - Your card collection manager" />
 
-	<div class="mb-6">
-		<StatsCard {stats} />
-	</div>
+	<div class="mb-6"><StatsCard {stats} /></div>
 
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 		<a
-			href={resolve('/search')}
+			href={resolve('search')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
@@ -98,7 +96,7 @@
 		</a>
 
 		<a
-			href={resolve('/inventory')}
+			href={resolve('inventory')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
@@ -110,7 +108,7 @@
 		</a>
 
 		<a
-			href={resolve('/inventory/recent')}
+			href={resolve('inventory/recent')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
@@ -122,7 +120,7 @@
 		</a>
 
 		<a
-			href={resolve('/storage')}
+			href={resolve('storage')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
@@ -133,9 +131,7 @@
 			</div>
 		</a>
 
-		<a
-			href={resolve('/rules')}
-			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a href={resolve('rules')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<ClipboardList class="h-6 w-6" />
@@ -145,7 +141,7 @@
 			</div>
 		</a>
 
-		<a href={resolve('/jobs')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
+		<a href={resolve('jobs')} class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<Clock class="h-6 w-6" />
@@ -156,7 +152,7 @@
 		</a>
 
 		<a
-			href={resolve('/settings')}
+			href={resolve('settings')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">

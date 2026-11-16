@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { StorageLocation } from '$lib';
+	import type { StorageLocation } from '#lib';
 	interface Props {
 		locations: StorageLocation[];
 		selected: number | 'auto';

@@ -27,7 +27,7 @@ function generateId(): string {
  *
  * @example
  * ```ts
- * import { notifications } from '$lib';
+ * import { notifications } from '#lib';
  *
  * // Show a success notification
  * notifications.success('Item created successfully!');

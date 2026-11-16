@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import { fail } from '@sveltejs/kit';
-import type { ListSummary } from '$lib';
+import type { ListSummary } from '#lib';
 
 export const load: PageServerLoad = async ({ fetch }) => {
 	try {

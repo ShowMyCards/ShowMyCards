@@ -1,4 +1,4 @@
-import { invalidateAll } from '$app/navigation';
+import { refreshAll } from '$app/navigation';
 import { deserialize } from '$app/forms';
 import { notifications } from '../stores/notifications.svelte';
 import { getActionError, getActionMessage } from '../utils/form-actions';
@@ -36,7 +36,7 @@ async function submitAction(
 		if (result.type === 'success') {
 			notifications.success(getActionMessage(result.data, options.successMessage));
 			options.onSuccess?.();
-			await invalidateAll();
+			await refreshAll();
 			return true;
 		} else if (result.type === 'failure') {
 			notifications.error(getActionError(result.data, options.errorMessage));
@@ -290,7 +290,7 @@ export function useRuleCrud(getRules: () => SortingRule[]) {
 		);
 
 		if (!success) {
-			await invalidateAll();
+			await refreshAll();
 		}
 
 		isUpdatingPriorities = false;

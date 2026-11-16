@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import { fail } from '@sveltejs/kit';
-import { fetchStorageLocations } from '$lib/server/storage';
+import { fetchStorageLocations } from '#lib/server/storage.ts';
 
 export const load: PageServerLoad = async ({ fetch }) => {
 	// The location list is this page's primary content, so a failed load must be

@@ -7,7 +7,7 @@
 # Base image pinned to digest as defence against tag hijacks on Docker Hub
 # (tags are mutable). Renovate's `docker` manager keeps the digest current
 # and the version tag is retained as a human-readable hint.
-FROM golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS backend-builder
+FROM golang:1.26-alpine@sha256:30b1e546a9c7fa3b747c2bdba3a0c7bdf3a02ebb4c5b8405d2f948d7e8aac4ec AS backend-builder
 
 # The base image's Go must satisfy backend/go.mod's `go` directive on its own.
 # Left unset, GOTOOLCHAIN defaults to `auto`, and Go quietly downloads a newer
@@ -33,7 +33,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-X backend/version.Version=${VER
 # ============================================
 # Stage 2: Build SvelteKit frontend
 # ============================================
-FROM oven/bun:1-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS frontend-builder
+FROM oven/bun:1-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a AS frontend-builder
 
 WORKDIR /app
 
@@ -46,7 +46,7 @@ RUN bun run build
 # ============================================
 # Stage 3: Runtime image
 # ============================================
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
 
 WORKDIR /app
 

@@ -5,7 +5,7 @@
  *
  * @example
  * ```ts
- * import { storageApi, listsApi, rulesApi } from '$lib/api';
+ * import { storageApi, listsApi, rulesApi } from '#lib/api/index.ts';
  *
  * const locations = await storageApi.list();
  * const lists = await listsApi.list();

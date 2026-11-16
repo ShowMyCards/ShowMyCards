@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 

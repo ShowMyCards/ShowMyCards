@@ -1,4 +1,4 @@
-import { BACKEND_URL, type JobType, type JobStatus, type ScheduledTaskInfo } from '$lib';
+import { BACKEND_URL, type JobType, type JobStatus, type ScheduledTaskInfo } from '#lib';
 import type { PageServerLoad } from './$types';
 
 // API response has flattened BaseModel fields

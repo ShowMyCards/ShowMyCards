@@ -1,5 +1,5 @@
-import { BACKEND_URL } from '$lib';
-import { resolveBackendPath } from '$lib/api/path-resolver';
+import { BACKEND_URL } from '#lib';
+import { resolveBackendPath } from '#lib/api/path-resolver.ts';
 import type { RequestHandler } from './$types';
 
 /**

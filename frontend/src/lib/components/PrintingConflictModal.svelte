@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Modal from './Modal.svelte';
-	import type { StorageLocation } from '$lib';
-	import type { ExistingPrintingInfo } from '$lib/types/api';
+	import type { StorageLocation } from '#lib';
+	import type { ExistingPrintingInfo } from '#lib/types/api.ts';
 
 	interface Props {
 		open: boolean;
