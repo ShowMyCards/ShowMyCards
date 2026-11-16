@@ -46,7 +46,7 @@ RUN bun run build
 # ============================================
 # Stage 3: Runtime image
 # ============================================
-FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+FROM alpine:3.23@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2
 
 WORKDIR /app
 
