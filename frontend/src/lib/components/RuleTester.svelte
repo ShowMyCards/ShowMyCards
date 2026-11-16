@@ -12,11 +12,6 @@
 	// Full Scryfall card type with all fields for evaluation
 	interface ScryfallCard extends CardResult {
 		// Additional fields from Scryfall API
-		image_uris?: {
-			small?: string;
-			normal?: string;
-			large?: string;
-		};
 		rarity?: string;
 		colors?: string[];
 		cmc?: number;
@@ -232,8 +227,8 @@
 							onclick={() => selectCard(card)}
 							class="btn btn-ghost btn-sm w-full justify-start text-left h-auto py-2 normal-case">
 							<div class="flex items-center gap-3 w-full">
-								{#if card.image_uris?.small}
-									<img src={card.image_uris.small} alt={card.name} class="w-10 h-auto rounded" />
+								{#if card.image_uri}
+									<img src={card.image_uri} alt={card.name} class="w-10 h-auto rounded" />
 								{/if}
 								<div class="flex-1 min-w-0">
 									<div class="font-semibold text-xs truncate">{card.name}</div>
@@ -258,9 +253,9 @@
 			<div class="card bg-base-200 shadow-sm">
 				<div class="card-body p-3 space-y-2">
 					<div class="flex items-start gap-3">
-						{#if selectedCard.image_uris?.small}
+						{#if selectedCard.image_uri}
 							<img
-								src={selectedCard.image_uris.small}
+								src={selectedCard.image_uri}
 								alt={selectedCard.name}
 								class="w-20 h-auto rounded" />
 						{/if}

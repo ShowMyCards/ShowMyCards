@@ -1,5 +1,5 @@
-github.com/BlueMonday/go-scryfall v0.9.1 h1:QMPxgoZ+oS8q6igoDvMnUCGz4KJlv91ZxbfuJeADOyA=
-github.com/BlueMonday/go-scryfall v0.9.1/go.mod h1:SmNHnIHD64n9Az3xFwOhNxR/ZfX4eQDiZaclbaVV7o8=
+github.com/BlueMonday/go-scryfall v0.11.0 h1:nWDzhRnv7eFUl0TDtmU0j4jxYyL0A3cdZqboFW/xuJY=
+github.com/BlueMonday/go-scryfall v0.11.0/go.mod h1:guxMCLC6GnOXIAk6zcpkAtJzTnOfV6glcJgx4ztPQ9o=
 github.com/TwiN/gocache/v2 v2.4.0 h1:BZ/TqvhipDQE23MFFTjC0MiI1qZ7GEVtSdOFVVXyr18=
 github.com/TwiN/gocache/v2 v2.4.0/go.mod h1:Cl1c0qNlQlXzJhTpAARVqpQDSuGDM5RhtzPYAM1x17g=
 github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eTWro=
