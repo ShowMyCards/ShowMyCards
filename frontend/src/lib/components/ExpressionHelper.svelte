@@ -46,7 +46,7 @@
 			type: 'string',
 			description: 'Set type (core, expansion, commander, etc.)'
 		},
-		{ field: 'set', type: 'string', description: 'Set code (e.g., "MH2")' },
+		{ field: 'set', type: 'string', description: 'Set code, case-insensitive (e.g., "MH2")' },
 		{ field: 'set_name', type: 'string', description: 'Full set name' },
 		{ field: 'name', type: 'string', description: 'Card name' }
 	];
@@ -131,6 +131,11 @@
 			category: 'Set-based',
 			expression: 'set == "MH2"',
 			description: 'Modern Horizons 2 cards'
+		},
+		{
+			category: 'Set-based',
+			expression: 'set in ["MH2", "MH3"]',
+			description: 'Modern Horizons 2 or 3 cards'
 		},
 		{
 			category: 'Type-based',
