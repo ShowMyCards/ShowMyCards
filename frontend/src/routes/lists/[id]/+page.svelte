@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/env';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { deserialize, enhance } from '$app/forms';
 	import type { PageData, ActionData } from './$types';
@@ -186,7 +186,7 @@
 
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
-				await invalidateAll();
+				await refreshAll();
 			} else {
 				notifications.error('Failed to add items. Please try again.');
 			}

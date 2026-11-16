@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/env';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import {
 		CardResultCard,
 		EmptyState,
@@ -136,7 +136,7 @@
 	}
 
 	function handleBulkComplete() {
-		invalidateAll();
+		refreshAll();
 	}
 
 	/**
@@ -186,7 +186,7 @@
 				Key intentionally includes total_quantity, not just card.id. CardResultCard
 				captures card.inventory into local $state once on mount and never re-syncs from
 				the prop (it diverges via optimistic +/-). After a split-move calls
-				invalidateAll(), the reloaded card keeps the same id but a new quantity; keying
+				refreshAll(), the reloaded card keeps the same id but a new quantity; keying
 				on id alone would reuse the stale instance and show the pre-move quantity. The
 				quantity in the key forces a remount so the fresh data is read. Do not simplify
 				to (card.id) without first making CardResultCard reconcile from props.

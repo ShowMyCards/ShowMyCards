@@ -48,7 +48,7 @@
 		if (filterEnabled !== null) {
 			url.searchParams.set('enabled', filterEnabled.toString());
 		}
-		await goto(resolve(`${url.pathname}${url.search}` as '/rules'), { invalidateAll: true });
+		await goto(resolve(`/rules?${url.searchParams}`), { refreshAll: true });
 	}
 
 	async function handleFilterChange(enabled: boolean | null) {
@@ -60,7 +60,7 @@
 		} else {
 			url.searchParams.delete('enabled');
 		}
-		await goto(resolve(`${url.pathname}${url.search}` as '/rules'), { invalidateAll: true });
+		await goto(resolve(`/rules?${url.searchParams}`), { refreshAll: true });
 	}
 </script>
 

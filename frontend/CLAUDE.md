@@ -43,10 +43,10 @@ ShowMyCards/
 │   │   │   ├── config.ts           # App configuration (e.g., BACKEND_URL)
 │   │   │   └── index.ts            # Library exports
 │   │   ├── app.html                # HTML template
-│   │   └── app.d.ts                # TypeScript definitions
+│   │   ├── app.d.ts                # TypeScript definitions
+│   │   └── env.ts                  # Environment variable declarations
 │   ├── static/                     # Static assets (served as-is)
-│   ├── svelte.config.js            # SvelteKit configuration
-│   ├── vite.config.ts              # Vite + Vitest configuration
+│   ├── vite.config.ts              # Vite, SvelteKit + Vitest configuration
 │   └── package.json                # Dependencies and scripts
 ├── website/                        # Astro marketing site
 ├── docker/                         # Docker configurations

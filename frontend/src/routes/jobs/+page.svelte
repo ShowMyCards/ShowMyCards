@@ -65,7 +65,7 @@
 	}
 
 	function handlePageChange(newPage: number) {
-		goto(resolve(`/jobs?page=${newPage}` as '/jobs'));
+		goto(resolve(`/jobs?page=${newPage}`));
 	}
 
 	// Calculate job statistics

@@ -256,10 +256,11 @@ usable.
 - **Layout hierarchy.** Use `+layout.svelte` and `+layout.ts` for shared UI
   and data. Don't repeat the same wrapper markup in every page component.
 - **`#lib` alias.** All shared code should live under `src/lib/` and be
-  imported via `#lib/...`. Don't use relative paths like `../../../lib//index.ts`.
-- **Environment variables.** Use `$env/static/public` for client-safe config
-  and `$env/static/private` for server-only secrets. Don't use `process.env`
-  or `import.meta.env` directly.
+  imported via `#lib/...`. Don't use relative paths like `../../../lib/`.
+- **Environment variables.** Declare every variable in `src/env.ts` with
+  `defineEnvVars`, then import client-safe config from `$app/env/public` and
+  server-only secrets from `$app/env/private`. Don't use `process.env`,
+  `import.meta.env`, or the deprecated `$env/*` modules directly.
 
 ---
 
