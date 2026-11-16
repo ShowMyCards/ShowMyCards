@@ -12,7 +12,9 @@
  *      [quantity] Name [(SET) COLLECTOR] [*F*|*E*]
  *      - treatment marker is TRAILING: *F* = foil, *E* = etched
  *      - "1 Ashnod's Altar"              -> any printing (name search)
- *      - "1 Ashnod's Altar (BRR) 67 *F*" -> pinned printing (e:BRR cn:67), foil
+ *      - "1 Ashnod's Altar (BRR) 67 *F*" -> pinned printing (e:BRR cn:"67"), foil
+ *      - the collector number is always quoted: Scryfall does not match hyphenated
+ *        (The List's "2XM-169") or suffixed ("112p") numbers in an unquoted cn:
  *
  * Zones (deck import): section headers (Commander / Deck / Sideboard / Maybeboard
  * and common variants, plus an "About" metadata block that is skipped) switch the
@@ -202,7 +204,7 @@ function parseCardLine(
 			lineNumber,
 			quantity,
 			treatment,
-			query: withLanguage(`e:${set} cn:${collector}`, options.language),
+			query: withLanguage(`e:${set} cn:"${collector}"`, options.language),
 			zone,
 			name: name.trim(),
 			set,
