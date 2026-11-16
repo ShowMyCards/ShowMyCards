@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
-import { BACKEND_URL } from '$lib';
-import { loadStorageLocations } from '$lib/server/storage';
+import { BACKEND_URL } from '#lib';
+import { loadStorageLocations } from '#lib/server/storage.ts';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ fetch, url }) => {

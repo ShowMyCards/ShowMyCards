@@ -15,7 +15,7 @@
 		ScheduledTaskCard,
 		Modal,
 		type Job
-	} from '$lib';
+	} from '#lib';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';

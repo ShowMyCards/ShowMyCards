@@ -9,15 +9,15 @@
 		SCRYFALL_LANGUAGES,
 		type EnhancedCardResult,
 		type Inventory
-	} from '$lib';
+	} from '#lib';
 	import {
 		parseCardList,
 		resolveTreatment,
 		getTreatmentDisplayName,
 		getTreatmentMarker,
 		type ParsedCard
-	} from '$lib/utils/card-list-parser';
-	import { preprocessImportText } from '$lib/utils/manabox';
+	} from '#lib/utils/card-list-parser.ts';
+	import { preprocessImportText } from '#lib/utils/manabox.ts';
 	import { deserialize } from '$app/forms';
 	import { FileText, Search, Plus, Check, AlertCircle, Loader2, X } from '@lucide/svelte';
 

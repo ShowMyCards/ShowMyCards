@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import type { Snippet } from 'svelte';
-	import { EmptyState, Pagination } from '$lib';
+	import { EmptyState, Pagination } from '#lib';
 	import type {
 		DisplayableCard,
 		ViewMode,

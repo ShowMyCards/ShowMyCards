@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import {
 		PageHeader,
 		EmptyState,
@@ -9,7 +9,7 @@
 		RuleTester,
 		notifications,
 		useRuleCrud
-	} from '$lib';
+	} from '#lib';
 	import { Plus } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -155,11 +155,17 @@
 	open={crud.showDeleteModal}
 	onClose={() => (crud.showDeleteModal = false)}
 	title="Delete Storage Rule">
-	<p>Are you sure you want to delete <strong>{crud.ruleToDelete?.name}</strong>?</p>
+	<p>
+		Are you sure you want to delete
+		<strong>{crud.ruleToDelete?.name}</strong>
+		?
+	</p>
+
 	<p class="text-sm opacity-70 mt-2">This action cannot be undone.</p>
 
 	<div class="modal-action">
 		<button onclick={() => (crud.showDeleteModal = false)} class="btn btn-ghost">Cancel</button>
+
 		<button onclick={crud.handleDeleteRule} class="btn btn-error">Delete Rule</button>
 	</div>
 </Modal>

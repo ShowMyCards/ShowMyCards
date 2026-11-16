@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Modal from './Modal.svelte';
 	import SetCombobox from './SetCombobox.svelte';
-	import { buildSearchQuery } from '$lib/utils/search-builder';
-	import type { Set as CardSet } from '$lib/types/models';
+	import { buildSearchQuery } from '#lib/utils/search-builder.ts';
+	import type { Set as CardSet } from '#lib/types/models.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	interface Props {

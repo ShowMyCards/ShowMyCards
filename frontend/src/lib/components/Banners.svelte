@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { bannersApi, usePolling, type Banner as BannerData } from '$lib';
-	import { browser } from '$app/environment';
+	import { bannersApi, usePolling, type Banner as BannerData } from '#lib';
+	import { browser } from '$app/env';
 	import { slide } from 'svelte/transition';
 	import Banner from './Banner.svelte';
 
@@ -62,7 +62,5 @@
 </script>
 
 {#each visibleBanners as banner (banner.id)}
-	<div transition:slide={{ duration: 200 }}>
-		<Banner {banner} ondismiss={dismiss} />
-	</div>
+	<div transition:slide={{ duration: 200 }}><Banner {banner} ondismiss={dismiss} /></div>
 {/each}

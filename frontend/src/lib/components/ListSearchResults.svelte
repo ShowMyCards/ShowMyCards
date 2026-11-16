@@ -5,7 +5,7 @@
 		sortCardsBySetAndCollector,
 		groupCardsByTreatment,
 		type ScryfallCard
-	} from '$lib';
+	} from '#lib';
 
 	interface Props {
 		searchResults: ScryfallCard[];

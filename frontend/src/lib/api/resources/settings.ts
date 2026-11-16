@@ -21,7 +21,7 @@ export interface UpdateSettingsRequest {
  *
  * @example
  * ```ts
- * import { settingsApi } from '$lib/api';
+ * import { settingsApi } from '#lib/api/index.ts';
  *
  * // Get all settings
  * const settings = await settingsApi.get();

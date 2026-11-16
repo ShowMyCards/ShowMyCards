@@ -6,7 +6,7 @@
  * @example
  * ```svelte
  * <script>
- *   import { selection } from '$lib';
+ *   import { selection } from '#lib';
  *
  *   function handleCheckbox(id: number) {
  *     selection.toggle(id);

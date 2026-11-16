@@ -6,6 +6,6 @@ import { vi } from 'vitest';
 // throws (`Cannot read properties of undefined (reading 'env')`).
 //
 // Stubbing it here, via the `client` project's `setupFiles`, lets any test
-// that pulls in the `$lib` barrel — which re-exports `config.ts`, and
+// that pulls in the `#lib` barrel — which re-exports `config.ts`, and
 // `config.ts` reads this env — import cleanly.
 vi.mock('$env/dynamic/public', () => ({ env: {} }));

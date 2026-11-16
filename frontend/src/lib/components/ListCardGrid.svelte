@@ -9,7 +9,7 @@
 		getActionError,
 		scryfallImageUrl,
 		type EnrichedListItem
-	} from '$lib';
+	} from '#lib';
 	import { Plus, Minus } from '@lucide/svelte';
 
 	interface Props {

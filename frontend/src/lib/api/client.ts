@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { BACKEND_URL } from '../config';
 import { resolveBackendPath } from './path-resolver';
 

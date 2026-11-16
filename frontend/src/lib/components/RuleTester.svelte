@@ -6,8 +6,8 @@
 		type StorageLocation,
 		getCardTreatmentName,
 		getAvailableTreatments
-	} from '$lib';
-	import type { CardResult } from '$lib/types/api';
+	} from '#lib';
+	import type { CardResult } from '#lib/types/api.ts';
 
 	// Full Scryfall card type with all fields for evaluation
 	interface ScryfallCard extends CardResult {

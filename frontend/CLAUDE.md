@@ -116,7 +116,7 @@ This frontend receives auto-generated TypeScript types from the Go backend via [
 These types are re-exported from `src/lib/index.ts` for easy importing:
 
 ```typescript
-import { BACKEND_URL, type Inventory, type SearchResponse } from '$lib';
+import { BACKEND_URL, type Inventory, type SearchResponse } from '#lib';
 ```
 
 ### Regenerating Types
@@ -376,7 +376,7 @@ The application has a set of reusable components in `src/lib/components/`. All c
 Helper functions for generating card treatment names from Scryfall data:
 
 ```typescript
-import { getCardTreatmentName, getAvailableTreatments } from '$lib';
+import { getCardTreatmentName, getAvailableTreatments } from '#lib';
 
 // Get treatment name for a specific finish
 const treatmentName = getCardTreatmentName(
@@ -494,7 +494,7 @@ export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost
 
 Set `VITE_BACKEND_URL` environment variable to override the default.
 
-- **Data-loader error contract.** Shared loaders (e.g. `$lib/server/storage.ts`)
+- **Data-loader error contract.** Shared loaders (e.g. `#lib/server/storage.ts`)
   follow a swallow-vs-throw convention chosen by whether the data is the page's
   primary content or auxiliary — see FRONTEND_REVIEW_STANDARDS.md §9.
 
