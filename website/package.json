@@ -10,15 +10,15 @@
 		"deploy": "astro build && wrangler deploy"
 	},
 	"dependencies": {
-		"@tailwindcss/vite": "^4.3.0",
-		"@tailwindplus/elements": "^1.0.22",
-		"astro": "^6.4.8",
-		"tailwindcss": "^4.3.0"
+		"@tailwindcss/vite": "4.3.5",
+		"@tailwindplus/elements": "1.0.22",
+		"astro": "6.4.8",
+		"tailwindcss": "4.3.5"
 	},
 	"devDependencies": {
-		"@tailwindcss/typography": "^0.5.19",
-		"@types/node": "^25.9.1",
-		"wrangler": "^4.93.0"
+		"@tailwindcss/typography": "0.5.20",
+		"@types/node": "25.9.9",
+		"wrangler": "4.161.0"
 	},
 	"overrides": {
 		"esbuild": "^0.28.1",
