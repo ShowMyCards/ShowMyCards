@@ -9,18 +9,28 @@ import (
 // ParsePriceFromScryfall extracts the USD price for a specific treatment from scryfall.Prices.
 // It maps card treatments to Scryfall price fields and falls back to nonfoil price if unavailable.
 func ParsePriceFromScryfall(prices scryfall.Prices, treatment string) float64 {
+	return parseTreatmentPrice(prices.USD, prices.USDFoil, prices.USDEtched, treatment)
+}
+
+// ParseEURPriceFromScryfall extracts a treatment-aware EUR price, falling back
+// only within EUR. Etched cards use EUR foil prices, matching the frontend.
+func ParseEURPriceFromScryfall(prices scryfall.Prices, treatment string) float64 {
+	return parseTreatmentPrice(prices.EUR, prices.EURFoil, prices.EURFoil, treatment)
+}
+
+func parseTreatmentPrice(nonfoil, foil, etched, treatment string) float64 {
 	// Map treatment to Scryfall price field
 	var priceStr string
 	switch treatment {
 	case "foil":
-		priceStr = prices.USDFoil
+		priceStr = foil
 	case "etched":
-		priceStr = prices.USDEtched
+		priceStr = etched
 	case "nonfoil":
-		priceStr = prices.USD
+		priceStr = nonfoil
 	default:
 		// For other treatments (glossy, etc.), try foil first
-		priceStr = prices.USDFoil
+		priceStr = foil
 	}
 
 	// Parse the price string to float64
@@ -31,8 +41,8 @@ func ParsePriceFromScryfall(prices scryfall.Prices, treatment string) float64 {
 	}
 
 	// Fallback to nonfoil price if treatment-specific price not available
-	if treatment != "nonfoil" && prices.USD != "" {
-		if price, err := strconv.ParseFloat(prices.USD, 64); err == nil {
+	if treatment != "nonfoil" && nonfoil != "" {
+		if price, err := strconv.ParseFloat(nonfoil, 64); err == nil {
 			return price
 		}
 	}

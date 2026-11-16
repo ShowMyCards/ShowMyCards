@@ -19,11 +19,15 @@ func NewDashboardHandler(db *gorm.DB) *DashboardHandler {
 	return &DashboardHandler{db: db}
 }
 
-// calculateInventoryValue computes the total USD value of inventory items
-// using treatment-aware pricing via ParsePriceFromScryfall.
-func calculateInventoryValue(db *gorm.DB, items []models.Inventory) float64 {
+type currencyValues struct {
+	usd float64
+	eur float64
+}
+
+// calculateInventoryValue computes treatment-aware USD and EUR inventory totals.
+func calculateInventoryValue(db *gorm.DB, items []models.Inventory) currencyValues {
 	if len(items) == 0 {
-		return 0
+		return currencyValues{}
 	}
 
 	// Collect unique scryfall IDs
@@ -40,14 +44,14 @@ func calculateInventoryValue(db *gorm.DB, items []models.Inventory) float64 {
 	scryfallCardMap, err := models.GetScryfallCardsByIDs(db, scryfallIDs)
 	if err != nil {
 		slog.Warn("failed to fetch cards for inventory value calculation", "component", "dashboard", "error", err)
-		return 0
+		return currencyValues{}
 	}
 
-	var totalValue float64
+	var totalValue currencyValues
 	for _, item := range items {
 		if card, ok := scryfallCardMap[item.ScryfallID]; ok {
-			price := utils.ParsePriceFromScryfall(card.Prices, item.Treatment)
-			totalValue += price * float64(item.Quantity)
+			totalValue.usd += utils.ParsePriceFromScryfall(card.Prices, item.Treatment) * float64(item.Quantity)
+			totalValue.eur += utils.ParseEURPriceFromScryfall(card.Prices, item.Treatment) * float64(item.Quantity)
 		}
 	}
 	return totalValue
@@ -56,20 +60,23 @@ func calculateInventoryValue(db *gorm.DB, items []models.Inventory) float64 {
 // DashboardStats represents the statistics for the dashboard
 // tygo:export
 type DashboardStats struct {
-	TotalInventoryCards      int64   `json:"total_inventory_cards"`       // Sum of inventory.quantity
-	TotalWishlistCards       int64   `json:"total_wishlist_cards"`        // Sum of list_item.collected_quantity
-	TotalCollectionValue     float64 `json:"total_collection_value"`      // Value from inventory
-	TotalCollectedFromLists  float64 `json:"total_collected_from_lists"`  // Value of cards collected from lists
-	TotalRemainingListsValue float64 `json:"total_remaining_lists_value"` // Value of cards still needed from lists
-	TotalStorageLocations    int64   `json:"total_storage_locations"`
-	TotalLists               int64   `json:"total_lists"`
-	UnassignedCards          int64   `json:"unassigned_cards"`
+	TotalInventoryCards         int64   `json:"total_inventory_cards"`           // Sum of inventory.quantity
+	TotalWishlistCards          int64   `json:"total_wishlist_cards"`            // Sum of list_item.collected_quantity
+	TotalCollectionValue        float64 `json:"total_collection_value"`          // USD value from inventory
+	TotalCollectedFromLists     float64 `json:"total_collected_from_lists"`      // USD value of cards collected from lists
+	TotalRemainingListsValue    float64 `json:"total_remaining_lists_value"`     // USD value of cards still needed from lists
+	TotalCollectionValueEUR     float64 `json:"total_collection_value_eur"`      // EUR value from inventory
+	TotalCollectedFromListsEUR  float64 `json:"total_collected_from_lists_eur"`  // EUR value of cards collected from lists
+	TotalRemainingListsValueEUR float64 `json:"total_remaining_lists_value_eur"` // EUR value of cards still needed from lists
+	TotalStorageLocations       int64   `json:"total_storage_locations"`
+	TotalLists                  int64   `json:"total_lists"`
+	UnassignedCards             int64   `json:"unassigned_cards"`
 }
 
 // listValueResult holds the computed collected and remaining values for lists.
 type listValueResult struct {
-	collected float64
-	remaining float64
+	collected currencyValues
+	remaining currencyValues
 }
 
 // calculateListValues computes the total collected and remaining values for all list items.
@@ -96,12 +103,15 @@ func calculateListValues(db *gorm.DB, listItems []models.ListItem) listValueResu
 	for _, item := range listItems {
 		if scryfallCard, ok := scryfallCardMap[item.ScryfallID]; ok {
 			price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+			priceEUR := utils.ParseEURPriceFromScryfall(scryfallCard.Prices, item.Treatment)
 
-			result.collected += price * float64(item.CollectedQuantity)
+			result.collected.usd += price * float64(item.CollectedQuantity)
+			result.collected.eur += priceEUR * float64(item.CollectedQuantity)
 
 			remaining := item.DesiredQuantity - item.CollectedQuantity
 			if remaining > 0 {
-				result.remaining += price * float64(remaining)
+				result.remaining.usd += price * float64(remaining)
+				result.remaining.eur += priceEUR * float64(remaining)
 			}
 		}
 	}
@@ -177,7 +187,9 @@ func (h *DashboardHandler) GetStats(c fiber.Ctx) error {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to calculate collection value", "database query failed", err)
 	}
-	stats.TotalCollectionValue = calculateInventoryValue(db, inventoryItems)
+	inventoryValues := calculateInventoryValue(db, inventoryItems)
+	stats.TotalCollectionValue = inventoryValues.usd
+	stats.TotalCollectionValueEUR = inventoryValues.eur
 
 	// Calculate total wishlist values (both collected and remaining)
 	var listItems []models.ListItem
@@ -187,8 +199,10 @@ func (h *DashboardHandler) GetStats(c fiber.Ctx) error {
 	}
 
 	listValues := calculateListValues(db, listItems)
-	stats.TotalCollectedFromLists = listValues.collected
-	stats.TotalRemainingListsValue = listValues.remaining
+	stats.TotalCollectedFromLists = listValues.collected.usd
+	stats.TotalRemainingListsValue = listValues.remaining.usd
+	stats.TotalCollectedFromListsEUR = listValues.collected.eur
+	stats.TotalRemainingListsValueEUR = listValues.remaining.eur
 
 	return c.JSON(stats)
 }
