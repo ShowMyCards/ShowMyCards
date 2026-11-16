@@ -1,5 +1,5 @@
-import { browser } from '$app/environment';
-import type { ViewMode } from '$lib';
+import { browser } from '$app/env';
+import type { ViewMode } from '#lib';
 
 /**
  * Reactive view mode state persisted to localStorage.

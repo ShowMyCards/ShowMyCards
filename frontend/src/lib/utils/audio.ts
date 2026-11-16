@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { audio } from '$lib';
+ * import { audio } from '#lib';
  *
  * // Play a sound
  * audio.play('match');

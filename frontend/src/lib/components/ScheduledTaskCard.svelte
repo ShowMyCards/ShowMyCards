@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Lozenge } from '$lib';
+	import { Lozenge } from '#lib';
 	import { resolve } from '$app/paths';
-	import type { ScheduledTaskInfo } from '$lib';
+	import type { ScheduledTaskInfo } from '#lib';
 
 	let { task }: { task: ScheduledTaskInfo } = $props();
 

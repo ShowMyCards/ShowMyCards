@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { SearchResponse } from '$lib';
+import type { SearchResponse } from '#lib';
 
 /**
  * Query parameters for card search
@@ -16,7 +16,7 @@ export interface SearchParams {
  *
  * @example
  * ```ts
- * import { searchApi } from '$lib/api';
+ * import { searchApi } from '#lib/api/index.ts';
  *
  * // Search for cards
  * const results = await searchApi.cards({ q: 'lightning bolt', page: 1 });

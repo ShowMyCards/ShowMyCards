@@ -1392,8 +1392,11 @@ func TestListAsCards_EnhancedCardFields(t *testing.T) {
 	if card.Prices.USD == "" {
 		t.Error("expected USD price to be set")
 	}
+	wantImage := "https://cards.scryfall.io/grid/front/d/5/d573ef03-4730-45aa-93dd-e45ac1dbaf4a.webp?1559591645"
 	if card.ImageURI == nil {
 		t.Error("expected image_uri to be set")
+	} else if *card.ImageURI != wantImage {
+		t.Errorf("expected image_uri %s (grid WebP), got %s", wantImage, *card.ImageURI)
 	}
 	if card.Inventory.TotalQuantity != 3 {
 		t.Errorf("expected total_quantity 3, got %d", card.Inventory.TotalQuantity)

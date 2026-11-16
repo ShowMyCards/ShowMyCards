@@ -6,6 +6,7 @@ import (
 	"backend/models"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/expr-lang/expr"
 	"gorm.io/gorm"
@@ -69,6 +70,13 @@ func (e *Evaluator) evaluateExpression(expression string, cardData map[string]in
 		env[k] = v
 	}
 
+	// Scryfall returns set codes in lowercase ("c20"), but players usually write
+	// them in uppercase ("C20"). Expose the uppercase form and let setCodePatcher
+	// uppercase the literals compared against it, so either case matches.
+	if set, ok := env["set"].(string); ok {
+		env["set"] = strings.ToUpper(set)
+	}
+
 	// Add helper functions
 	env["hasColor"] = func(color string) bool {
 		return hasColor(cardData, color)
@@ -87,7 +95,7 @@ func (e *Evaluator) evaluateExpression(expression string, cardData map[string]in
 	}
 
 	// Compile the expression
-	program, err := expr.Compile(expression, expr.Env(env), expr.AsBool())
+	program, err := expr.Compile(expression, expr.Env(env), expr.AsBool(), expr.Patch(setCodePatcher{}))
 	if err != nil {
 		return false, fmt.Errorf("failed to compile expression: %w", err)
 	}

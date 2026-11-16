@@ -117,7 +117,7 @@ The codebase must use Svelte 5 runes exclusively. Flag any Svelte 4 patterns.
 Since the frontend consumes a Go Fiber API:
 
 - **Centralise API calls.** All fetch calls to the backend should go through a
-  shared API client module (`$lib/api/` or similar). Do not scatter raw `fetch`
+  shared API client module (`#lib/api/` or similar). Do not scatter raw `fetch`
   calls across components.
 - **Type the API responses.** Define TypeScript interfaces/types for every API
   response shape. Do not use `any` or untyped `data` objects.
@@ -167,7 +167,7 @@ Since the frontend consumes a Go Fiber API:
   decomposed. Separate data logic from presentation.
 - **Overly complex template expressions.** If a `{#if}` / `{#each}` / `{:else}`
   block is nested 3+ levels deep, extract inner blocks into child components.
-- **Utility grab-bags.** A `$lib/utils.ts` file with 20+ unrelated exports
+- **Utility grab-bags.** A `#lib/utils.ts` file with 20+ unrelated exports
   should be broken into focused modules.
 
 ### When NOT to Flag
@@ -255,11 +255,12 @@ usable.
   client-side is sufficient.
 - **Layout hierarchy.** Use `+layout.svelte` and `+layout.ts` for shared UI
   and data. Don't repeat the same wrapper markup in every page component.
-- **`$lib` alias.** All shared code should live under `src/lib/` and be
-  imported via `$lib/...`. Don't use relative paths like `../../../lib/`.
-- **Environment variables.** Use `$env/static/public` for client-safe config
-  and `$env/static/private` for server-only secrets. Don't use `process.env`
-  or `import.meta.env` directly.
+- **`#lib` alias.** All shared code should live under `src/lib/` and be
+  imported via `#lib/...`. Don't use relative paths like `../../../lib/`.
+- **Environment variables.** Declare every variable in `src/env.ts` with
+  `defineEnvVars`, then import client-safe config from `$app/env/public` and
+  server-only secrets from `$app/env/private`. Don't use `process.env`,
+  `import.meta.env`, or the deprecated `$env/*` modules directly.
 
 ---
 

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import type { StorageLocation } from '$lib';
-	import { notifications, getActionError } from '$lib';
+	import type { StorageLocation } from '#lib';
+	import { notifications, getActionError } from '#lib';
 	import { Box, BookOpen, Pencil, Trash2, Grid2x2 } from '@lucide/svelte';
 
 	interface Props {
@@ -130,7 +130,7 @@
 		<!-- Action Buttons -->
 		<div class="flex gap-2 ml-auto">
 			<a
-				href={resolve(`/inventory/${location.id}`)}
+				href={resolve(`inventory/${location.id}`)}
 				class="btn bg-base-100 btn-sm"
 				title="Browse cards in this location">
 				<Grid2x2 class="w-4 h-4" />

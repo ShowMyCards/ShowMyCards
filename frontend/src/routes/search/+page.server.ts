@@ -1,10 +1,10 @@
-import { BACKEND_URL, type SearchResponse } from '$lib';
+import { BACKEND_URL, type SearchResponse } from '#lib';
 import {
 	handleAddInventory,
 	handleDeleteInventory,
 	handleUpdateInventory
-} from '$lib/server/inventory-actions';
-import { loadStorageLocations } from '$lib/server/storage';
+} from '#lib/server/inventory-actions.ts';
+import { loadStorageLocations } from '#lib/server/storage.ts';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 
