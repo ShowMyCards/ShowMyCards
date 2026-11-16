@@ -3,13 +3,13 @@ import {
 	type InventoryCardsResponse,
 	type StorageLocationWithCount,
 	type InventoryCard
-} from '$lib';
+} from '#lib';
 import {
 	handleAddInventory,
 	handleDeleteInventory,
 	handleUpdateInventory
-} from '$lib/server/inventory-actions';
-import { loadStorageLocations } from '$lib/server/storage';
+} from '#lib/server/inventory-actions.ts';
+import { loadStorageLocations } from '#lib/server/storage.ts';
 import type { PageServerLoad, Actions } from './$types';
 import { error } from '@sveltejs/kit';
 

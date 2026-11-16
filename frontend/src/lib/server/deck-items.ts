@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 
 /** A single deck item to add, matching the backend CreateDeckItemRequest shape. */
 export interface DeckItemInput {

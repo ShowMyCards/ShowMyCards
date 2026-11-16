@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { manaSymbolClasses } from '$lib/utils/mana';
+	import { manaSymbolClasses } from '#lib/utils/mana.ts';
 
 	let { cost, class: className = '' }: { cost?: string | null; class?: string } = $props();
 

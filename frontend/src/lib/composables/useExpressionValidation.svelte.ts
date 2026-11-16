@@ -1,5 +1,5 @@
 import { TIMEOUTS } from '../constants';
-import { rulesApi, ApiError } from '$lib/api';
+import { rulesApi, ApiError } from '#lib/api/index.ts';
 
 /**
  * Reusable debounced expression validation

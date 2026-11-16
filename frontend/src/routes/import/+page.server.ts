@@ -1,7 +1,7 @@
-import { BACKEND_URL, type SearchResponse, type DeckSummary } from '$lib';
-import { handleAddInventory } from '$lib/server/inventory-actions';
-import { loadStorageLocations } from '$lib/server/storage';
-import { upsertDeckItems } from '$lib/server/deck-items';
+import { BACKEND_URL, type SearchResponse, type DeckSummary } from '#lib';
+import { handleAddInventory } from '#lib/server/inventory-actions.ts';
+import { loadStorageLocations } from '#lib/server/storage.ts';
+import { upsertDeckItems } from '#lib/server/deck-items.ts';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { DeckSummary } from '$lib';
+	import type { DeckSummary } from '#lib';
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
-	import { Modal, FormField, notifications, getActionError } from '$lib';
+	import { Modal, FormField, notifications, getActionError } from '#lib';
 	import { Layers, Pencil, Trash2 } from '@lucide/svelte';
 
 	let { deck }: { deck: DeckSummary } = $props();
@@ -79,7 +79,7 @@
 					title="Delete this deck">
 					<Trash2 class="w-4 h-4" />
 				</button>
-				<a href={resolve(`/decks/${deck.id}`)} class="btn btn-primary btn-sm"> Open </a>
+				<a href={resolve(`decks/${deck.id}`)} class="btn btn-primary btn-sm"> Open </a>
 			</div>
 		</div>
 	</div>

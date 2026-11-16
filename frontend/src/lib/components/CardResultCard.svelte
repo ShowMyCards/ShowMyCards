@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '$lib';
+	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '#lib';
 	import {
 		getCardTreatmentName,
 		getDisplayName,
@@ -9,24 +10,26 @@
 		keyboard,
 		selection,
 		audio
-	} from '$lib';
+	} from '#lib';
 	import { FolderInput, LayersPlus } from '@lucide/svelte';
 	import AddToDeckModal from './AddToDeckModal.svelte';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
-	import { deserialize } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import CardInventoryLocations from './CardInventoryLocations.svelte';
+	import { deserialize, type ActionResult } from '$app/forms';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { ActionResult } from '@sveltejs/kit';
-	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
+	import type { ByOracleResponse, ExistingPrintingInfo } from '#lib/types/api.ts';
 
 	let {
 		card,
 		onremove,
 		storageLocations = [],
 		selectable = false,
+		readOnly = false,
+		showLocations = false,
 		onSplitMove,
 		deck
 	}: {
@@ -34,6 +37,8 @@
 		onremove?: (cardId: string) => void;
 		storageLocations?: StorageLocation[];
 		selectable?: boolean;
+		readOnly?: boolean;
+		showLocations?: boolean;
 		onSplitMove?: (inv: Inventory, available: number) => void;
 		/** Optional deck-availability summary; renders a "free for decks" indicator when set. */
 		deck?: { owned: number; decked: number; free: number };
@@ -43,7 +48,8 @@
 	let selectedStorageLocation = $state<number | 'auto'>('auto');
 
 	// Track if this card is the keyboard hover target
-	const isKeyboardTarget = $derived(keyboard.hoveredId === card.id);
+	const isKeyboardTarget = $derived(!readOnly && keyboard.hoveredId === card.id);
+	onDestroy(() => keyboard.clearHoverTarget(card.id));
 
 	// Local reactive state for inventory (initialized from prop, then managed locally)
 	// Intentionally captures initial value — diverges from prop via optimistic add/remove
@@ -51,6 +57,9 @@
 	let inventory = $state<Inventory[]>([...card.inventory.this_printing]);
 	// svelte-ignore state_referenced_locally
 	let totalQuantity = $state(card.inventory.total_quantity);
+	// Read-only cards follow refreshed props without keeping an editable snapshot.
+	const displayedInventory = $derived(readOnly ? card.inventory.this_printing : inventory);
+	const displayedQuantity = $derived(readOnly ? card.inventory.total_quantity : totalQuantity);
 
 	let adding = $state(false);
 	let removing = $state(false);
@@ -61,7 +70,7 @@
 	// Refresh the "free for decks" indicator when this tile shows one; other views
 	// (e.g. search) have nothing deck-related to reload.
 	function handleAddedToDeck() {
-		if (deck) invalidateAll();
+		if (deck) refreshAll();
 	}
 
 	// Printing conflict modal state
@@ -81,7 +90,7 @@
 	// Group inventory by treatment for this printing
 	const thisPrintingByTreatment = $derived.by(() => {
 		const map = new SvelteMap<string, number>();
-		for (const inv of inventory) {
+		for (const inv of displayedInventory) {
 			const treatment = inv.treatment || 'nonfoil';
 			map.set(treatment, (map.get(treatment) || 0) + inv.quantity);
 		}
@@ -132,7 +141,7 @@
 	}
 
 	async function handleIncrement(treatment: string) {
-		if (adding) return;
+		if (readOnly || adding) return;
 
 		// Check for existing printings in different locations
 		const hasConflict = await checkForExistingPrintings(treatment);
@@ -146,7 +155,7 @@
 	}
 
 	async function doAddToInventory(treatment: string) {
-		if (adding) return;
+		if (readOnly || adding) return;
 
 		adding = true;
 
@@ -155,7 +164,7 @@
 			id: Date.now(), // Temporary ID
 			scryfall_id: card.id,
 			oracle_id: card.oracle_id,
-			treatment: treatment,
+			treatment,
 			quantity: 1,
 			storage_location_id: undefined,
 			storage_location: undefined,
@@ -234,7 +243,7 @@
 	async function handleDecrement(treatment: string) {
 		// Guard against concurrent mutations: rapid clicks would otherwise read
 		// stale state and issue duplicate requests, desyncing totalQuantity.
-		if (adding || removing) return;
+		if (readOnly || adding || removing) return;
 
 		const inv = inventory.find((i) => i.treatment === treatment);
 		if (!inv) return;
@@ -315,6 +324,7 @@
 	};
 
 	function handleMouseEnter() {
+		if (readOnly) return;
 		keyboard.setHoverTarget(card.id, cardActions);
 	}
 
@@ -325,10 +335,10 @@
 	// Selection handling - select all inventory IDs for this card
 	const inventoryIds = $derived(inventory.map((i) => i.id));
 	const isSelected = $derived(
-		inventoryIds.length > 0 && inventoryIds.every((id) => selection.isSelected(id))
+		!readOnly && inventoryIds.length > 0 && inventoryIds.every((id) => selection.isSelected(id))
 	);
 	const isPartiallySelected = $derived(
-		!isSelected && inventoryIds.some((id) => selection.isSelected(id))
+		!readOnly && !isSelected && inventoryIds.some((id) => selection.isSelected(id))
 	);
 
 	function handleSelectionChange() {
@@ -358,7 +368,7 @@
 	onmouseenter={handleMouseEnter}
 	onmouseleave={handleMouseLeave}>
 	<!-- Selection checkbox -->
-	{#if selectable && inventoryIds.length > 0}
+	{#if !readOnly && selectable && inventoryIds.length > 0}
 		<div class="absolute top-3 left-3 z-10">
 			<input
 				type="checkbox"
@@ -378,7 +388,7 @@
 		<LayersPlus class="h-4 w-4" />
 	</button>
 	<!-- Clickable image to card details -->
-	<a href={resolve(`/cards/${card.id}`)} class="block">
+	<a href={resolve(`cards/${card.id}`)} class="block">
 		{#if card.image_uri}
 			<figure class="cursor-pointer hover:opacity-90 transition-opacity">
 				<img src={card.image_uri} alt={card.name} loading="lazy" />
@@ -396,18 +406,17 @@
 			<div>
 				<!-- Clickable name to card details -->
 				<a
-					href={resolve(`/cards/${card.id}`)}
-					class="card-title text-lg hover:text-primary transition-colors">
-					{getDisplayName(card)}
-				</a>
+					href={resolve(`cards/${card.id}`)}
+					class="card-title text-lg hover:text-primary transition-colors">{getDisplayName(card)}</a>
+
 				<div class="text-sm opacity-70 flex items-center gap-2 flex-wrap">
 					<span>{card.set_name}</span>
 					<span class="badge badge-outline badge-xs uppercase">{card.language}</span>
 				</div>
 			</div>
-			{#if totalQuantity > 0}
+			{#if displayedQuantity > 0}
 				<div class="badge badge-primary badge-lg font-semibold">
-					{totalQuantity}
+					{displayedQuantity}
 				</div>
 			{/if}
 		</div>
@@ -426,7 +435,7 @@
 		{/if}
 
 		<!-- Storage location override dropdown -->
-		{#if storageLocations.length > 0}
+		{#if !readOnly && storageLocations.length > 0}
 			<div class="mb-2">
 				<StorageLocationDropdown
 					locations={storageLocations}
@@ -434,6 +443,10 @@
 					onchange={(v) => (selectedStorageLocation = v)}
 					compact />
 			</div>
+		{/if}
+
+		{#if showLocations}
+			<CardInventoryLocations inventory={displayedInventory} />
 		{/if}
 
 		<div class="flex">
@@ -455,37 +468,37 @@
 					</div>
 					<!-- Price -->
 					{#if card.prices && (card.prices.usd || card.prices.usd_foil || card.prices.usd_etched)}
-						<div class="py-1">
-							<PriceLozenge {treatment} prices={card.prices} />
-						</div>
+						<div class="py-1"><PriceLozenge {treatment} prices={card.prices} /></div>
 					{/if}
 					<!-- Quantity (prominent) -->
 					<div class="text-2xl font-bold my-1">{quantity}</div>
 					<!-- +/- Buttons -->
-					<div class="flex items-center gap-1">
-						<button
-							onclick={() => handleDecrement(treatment)}
-							disabled={quantity === 0 || adding || removing}
-							class="btn btn-sm btn-square bg-base-100">
-							−
-						</button>
-						<button
-							onclick={() => handleIncrement(treatment)}
-							disabled={adding || removing}
-							class="btn btn-sm btn-square bg-base-100">
-							+
-						</button>
-						{#if onSplitMove && quantity > 0}
+					{#if !readOnly}
+						<div class="flex items-center gap-1">
 							<button
-								onclick={() => handleSplitMove(treatment)}
-								disabled={adding || removing}
-								class="btn btn-sm btn-square bg-base-100"
-								title="Move copies to another location"
-								aria-label="Move copies to another location">
-								<FolderInput class="h-4 w-4" />
+								onclick={() => handleDecrement(treatment)}
+								disabled={quantity === 0 || adding || removing}
+								class="btn btn-sm btn-square bg-base-100">
+								−
 							</button>
-						{/if}
-					</div>
+							<button
+								onclick={() => handleIncrement(treatment)}
+								disabled={adding || removing}
+								class="btn btn-sm btn-square bg-base-100">
+								+
+							</button>
+							{#if onSplitMove && quantity > 0}
+								<button
+									onclick={() => handleSplitMove(treatment)}
+									disabled={adding || removing}
+									class="btn btn-sm btn-square bg-base-100"
+									title="Move copies to another location"
+									aria-label="Move copies to another location">
+									<FolderInput class="h-4 w-4" />
+								</button>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -509,12 +522,14 @@
 		onAdded={handleAddedToDeck} />
 {/if}
 
-<PrintingConflictModal
-	open={showConflictModal}
-	cardName={card.name}
-	treatment={conflictTreatment}
-	{existingPrintings}
-	{existingLocations}
-	selectedLocation={selectedLocationObj}
-	onClose={() => (showConflictModal = false)}
-	onChoose={handleConflictChoice} />
+{#if !readOnly}
+	<PrintingConflictModal
+		open={showConflictModal}
+		cardName={card.name}
+		treatment={conflictTreatment}
+		{existingPrintings}
+		{existingLocations}
+		selectedLocation={selectedLocationObj}
+		onClose={() => (showConflictModal = false)}
+		onChoose={handleConflictChoice} />
+{/if}

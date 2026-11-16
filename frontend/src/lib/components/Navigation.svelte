@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { menuItems } from '$lib/data/navigation';
+	import { menuItems } from '#lib/data/navigation.ts';
 	import { resolve } from '$app/paths';
 
 	let appVersion = $state('');

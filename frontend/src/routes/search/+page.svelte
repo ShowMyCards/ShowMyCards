@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import { untrack } from 'svelte';
 	import { enhance, deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
@@ -21,10 +21,10 @@
 		SCRYFALL_LANGUAGES,
 		type EnhancedCardResult,
 		type InventoryCard
-	} from '$lib';
+	} from '#lib';
 	import { Search, Lightbulb, SlidersHorizontal } from '@lucide/svelte';
-	import SearchBuilderModal from '$lib/components/SearchBuilderModal.svelte';
-	import SetIcon from '$lib/components/SetIcon.svelte';
+	import SearchBuilderModal from '#lib/components/SearchBuilderModal.svelte';
+	import SetIcon from '#lib/components/SetIcon.svelte';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
@@ -228,10 +228,8 @@
 						type="button"
 						class="btn btn-outline"
 						title="Advanced"
-						onclick={() => (showSearchBuilder = true)}>
-						<SlidersHorizontal class="w-4 h-4" />
-						Advanced
-					</button>
+						onclick={() => (showSearchBuilder = true)}
+						><SlidersHorizontal class="w-4 h-4" /> Advanced</button>
 				</div>
 				{#if hasTypedLanguage}
 					<p class="text-xs opacity-70 mt-2">
@@ -362,9 +360,8 @@
 								{@const totalQty = card.inventory.total_quantity}
 								<tr class="hover:bg-base-300">
 									<td>
-										<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
-											{getDisplayName(card)}
-										</a>
+										<a href={resolve(`cards/${card.id}`)} class="font-semibold hover:text-primary"
+											>{getDisplayName(card)}</a>
 									</td>
 									<td>
 										<div class="flex items-center gap-2">
@@ -373,6 +370,7 @@
 												setName={card.set_name}
 												rarity="common"
 												{isFoil} />
+
 											<span class="text-sm">{card.set_name}</span>
 										</div>
 									</td>

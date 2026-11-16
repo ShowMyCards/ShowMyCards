@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
@@ -12,10 +12,10 @@
 		DeckAddResultCard,
 		notifications,
 		getActionError,
-		type ScryfallCard,
+		type EnhancedCardResult,
 		type EnrichedDeckItem
-	} from '$lib';
-	import type { DeckGroupMode, DeckSortMode } from '$lib/utils/deck-grouping';
+	} from '#lib';
+	import type { DeckGroupMode, DeckSortMode } from '#lib/utils/deck-grouping.ts';
 	import { ArrowLeft, Pencil, Trash2, Search, Info } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -54,10 +54,9 @@
 		}
 	});
 
-	const searchResults = $derived<ScryfallCard[]>(
-		form && 'searchResults' in form ? ((form.searchResults as ScryfallCard[]) ?? []) : []
+	const searchResults = $derived<EnhancedCardResult[]>(
+		form && 'searchResults' in form ? ((form.searchResults as EnhancedCardResult[]) ?? []) : []
 	);
-
 	const totalItems = $derived(
 		data.items.command.length +
 			data.items.main.length +
@@ -138,13 +137,12 @@
 	{#if data.deck}
 		<PageHeader title={data.deck.name} description={data.deck.description}>
 			{#snippet actions()}
-				<a href={resolve('/decks')} class="btn bg-base-100 btn-sm">
-					<ArrowLeft class="w-4 h-4" />
-					Back
-				</a>
-				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit deck">
-					<Pencil class="w-4 h-4" />
-				</button>
+				<a href={resolve('/decks')} class="btn bg-base-100 btn-sm"
+					><ArrowLeft class="w-4 h-4" /> Back</a>
+
+				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit deck"
+					><Pencil class="w-4 h-4" /></button>
+
 				<button
 					onclick={() => (showDeleteModal = true)}
 					class="btn bg-base-100 btn-sm text-error"
@@ -296,6 +294,7 @@
 </div>
 
 <!-- Edit Deck Modal -->
+
 <Modal open={showEditModal} onClose={() => (showEditModal = false)} title="Edit Deck">
 	<form
 		method="POST"
@@ -357,6 +356,7 @@
 </Modal>
 
 <!-- Delete Deck Modal -->
+
 <Modal open={showDeleteModal} onClose={() => (showDeleteModal = false)} title="Delete Deck">
 	<p>
 		Are you sure you want to delete <span class="font-semibold">{data.deck?.name}</span>? This will

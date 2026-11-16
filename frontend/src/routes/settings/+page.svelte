@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import {
 		PageHeader,
 		Lozenge,
@@ -7,12 +7,12 @@
 		getActionError,
 		dataApi,
 		SCRYFALL_LANGUAGES
-	} from '$lib';
-	import type { ExportData, ImportResponse } from '$lib';
-	import SettingRow from '$lib/components/SettingRow.svelte';
-	import SettingActions from '$lib/components/SettingActions.svelte';
-	import DisplaySettings from '$lib/components/DisplaySettings.svelte';
-	import BulkImportCard from '$lib/components/BulkImportCard.svelte';
+	} from '#lib';
+	import type { ExportData, ImportResponse } from '#lib';
+	import SettingRow from '#lib/components/SettingRow.svelte';
+	import SettingActions from '#lib/components/SettingActions.svelte';
+	import DisplaySettings from '#lib/components/DisplaySettings.svelte';
+	import BulkImportCard from '#lib/components/BulkImportCard.svelte';
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
@@ -216,7 +216,10 @@
 								{:else if settings.bulk_data_last_update_status === 'in_progress'}
 									<Lozenge color="warning" size="xsmall">In Progress</Lozenge>
 								{/if}
-								· <a href={resolve('/jobs')} class="link link-primary text-sm">View job history</a>
+
+								·
+
+								<a href={resolve('jobs')} class="link link-primary text-sm">View job history</a>
 							</p>
 						{/if}
 					</div>
@@ -277,10 +280,8 @@
 				</p>
 
 				<div class="flex flex-wrap gap-3">
-					<a href={resolve('/api/data/export')} class="btn btn-primary" download>
-						<Download class="w-4 h-4" />
-						Export Data
-					</a>
+					<a href={resolve('api/data/export')} class="btn btn-primary" download
+						><Download class="w-4 h-4" /> Export Data</a>
 
 					<button class="btn btn-secondary" onclick={() => fileInput?.click()}>
 						<Upload class="w-4 h-4" />

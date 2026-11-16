@@ -5,7 +5,7 @@
  * Persists to localStorage.
  */
 
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 export type Currency = 'usd' | 'eur';
 

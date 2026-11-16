@@ -14,7 +14,7 @@
 		type CardResult,
 		type ResolveResult,
 		type Inventory
-	} from '$lib';
+	} from '#lib';
 	import {
 		parseCardList,
 		resolveTreatment,
@@ -22,9 +22,9 @@
 		getTreatmentMarker,
 		type ParsedCard,
 		type ImportZone
-	} from '$lib/utils/card-list-parser';
+	} from '#lib/utils/card-list-parser.ts';
 	import { deserialize } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import {
 		FileText,
 		Search,
@@ -360,7 +360,7 @@
 				notifications.success(
 					`Added ${items.length} card${items.length !== 1 ? 's' : ''} to ${deckName}`
 				);
-				await invalidateAll();
+				await refreshAll();
 			} else {
 				notifications.error(
 					result.type === 'failure'
@@ -397,7 +397,7 @@
 
 			if (result.type === 'success' && result.data) {
 				const created = (result.data as { deck: { id: number } }).deck;
-				await invalidateAll();
+				await refreshAll();
 				selectedDeckId = String(created.id);
 				showCreateDeckModal = false;
 				newDeckName = '';

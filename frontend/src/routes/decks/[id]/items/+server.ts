@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { upsertDeckItems } from '$lib/server/deck-items';
+import { upsertDeckItems } from '#lib/server/deck-items.ts';
 import type { RequestHandler } from './$types';
 
 /**

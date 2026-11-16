@@ -1,6 +1,6 @@
 import type { Snippet } from 'svelte';
-import type { RuntimeStorageLocation as StorageLocation } from '$lib/types/runtime';
-import type { CardPrices } from '$lib/types/api';
+import type { RuntimeStorageLocation as StorageLocation } from '#lib/types/runtime.ts';
+import type { CardPrices } from '#lib/types/api.ts';
 
 // Re-export for convenience
 export type { StorageLocation };

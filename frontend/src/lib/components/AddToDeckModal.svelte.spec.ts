@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { DeckSummary } from '$lib';
+import type { DeckSummary } from '#lib';
 import AddToDeckModal from './AddToDeckModal.svelte';
 
 function deck(id: number, name: string): DeckSummary {
@@ -13,7 +13,8 @@ function deck(id: number, name: string): DeckSummary {
 		updated_at: '',
 		total_items: 0,
 		total_cards_demand: 0,
-		aggregate_shortfall: 0
+		aggregate_shortfall: 0,
+		aggregate_over_committed: 0
 	};
 }
 

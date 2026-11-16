@@ -1,8 +1,8 @@
 import type { PageServerLoad, Actions } from './$types';
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import { fail, redirect } from '@sveltejs/kit';
-import type { Deck, DeckItemsResponse } from '$lib';
-import { upsertDeckItems } from '$lib/server/deck-items';
+import type { Deck, DeckItemsResponse } from '#lib';
+import { upsertDeckItems } from '#lib/server/deck-items.ts';
 
 const emptyItems: DeckItemsResponse = {
 	deck_id: 0,

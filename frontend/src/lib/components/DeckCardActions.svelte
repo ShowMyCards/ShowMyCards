@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { EnrichedDeckItem } from '$lib';
-	import { notifications, getActionError } from '$lib';
-	import { invalidateAll } from '$app/navigation';
+	import type { EnrichedDeckItem } from '#lib';
+	import { notifications, getActionError } from '#lib';
+	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { ChevronDown, Trash2 } from '@lucide/svelte';
 
@@ -41,7 +41,7 @@
 		const response = await fetch(`?/${action}`, { method: 'POST', body: formData });
 		const result = deserialize(await response.text());
 		if (result.type === 'success') {
-			await invalidateAll();
+			await refreshAll();
 			return true;
 		}
 		notifications.error(

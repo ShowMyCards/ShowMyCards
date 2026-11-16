@@ -2,7 +2,7 @@
  * Data adapters for normalizing different card data sources into DisplayableCard
  */
 
-import type { EnhancedCardResult, EnrichedListItem } from '$lib';
+import type { EnhancedCardResult, EnrichedListItem } from '#lib';
 import type { DisplayableCard, CardSourceType } from './types';
 
 /**

@@ -370,7 +370,9 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 	offset := utils.CalculateOffset(params.Page, params.PageSize)
 	if err := query.
 		Preload("StorageLocation").
-		Order("created_at DESC").
+		// id breaks created_at ties (bulk imports share timestamps) so offset
+		// pagination is deterministic and no row is skipped or repeated across pages.
+		Order("created_at DESC, id DESC").
 		Limit(params.PageSize).
 		Offset(offset).
 		Find(&inventoryItems).Error; err != nil {

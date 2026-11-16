@@ -1,5 +1,5 @@
-import { BACKEND_URL } from '$lib';
-import { fetchStorageLocationsWithCounts } from '$lib/server/storage';
+import { BACKEND_URL } from '#lib';
+import { fetchStorageLocationsWithCounts } from '#lib/server/storage.ts';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch, depends, setHeaders }) => {

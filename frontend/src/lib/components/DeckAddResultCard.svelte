@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { ScryfallCard } from '$lib';
-	import { notifications, getActionError } from '$lib';
-	import { invalidateAll } from '$app/navigation';
+	import type { EnhancedCardResult } from '#lib';
+	import { notifications, getActionError } from '#lib';
+	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { Plus } from '@lucide/svelte';
 
-	let { card }: { card: ScryfallCard } = $props();
+	let { card }: { card: EnhancedCardResult } = $props();
 
 	const ZONES = [
 		{ value: 'command', label: 'Command' },
@@ -19,7 +19,7 @@
 	let pin = $state(false);
 	let adding = $state(false);
 
-	const imageUri = $derived(card.image_uris?.small ?? card.image_uris?.normal ?? '');
+	const imageUri = $derived(card.image_uri ?? '');
 
 	async function add() {
 		if (adding) return;
@@ -42,7 +42,7 @@
 			const response = await fetch('?/addItems', { method: 'POST', body: formData });
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
-				await invalidateAll();
+				await refreshAll();
 				const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
 				notifications.success(`Added ${card.name} to ${zoneLabel}`);
 			} else if (result.type === 'failure') {
@@ -70,7 +70,7 @@
 		<div class="min-w-0">
 			<div class="font-medium truncate">{card.name}</div>
 			<div class="text-xs opacity-60">{card.set_name} · #{card.collector_number}</div>
-			<div class="text-xs opacity-50 uppercase">{card.set}</div>
+			<div class="text-xs opacity-50 uppercase">{card.set_code}</div>
 		</div>
 	</div>
 

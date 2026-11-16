@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { EnrichedDeckItem } from '$lib';
+	import type { EnrichedDeckItem } from '#lib';
 	import ManaCost from './ManaCost.svelte';
 	import DeckCardActions from './DeckCardActions.svelte';
-	import { groupCards, type DeckGroupMode, type DeckSortMode } from '$lib/utils/deck-grouping';
+	import { groupCards, type DeckGroupMode, type DeckSortMode } from '#lib/utils/deck-grouping.ts';
 	import { resolve } from '$app/paths';
 
 	let {
@@ -36,7 +36,7 @@
 	}
 
 	function cardHref(item: EnrichedDeckItem): string | undefined {
-		return item.printing_id ? resolve(`/cards/${item.printing_id}`) : undefined;
+		return item.printing_id ? resolve(`cards/${item.printing_id}`) : undefined;
 	}
 </script>
 
@@ -55,7 +55,7 @@
 	{@const href = cardHref(item)}
 	{#if href}
 		<a
-			href={resolve(`/cards/${item.printing_id}`)}
+			href={resolve(`cards/${item.printing_id}`)}
 			class="block transition-transform hover:brightness-110">{@render cardImage(item)}</a>
 	{:else}
 		{@render cardImage(item)}
@@ -91,7 +91,7 @@
 							</span>
 							{#if href}
 								<a
-									href={resolve(`/cards/${item.printing_id}`)}
+									href={resolve(`cards/${item.printing_id}`)}
 									class="hover:text-primary flex-1 truncate">{item.name || 'Unknown card'}</a>
 							{:else}
 								<span class="flex-1 truncate">{item.name || 'Unknown card'}</span>

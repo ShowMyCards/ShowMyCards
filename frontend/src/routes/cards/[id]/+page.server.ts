@@ -1,4 +1,4 @@
-import { BACKEND_URL, type EnhancedCardResult, type DeckCardUsage } from '$lib';
+import { BACKEND_URL, type EnhancedCardResult, type DeckCardUsage } from '#lib';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { audio, currency, type Currency } from '$lib';
+	import { browser } from '$app/env';
+	import { audio, currency, type Currency } from '#lib';
 	import SettingRow from './SettingRow.svelte';
 
 	// Sound settings (client-only, stored in localStorage)

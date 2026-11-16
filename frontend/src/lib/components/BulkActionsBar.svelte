@@ -5,8 +5,8 @@
 		notifications,
 		type InventoryCard,
 		type StorageLocation
-	} from '$lib';
-	import type { AddToDeckCard } from '$lib/utils/deck-add';
+	} from '#lib';
+	import type { AddToDeckCard } from '#lib/utils/deck-add.ts';
 	import { X, FolderInput, Trash2, RefreshCw, LayersPlus } from '@lucide/svelte';
 	import AddToDeckModal from './AddToDeckModal.svelte';
 

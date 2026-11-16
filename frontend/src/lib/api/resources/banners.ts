@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { Banner } from '$lib';
+import type { Banner } from '#lib';
 
 /**
  * Banners API methods.
@@ -9,7 +9,7 @@ import type { Banner } from '$lib';
  *
  * @example
  * ```ts
- * import { bannersApi } from '$lib';
+ * import { bannersApi } from '#lib';
  *
  * const banners = await bannersApi.list();
  * ```

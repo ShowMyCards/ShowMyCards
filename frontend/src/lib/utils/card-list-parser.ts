@@ -106,9 +106,7 @@ const ZONE_HEADERS: Record<string, ImportZone | 'ignore'> = {
 };
 
 type LineKind =
-	| { kind: 'card' }
-	| { kind: 'header'; zone: ImportZone | 'ignore' }
-	| { kind: 'skip' };
+	{ kind: 'card' } | { kind: 'header'; zone: ImportZone | 'ignore' } | { kind: 'skip' };
 
 /**
  * Classify a non-empty, non-comment line as a card, a section header, or a

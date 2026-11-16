@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { decksApi, notifications, type DeckSummary, type DeckZone } from '$lib';
-	import { buildDeckItems, type AddToDeckCard } from '$lib/utils/deck-add';
+	import { decksApi, notifications, type DeckSummary, type DeckZone } from '#lib';
+	import { buildDeckItems, type AddToDeckCard } from '#lib/utils/deck-add.ts';
 	import { LayersPlus, Plus } from '@lucide/svelte';
 	import Modal from './Modal.svelte';
 
@@ -103,7 +103,8 @@
 					updated_at: '',
 					total_items: 0,
 					total_cards_demand: 0,
-					aggregate_shortfall: 0
+					aggregate_shortfall: 0,
+					aggregate_over_committed: 0
 				},
 				...decks
 			];

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { ListSummary } from '$lib';
+	import type { ListSummary } from '#lib';
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
-	import { Modal, FormField, notifications, getActionError } from '$lib';
+	import { Modal, FormField, notifications, getActionError } from '#lib';
 	import { ListTodo, Pencil, Trash2 } from '@lucide/svelte';
 
 	let { list }: { list: ListSummary } = $props();
@@ -68,22 +68,22 @@
 
 			<!-- Actions -->
 			<div class="shrink-0 flex items-center gap-2">
-				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit this list">
-					<Pencil class="w-4 h-4" />
-				</button>
+				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit this list"
+					><Pencil class="w-4 h-4" /></button>
+
 				<button
 					onclick={() => (showDeleteModal = true)}
 					class="btn bg-base-100 btn-sm text-error"
-					title="Delete this list">
-					<Trash2 class="w-4 h-4" />
-				</button>
-				<a href={resolve(`/lists/${list.id}`)} class="btn btn-primary btn-sm"> Browse </a>
+					title="Delete this list"><Trash2 class="w-4 h-4" /></button>
+
+				<a href={resolve(`lists/${list.id}`)} class="btn btn-primary btn-sm">Browse</a>
 			</div>
 		</div>
 	</div>
 </div>
 
 <!-- Edit Modal -->
+
 <Modal open={showEditModal} onClose={() => (showEditModal = false)} title="Edit List">
 	<form
 		method="POST"
@@ -152,6 +152,7 @@
 </Modal>
 
 <!-- Delete Confirmation Modal -->
+
 <Modal open={showDeleteModal} onClose={() => (showDeleteModal = false)} title="Delete List">
 	<p>
 		Are you sure you want to delete <span class="font-semibold">{list.name}</span>? This will also

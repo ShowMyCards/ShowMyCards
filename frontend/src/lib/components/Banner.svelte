@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Banner } from '$lib';
+	import type { Banner } from '#lib';
 	import { Info, TriangleAlert, CircleAlert, X } from '@lucide/svelte';
 
 	interface Props {
