@@ -59,13 +59,13 @@ describe('parseCardList — decklist identity', () => {
 			collectorNumber: '67',
 			treatment: 'foil',
 			pinned: true,
-			query: 'e:BRR cn:67'
+			query: 'e:BRR cn:"67"'
 		});
 	});
 
 	it('parses an etched marker', () => {
 		const { cards } = parseCardList('1 Gravecrawler (2X2) 438 *E*');
-		expect(cards[0]).toMatchObject({ treatment: 'etched', pinned: true, query: 'e:2X2 cn:438' });
+		expect(cards[0]).toMatchObject({ treatment: 'etched', pinned: true, query: 'e:2X2 cn:"438"' });
 	});
 
 	it('handles collector numbers with letter suffixes', () => {
@@ -73,8 +73,28 @@ describe('parseCardList — decklist identity', () => {
 			'1 Sothera, the Supervoid (PEOE) 115s *F*\n1 The Meathook Massacre (PMID) 112p *F*'
 		);
 		expect(cards[0].collectorNumber).toBe('115s');
-		expect(cards[0].query).toBe('e:PEOE cn:115s');
+		expect(cards[0].query).toBe('e:PEOE cn:"115s"');
 		expect(cards[1].collectorNumber).toBe('112p');
+	});
+
+	it('pins The List (PLST) printings with hyphenated collector numbers', () => {
+		const { cards } = parseCardList(
+			"1 Gelatinous Genesis (PLST) 2XM-169\n1 Predator's Howl (PLST) CNS-37"
+		);
+		expect(cards[0]).toMatchObject({
+			name: 'Gelatinous Genesis',
+			set: 'PLST',
+			collectorNumber: '2XM-169',
+			pinned: true,
+			query: 'e:PLST cn:"2XM-169"'
+		});
+		expect(cards[1]).toMatchObject({
+			name: "Predator's Howl",
+			set: 'PLST',
+			collectorNumber: 'CNS-37',
+			pinned: true,
+			query: 'e:PLST cn:"CNS-37"'
+		});
 	});
 
 	it('keeps a double-faced name intact and pins by set/collector', () => {
@@ -98,7 +118,7 @@ describe('parseCardList — decklist identity', () => {
 
 	it('appends the language clause to resolved queries', () => {
 		const { cards } = parseCardList("1 Ashnod's Altar (BRR) 67\nsol ring", { language: 'de' });
-		expect(cards[0].query).toBe('e:BRR cn:67 l:de');
+		expect(cards[0].query).toBe('e:BRR cn:"67" l:de');
 		expect(cards[1].query).toBe('sol ring l:de');
 	});
 
