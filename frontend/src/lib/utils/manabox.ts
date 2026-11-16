@@ -9,9 +9,12 @@
  * The import page only understands Scryfall search syntax
  * (see card-list-parser.ts), so ManaBox lines are converted to the equivalent
  * Scryfall syntax before being parsed:
- *   1 Lightning Bolt (2ED) 161   -> 1 e:2ED cn:161
- *   2 Counterspell (EMA) 43 *F*  -> 2! e:EMA cn:43
- *   1 Sol Ring (LTC) 284 *E*     -> 1!! e:LTC cn:284
+ *   1 Lightning Bolt (2ED) 161   -> 1 e:2ED cn:"161"
+ *   2 Counterspell (EMA) 43 *F*  -> 2! e:EMA cn:"43"
+ *   1 Sol Ring (LTC) 284 *E*     -> 1!! e:LTC cn:"284"
+ *
+ * The collector number is always quoted: Scryfall does not match hyphenated
+ * (The List's "2XM-169") or suffixed ("112p") numbers in an unquoted cn:.
  *
  * A trailing `*F*` marks a foil printing (`!` marker); `*E*` marks etched
  * (`!!` marker). Both map to card-list-parser's treatment markers.
@@ -55,7 +58,7 @@ export function convertManaboxLine(line: string): string | null {
 	// *F* -> foil (!), *E* -> etched (!!), none -> nonfoil.
 	const treatmentMarker = finishMarker === 'F' ? '!' : finishMarker === 'E' ? '!!' : '';
 
-	return `${quantity}${treatmentMarker} e:${setCode} cn:${collectorNumber}`;
+	return `${quantity}${treatmentMarker} e:${setCode} cn:"${collectorNumber}"`;
 }
 
 /**

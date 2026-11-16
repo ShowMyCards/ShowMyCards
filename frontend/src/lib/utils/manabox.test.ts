@@ -3,30 +3,35 @@ import { convertManaboxLine, preprocessImportText } from './manabox';
 
 describe('convertManaboxLine', () => {
 	it('converts a non-foil ManaBox line to Scryfall syntax', () => {
-		expect(convertManaboxLine('1 Lightning Bolt (2ED) 161')).toBe('1 e:2ED cn:161');
+		expect(convertManaboxLine('1 Lightning Bolt (2ED) 161')).toBe('1 e:2ED cn:"161"');
 	});
 
 	it('converts a foil ManaBox line and adds the foil marker', () => {
-		expect(convertManaboxLine('2 Counterspell (EMA) 43 *F*')).toBe('2! e:EMA cn:43');
+		expect(convertManaboxLine('2 Counterspell (EMA) 43 *F*')).toBe('2! e:EMA cn:"43"');
 	});
 
 	it('converts an etched ManaBox line and adds the etched marker', () => {
-		expect(convertManaboxLine('1 Sol Ring (LTC) 284 *E*')).toBe('1!! e:LTC cn:284');
+		expect(convertManaboxLine('1 Sol Ring (LTC) 284 *E*')).toBe('1!! e:LTC cn:"284"');
 	});
 
 	it('handles split-card names with no parentheses', () => {
-		expect(convertManaboxLine('3 Fire // Ice (APC) 128')).toBe('3 e:APC cn:128');
+		expect(convertManaboxLine('3 Fire // Ice (APC) 128')).toBe('3 e:APC cn:"128"');
 	});
 
 	it('binds the set code to the last group when the name contains parentheses', () => {
 		// The set code is always the parenthesised group immediately before the
 		// collector number, so a name that itself contains parentheses must not
 		// be mistaken for the set code.
-		expect(convertManaboxLine("1 Erase (Not the Urza's One) (WTH) 20")).toBe('1 e:WTH cn:20');
+		expect(convertManaboxLine("1 Erase (Not the Urza's One) (WTH) 20")).toBe('1 e:WTH cn:"20"');
 	});
 
 	it('handles star (foil-sheet) collector numbers', () => {
-		expect(convertManaboxLine('1 Arcane Signet (WOC) 118★')).toBe('1 e:WOC cn:118★');
+		expect(convertManaboxLine('1 Arcane Signet (WOC) 118★')).toBe('1 e:WOC cn:"118★"');
+	});
+
+	it('quotes hyphenated collector numbers (The List / PLST)', () => {
+		expect(convertManaboxLine('1 Gelatinous Genesis (PLST) 2XM-169')).toBe('1 e:PLST cn:"2XM-169"');
+		expect(convertManaboxLine("1 Predator's Howl (PLST) CNS-37")).toBe('1 e:PLST cn:"CNS-37"');
 	});
 
 	it('returns null for a Scryfall-style line (no parenthesised set code)', () => {
@@ -45,7 +50,7 @@ describe('convertManaboxLine', () => {
 
 describe('preprocessImportText', () => {
 	it('appends the language clause to converted ManaBox lines', () => {
-		expect(preprocessImportText('1 Lightning Bolt (2ED) 161', 'de')).toBe('1 e:2ED cn:161 l:de');
+		expect(preprocessImportText('1 Lightning Bolt (2ED) 161', 'de')).toBe('1 e:2ED cn:"161" l:de');
 	});
 
 	it('appends the language clause to passed-through Scryfall lines', () => {
@@ -63,7 +68,7 @@ describe('preprocessImportText', () => {
 	});
 
 	it('does not append a language clause when none is given', () => {
-		expect(preprocessImportText('1 Lightning Bolt (2ED) 161', '')).toBe('1 e:2ED cn:161');
+		expect(preprocessImportText('1 Lightning Bolt (2ED) 161', '')).toBe('1 e:2ED cn:"161"');
 	});
 
 	it('leaves parenthesised Scryfall queries intact while appending language', () => {
@@ -77,7 +82,7 @@ describe('preprocessImportText', () => {
 			'2 Counterspell (EMA) 43 *F*'
 		].join('\n');
 		expect(preprocessImportText(input, 'en')).toBe(
-			['1 e:2ED cn:161 l:en', '4 e:who cn:1056 l:en', '2! e:EMA cn:43 l:en'].join('\n')
+			['1 e:2ED cn:"161" l:en', '4 e:who cn:1056 l:en', '2! e:EMA cn:"43" l:en'].join('\n')
 		);
 	});
 });

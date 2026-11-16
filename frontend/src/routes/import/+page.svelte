@@ -587,8 +587,8 @@
 				selected card language is appended to every line.
 			</p>
 			<pre
-				class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">1 Lightning Bolt (2ED) 161    →  1 e:2ED cn:161
-2 Counterspell (EMA) 43 *F*   →  2! e:EMA cn:43</pre>
+				class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">1 Lightning Bolt (2ED) 161    →  1 e:2ED cn:"161"
+2 Counterspell (EMA) 43 *F*   →  2! e:EMA cn:"43"</pre>
 		</div>
 	</div>
 </div>
