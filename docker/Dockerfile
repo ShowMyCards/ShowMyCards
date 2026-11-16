@@ -7,7 +7,7 @@
 # Base image pinned to digest as defence against tag hijacks on Docker Hub
 # (tags are mutable). Renovate's `docker` manager keeps the digest current
 # and the version tag is retained as a human-readable hint.
-FROM golang:1.26-alpine@sha256:30b1e546a9c7fa3b747c2bdba3a0c7bdf3a02ebb4c5b8405d2f948d7e8aac4ec AS backend-builder
+FROM golang:1.26-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab AS backend-builder
 
 # The base image's Go must satisfy backend/go.mod's `go` directive on its own.
 # Left unset, GOTOOLCHAIN defaults to `auto`, and Go quietly downloads a newer
