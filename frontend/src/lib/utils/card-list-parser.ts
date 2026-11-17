@@ -12,9 +12,12 @@
  *      [quantity] Name [(SET) COLLECTOR] [*F*|*E*]
  *      - treatment marker is TRAILING: *F* = foil, *E* = etched
  *      - "1 Ashnod's Altar"              -> any printing (name search)
- *      - "1 Ashnod's Altar (BRR) 67 *F*" -> pinned printing (e:BRR cn:"67"), foil
- *      - the collector number is always quoted: Scryfall does not match hyphenated
- *        (The List's "2XM-169") or suffixed ("112p") numbers in an unquoted cn:
+ *      - "1 Ashnod's Altar (BRR) 67 *F*" -> pinned printing (e:BRR cn:67), foil
+ *
+ * Collector numbers that aren't purely digits are quoted in the resolved query
+ * (cn:"2XM-169", cn:"112p", cn:"65†"): Scryfall does not match them in an unquoted
+ * cn:. Plain numbers stay unquoted. This applies to both input styles, so a typed
+ * "e:plst cn:2XM-169" is rewritten too.
  *
  * Zones (deck import): section headers (Commander / Deck / Sideboard / Maybeboard
  * and common variants, plus an "About" metadata block that is skipped) switch the
@@ -81,7 +84,32 @@ const LEADING_PATTERN = /^(\d+)?\s*(!!?)?\s*(.+)$/;
 // "(o:draw or o:scry) e:dom" — cannot match and pass through as queries. The name
 // group is greedy so a name that itself contains parentheses binds the set to the
 // LAST "(XXX)" group (e.g. "Erase (Not the One) (WTH) 20").
-const PINNED_PATTERN = /^(.+)\s+\(([0-9A-Za-z]+)\)\s+([0-9A-Za-z★-]+)(?:\s+\*([FE])\*)?$/;
+//
+// The collector number is any run of characters except whitespace and those that
+// would let it swallow Scryfall syntax or the finish marker: ":" (so "e:dom" isn't
+// a number), '"' (keeps quoting intact), "(" ")" (Scryfall grouping) and "*" (the
+// *F* / *E* marker). This admits real numbers such as "65†", "2XM-169" and "118★".
+// The lookahead requires at least one letter or digit, so a lone "-" isn't a number.
+const PINNED_PATTERN =
+	/^(.+)\s+\(([0-9A-Za-z]+)\)\s+((?=[^\s:"()*]*[\p{L}\p{N}])[^\s:"()*]+)(?:\s+\*([FE])\*)?$/u;
+
+// An unquoted cn:/number: clause in a Scryfall query (":" or "=" only; range
+// comparisons like cn>=100 are numeric and left alone). The value stops at
+// whitespace, quotes and parentheses so grouped queries keep their syntax. The
+// first alternative consumes quoted strings whole so text inside them is untouched.
+const CN_CLAUSE_PATTERN = /"[^"]*"|(^|[\s(])(-?)(cn|number)([:=])([^\s"()]+)/gi;
+
+/** Build a cn: clause, quoting the collector number unless it is purely digits. */
+function cnClause(collector: string): string {
+	return /^\d+$/.test(collector) ? `cn:${collector}` : `cn:"${collector}"`;
+}
+
+/** Quote any non-numeric unquoted cn:/number: value in a Scryfall query. */
+function quoteCollectorNumbers(query: string): string {
+	return query.replace(CN_CLAUSE_PATTERN, (clause, lead, neg, key, op, value?: string) =>
+		value === undefined || /^\d+$/.test(value) ? clause : `${lead}${neg}${key}${op}"${value}"`
+	);
+}
 
 // Existing Scryfall language clause (l: or lang:), mirroring the backend's
 // languageClauseRegExp in backend/api/search.go so we never double-append.
@@ -202,7 +230,7 @@ function parseCardLine(
 			lineNumber,
 			quantity,
 			treatment,
-			query: withLanguage(`e:${set} cn:"${collector}"`, options.language),
+			query: withLanguage(`e:${set} ${cnClause(collector)}`, options.language),
 			zone,
 			name: name.trim(),
 			set,
@@ -224,7 +252,10 @@ function parseCardLine(
 		lineNumber,
 		quantity,
 		treatment,
-		query: withLanguage(rest.trim(), options.language),
+		query: withLanguage(
+			looksLikeQuery ? quoteCollectorNumbers(rest.trim()) : rest.trim(),
+			options.language
+		),
 		zone,
 		name: looksLikeQuery ? undefined : rest.trim(),
 		pinned: false

@@ -37,6 +37,31 @@ describe('parseCardList — Scryfall syntax (back-compat)', () => {
 		expect(cards[0].query).toBe('(o:draw or o:scry) e:dom');
 	});
 
+	it('quotes non-numeric cn:/number: values in typed queries', () => {
+		const { cards } = parseCardList(
+			[
+				'1 e:plst cn:2XM-169',
+				'1 e:pmid number:112p',
+				'1 e:2ed cn:161',
+				'1 e:plst cn:"CNS-37"',
+				'1 e:plst (cn:2XM-169 or cn:CNS-37)',
+				'1 e:plst -cn:2XM-169',
+				'1 e:2ed cn>=100',
+				'1 o:"cn:abc" e:dom'
+			].join('\n')
+		);
+		expect(cards.map((c) => c.query)).toEqual([
+			'e:plst cn:"2XM-169"',
+			'e:pmid number:"112p"',
+			'e:2ed cn:161',
+			'e:plst cn:"CNS-37"',
+			'e:plst (cn:"2XM-169" or cn:"CNS-37")',
+			'e:plst -cn:"2XM-169"',
+			'e:2ed cn>=100',
+			'o:"cn:abc" e:dom'
+		]);
+	});
+
 	it('binds the set to the LAST parenthesised group for names containing parentheses', () => {
 		// Preserves the ManaBox shim guarantee now that parsing is native.
 		const { cards } = parseCardList('1 Erase (Not the One) (WTH) 20');
@@ -59,13 +84,13 @@ describe('parseCardList — decklist identity', () => {
 			collectorNumber: '67',
 			treatment: 'foil',
 			pinned: true,
-			query: 'e:BRR cn:"67"'
+			query: 'e:BRR cn:67'
 		});
 	});
 
 	it('parses an etched marker', () => {
 		const { cards } = parseCardList('1 Gravecrawler (2X2) 438 *E*');
-		expect(cards[0]).toMatchObject({ treatment: 'etched', pinned: true, query: 'e:2X2 cn:"438"' });
+		expect(cards[0]).toMatchObject({ treatment: 'etched', pinned: true, query: 'e:2X2 cn:438' });
 	});
 
 	it('handles collector numbers with letter suffixes', () => {
@@ -75,6 +100,49 @@ describe('parseCardList — decklist identity', () => {
 		expect(cards[0].collectorNumber).toBe('115s');
 		expect(cards[0].query).toBe('e:PEOE cn:"115s"');
 		expect(cards[1].collectorNumber).toBe('112p');
+		expect(cards[1].query).toBe('e:PMID cn:"112p"');
+	});
+
+	it('quotes collector numbers containing symbols', () => {
+		const { cards } = parseCardList(
+			'1 Some Card (SET) 65†\n1 Other Card (SET) 118★ *F*\n1 Third Card (SET) 1Φ'
+		);
+		expect(cards[0]).toMatchObject({
+			collectorNumber: '65†',
+			pinned: true,
+			query: 'e:SET cn:"65†"'
+		});
+		expect(cards[1]).toMatchObject({
+			collectorNumber: '118★',
+			treatment: 'foil',
+			query: 'e:SET cn:"118★"'
+		});
+		expect(cards[2]).toMatchObject({ collectorNumber: '1Φ', query: 'e:SET cn:"1Φ"' });
+	});
+
+	it('pins collector numbers containing an underscore', () => {
+		// The only real example in Scryfall's data (checked 2026-11-17).
+		const { cards } = parseCardList('1 Jaya Ballard, Task Mage (PMPS08) a1_2007');
+		expect(cards[0]).toMatchObject({
+			name: 'Jaya Ballard, Task Mage',
+			set: 'PMPS08',
+			collectorNumber: 'a1_2007',
+			pinned: true,
+			query: 'e:PMPS08 cn:"a1_2007"'
+		});
+	});
+
+	it('leaves plain numeric collector numbers unquoted', () => {
+		const { cards } = parseCardList('1 Some Card (2ED) 161');
+		expect(cards[0]).toMatchObject({ collectorNumber: '161', query: 'e:2ED cn:161' });
+	});
+
+	it('does not read Scryfall clauses or a lone symbol as a collector number', () => {
+		const { cards } = parseCardList('1 Foo (ABC) e:dom\n1 Foo (ABC) -\n1 Foo (ABC) *F*');
+		for (const card of cards) {
+			expect(card.pinned).toBe(false);
+		}
+		expect(cards[0].query).toBe('Foo (ABC) e:dom');
 	});
 
 	it('pins The List (PLST) printings with hyphenated collector numbers', () => {
@@ -118,7 +186,7 @@ describe('parseCardList — decklist identity', () => {
 
 	it('appends the language clause to resolved queries', () => {
 		const { cards } = parseCardList("1 Ashnod's Altar (BRR) 67\nsol ring", { language: 'de' });
-		expect(cards[0].query).toBe('e:BRR cn:"67" l:de');
+		expect(cards[0].query).toBe('e:BRR cn:67 l:de');
 		expect(cards[1].query).toBe('sol ring l:de');
 	});
 
