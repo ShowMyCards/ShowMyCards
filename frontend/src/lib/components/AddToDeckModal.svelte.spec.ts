@@ -50,7 +50,7 @@ describe('AddToDeckModal', () => {
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		const onAdded = vi.fn();
 		const onClose = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose });
+		await render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose });
 
 		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
 		await page.getByRole('radio', { name: 'Side' }).click();
@@ -72,7 +72,7 @@ describe('AddToDeckModal', () => {
 	it('preselects the last deck used', async () => {
 		localStorage.setItem('smc-last-deck-id', '9');
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
 	});
@@ -80,7 +80,7 @@ describe('AddToDeckModal', () => {
 	it('offers a copies toggle in bulk mode and adds one of each', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onAdded = vi.fn();
-		render(AddToDeckModal, {
+		await render(AddToDeckModal, {
 			open: true,
 			bulk: true,
 			cards: [
@@ -112,9 +112,11 @@ describe('AddToDeckModal', () => {
 
 	it('prompts to create a deck when there are none', async () => {
 		mockBackend([]);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await expect.element(page.getByText('You have no decks yet')).toBeInTheDocument();
+		await expect
+			.element(page.getByText('You have no decks yet. Name your first one:'))
+			.toBeInTheDocument();
 		await expect.element(page.getByPlaceholder('New deck name')).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
 	});

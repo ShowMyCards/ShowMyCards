@@ -33,6 +33,37 @@
 	let saving = $state(false);
 	let removing = $state(false);
 
+	// Moving to another zone. With more than one copy we ask how many to move
+	// (defaulting to all of them); a single copy moves as soon as a zone is picked.
+	let moveZone = $derived<string>(item.zone);
+	let moveQty = $derived(item.desired_quantity);
+	const movePending = $derived(moveZone !== item.zone);
+	const moveQtyValid = $derived(
+		Number.isInteger(moveQty) && moveQty >= 1 && moveQty <= item.desired_quantity
+	);
+	const zoneLabel = (value: string) => ZONES.find((z) => z.value === value)?.label ?? value;
+
+	// The <details> menu stays open until something closes it: all row menus
+	// share a name so only one is open at a time, and outside clicks or Escape
+	// close it here.
+	let open = $state(false);
+	let menu: HTMLDetailsElement | undefined = $state();
+
+	function close() {
+		open = false;
+	}
+
+	function onDocumentClick(event: MouseEvent) {
+		if (open && menu && !menu.contains(event.target as Node)) close();
+	}
+
+	function onDocumentKeydown(event: KeyboardEvent) {
+		if (open && event.key === 'Escape') {
+			close();
+			menu?.querySelector('summary')?.focus();
+		}
+	}
+
 	async function post(action: string, fields: Record<string, string>): Promise<boolean> {
 		const formData = new FormData();
 		for (const [key, value] of Object.entries(fields)) {
@@ -60,14 +91,33 @@
 		}
 	}
 
-	async function changeZone(event: Event) {
-		const target = event.currentTarget as HTMLSelectElement;
-		const newZone = target.value;
-		if (newZone === item.zone) return;
+	function onZoneChange() {
+		if (movePending && item.desired_quantity === 1) move();
+	}
+
+	function cancelMove() {
+		moveZone = item.zone;
+		moveQty = item.desired_quantity;
+	}
+
+	async function move() {
+		if (saving || !movePending || !moveQtyValid) return;
 		saving = true;
-		const ok = await post('updateItem', { item_id: String(item.id), zone: newZone });
-		if (!ok) target.value = item.zone;
-		saving = false;
+		try {
+			const ok = await post('moveItem', {
+				item_id: String(item.id),
+				zone: moveZone,
+				quantity: String(moveQty)
+			});
+			if (ok) {
+				notifications.success(`Moved ${moveQty} ${item.name || 'card'} to ${zoneLabel(moveZone)}`);
+				close();
+			} else {
+				cancelMove();
+			}
+		} finally {
+			saving = false;
+		}
 	}
 
 	async function remove() {
@@ -75,14 +125,19 @@
 		removing = true;
 		try {
 			const ok = await post('deleteItem', { item_id: String(item.id) });
-			if (ok) notifications.success(`Removed ${item.name || 'card'} from deck`);
+			if (ok) {
+				notifications.success(`Removed ${item.name || 'card'} from deck`);
+				close();
+			}
 		} finally {
 			removing = false;
 		}
 	}
 </script>
 
-<details class="dropdown dropdown-end">
+<svelte:document onclick={onDocumentClick} onkeydown={onDocumentKeydown} />
+
+<details class="dropdown dropdown-end" name="deck-card-actions" bind:open bind:this={menu}>
 	<summary
 		class="btn btn-ghost btn-xs btn-square"
 		title="Card actions"
@@ -128,8 +183,8 @@
 		<div class="mb-2 flex items-center gap-2">
 			<span class="w-12 text-xs opacity-70">Zone</span>
 			<select
-				value={item.zone}
-				onchange={changeZone}
+				bind:value={moveZone}
+				onchange={onZoneChange}
 				disabled={saving}
 				class="select select-bordered select-xs"
 				aria-label="Zone">
@@ -138,6 +193,28 @@
 				{/each}
 			</select>
 		</div>
+
+		{#if movePending && item.desired_quantity > 1}
+			<div class="bg-base-200 rounded-box mb-2 p-2">
+				<div class="mb-2 flex items-center gap-2 text-xs">
+					<span>Move</span>
+					<input
+						type="number"
+						min="1"
+						max={item.desired_quantity}
+						bind:value={moveQty}
+						class="input input-bordered input-xs w-14"
+						aria-label="Quantity to move" />
+					<span>of {item.desired_quantity} to {zoneLabel(moveZone)}</span>
+				</div>
+				<div class="flex gap-2">
+					<button onclick={move} disabled={saving || !moveQtyValid} class="btn btn-primary btn-xs"
+						>Move</button>
+					<button onclick={cancelMove} disabled={saving} class="btn btn-ghost btn-xs"
+						>Cancel</button>
+				</div>
+			</div>
+		{/if}
 
 		<button
 			onclick={remove}

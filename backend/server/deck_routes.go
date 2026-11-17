@@ -24,5 +24,6 @@ func DeckRoutes(app *fiber.App, db *gorm.DB, settingsService *services.SettingsS
 	decks.Get("/:id/items", handler.ListItems)
 	decks.Post("/:id/items/batch", handler.CreateItemsBatch)
 	decks.Put("/:id/items/:item_id", handler.UpdateItem)
+	decks.Post("/:id/items/:item_id/move", handler.MoveItem)
 	decks.Delete("/:id/items/:item_id", handler.DeleteItem)
 }

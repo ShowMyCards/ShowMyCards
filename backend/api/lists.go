@@ -508,6 +508,10 @@ func (h *ListHandler) CreateItemsBatch(c fiber.Ctx) error {
 		return tx.Create(&items).Error
 	})
 	if err != nil {
+		if utils.IsDuplicateKey(err) {
+			return utils.ReturnError(c, fiber.StatusConflict,
+				"one or more cards already exist in this list")
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to create list items", "database insert failed", err)
 	}

@@ -33,7 +33,7 @@ describe('/+page.svelte', () => {
 
 	it('uses the selected currency for all dashboard values', async () => {
 		currency.set('eur');
-		render(Page, { data });
+		await render(Page, { data });
 
 		expect(page.getByText('€0.00', { exact: true }).elements()).toHaveLength(3);
 		expect(page.getByText('$0.00', { exact: true }).elements()).toHaveLength(0);
@@ -43,7 +43,7 @@ describe('/+page.svelte', () => {
 		'displays %s totals and updates all values when currency changes',
 		async (selectedCurrency) => {
 			currency.set(selectedCurrency);
-			render(Page, {
+			await render(Page, {
 				data: {
 					stats: {
 						...data.stats,
@@ -76,7 +76,7 @@ describe('/+page.svelte', () => {
 	);
 
 	it('should render h1', async () => {
-		render(Page, { data });
+		await render(Page, { data });
 
 		const heading = page.getByRole('heading', { level: 1 });
 		await expect.element(heading).toBeInTheDocument();

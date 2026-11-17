@@ -18,7 +18,7 @@ import (
 func setupListTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestListDelete_NotFound(t *testing.T) {
 func setupListTestAppWithCards(t *testing.T) (*fiber.App, *gorm.DB) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
@@ -548,7 +548,7 @@ func TestListItems_CompletionPercentage_EmptyList(t *testing.T) {
 func setupListTestAppWithPrintLookup(t *testing.T) (*fiber.App, *gorm.DB) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
@@ -737,5 +737,33 @@ func TestListItems_ValueCalculation_MixedCompletion(t *testing.T) {
 	// Completion: (2+1)*100 / (2+3) = 300/5 = 60
 	if result.CompletionPercent != 60 {
 		t.Errorf("expected completion_percent 60, got %d", result.CompletionPercent)
+	}
+}
+
+func TestListCreateItemsBatch_DuplicateConflicts(t *testing.T) {
+	app, db := setupListTestApp(t)
+	app.Post("/api/lists/:id/items/batch", NewListHandler(db).CreateItemsBatch)
+	list := createTestList(t, db, "Dupes")
+	createTestListItem(t, db, list.ID, "scry-1", "oracle-1", "nonfoil", 1, 0)
+
+	body, _ := json.Marshal(CreateItemsBatchRequest{Items: []CreateListItemRequest{
+		{ScryfallID: "scry-2", OracleID: "oracle-2", Treatment: "nonfoil", DesiredQuantity: 1},
+		{ScryfallID: "scry-1", OracleID: "oracle-1", Treatment: "nonfoil", DesiredQuantity: 3},
+	}})
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/lists/%d/items/batch", list.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected status %d, got %d", http.StatusConflict, resp.StatusCode)
+	}
+	var count int64
+	db.Model(&models.ListItem{}).Where("list_id = ?", list.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("expected only the pre-existing item after rollback, got %d", count)
 	}
 }
