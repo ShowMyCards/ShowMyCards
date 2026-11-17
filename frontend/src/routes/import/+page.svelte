@@ -791,7 +791,10 @@ Deck
 				foil,
 				<code class="bg-base-300 px-1 rounded">!!</code> etched), e.g.
 				<code class="bg-base-300 px-1 rounded">4! e:who cn:1056</code> or
-				<code class="bg-base-300 px-1 rounded">2 e:2xm cn:117</code>.
+				<code class="bg-base-300 px-1 rounded">2 e:2xm cn:117</code>. Collector numbers that aren't
+				plain digits are quoted for you (<code class="bg-base-300 px-1 rounded"
+					>e:plst cn:2XM-169</code>
+				searches <code class="bg-base-300 px-1 rounded">cn:"2XM-169"</code>).
 			</p>
 		</div>
 	</div>
