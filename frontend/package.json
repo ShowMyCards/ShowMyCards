@@ -44,7 +44,7 @@
 		"@lucide/svelte": "0.577.0",
 		"@tailwindcss/typography": "0.5.20",
 		"@thisux/sveltednd": "0.0.20",
-		"theme-change": "2.5.2"
+		"theme-change": "3.0.4"
 	},
 	"overrides": {
 		"@tailwindcss/typography": {
