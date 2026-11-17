@@ -114,7 +114,9 @@ describe('AddToDeckModal', () => {
 		mockBackend([]);
 		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await expect.element(page.getByText('You have no decks yet')).toBeInTheDocument();
+		await expect
+			.element(page.getByText('You have no decks yet. Name your first one:'))
+			.toBeInTheDocument();
 		await expect.element(page.getByPlaceholder('New deck name')).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
 	});
