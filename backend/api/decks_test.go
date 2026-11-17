@@ -48,6 +48,7 @@ func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app.Get("/api/decks/:id/items", handler.ListItems)
 	app.Post("/api/decks/:id/items/batch", handler.CreateItemsBatch)
 	app.Put("/api/decks/:id/items/:item_id", handler.UpdateItem)
+	app.Post("/api/decks/:id/items/:item_id/move", handler.MoveItem)
 	app.Delete("/api/decks/:id/items/:item_id", handler.DeleteItem)
 
 	return app, db
@@ -1208,5 +1209,143 @@ func TestDeckUpdateItem_ZoneCollisionConflicts(t *testing.T) {
 	db.First(&reloaded, inSide.ID)
 	if reloaded.Zone != models.ZoneSide {
 		t.Errorf("expected item to stay in side zone, got %s", reloaded.Zone)
+	}
+}
+
+// Move item tests
+
+func postDeckMove(t *testing.T, app *fiber.App, deckID, itemID uint, zone models.DeckZone, qty int) *http.Response {
+	t.Helper()
+	body, _ := json.Marshal(MoveDeckItemRequest{Zone: zone, Quantity: qty})
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/decks/%d/items/%d/move", deckID, itemID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	return resp
+}
+
+func createDeckItem(t *testing.T, db *gorm.DB, deckID uint, zone models.DeckZone, qty int) models.DeckItem {
+	t.Helper()
+	item := models.DeckItem{DeckID: deckID, OracleID: "oracle-1", ScryfallID: "scry-1", Treatment: "foil", Zone: zone, DesiredQuantity: qty}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("create item failed: %v", err)
+	}
+	return item
+}
+
+// deckZoneQuantities returns desired quantity per zone for the deck's items.
+func deckZoneQuantities(t *testing.T, db *gorm.DB, deckID uint) map[models.DeckZone]int {
+	t.Helper()
+	var items []models.DeckItem
+	db.Where("deck_id = ?", deckID).Find(&items)
+	got := map[models.DeckZone]int{}
+	for _, it := range items {
+		if _, dup := got[it.Zone]; dup {
+			t.Fatalf("more than one row in zone %s", it.Zone)
+		}
+		got[it.Zone] = it.DesiredQuantity
+	}
+	return got
+}
+
+func TestDeckMoveItem(t *testing.T) {
+	cases := []struct {
+		name     string
+		side     int // copies in side (the source)
+		main     int // copies already in main (0 = no row)
+		move     int
+		wantMain int
+		wantSide int // 0 = source row deleted
+	}{
+		{"all copies, empty target moves the row", 2, 0, 2, 2, 0},
+		{"some copies, empty target splits the row", 3, 0, 1, 1, 2},
+		{"all copies merge into target", 1, 1, 1, 2, 0},
+		{"some copies merge into target", 3, 2, 2, 4, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app, db := setupDeckTestApp(t)
+			deck := createTestDeck(t, db, "Move")
+			source := createDeckItem(t, db, deck.ID, models.ZoneSide, tc.side)
+			if tc.main > 0 {
+				createDeckItem(t, db, deck.ID, models.ZoneMain, tc.main)
+			}
+
+			resp := postDeckMove(t, app, deck.ID, source.ID, models.ZoneMain, tc.move)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+			}
+			var got models.DeckItem
+			if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if got.Zone != models.ZoneMain || got.DesiredQuantity != tc.wantMain {
+				t.Errorf("expected target main x%d, got %s x%d", tc.wantMain, got.Zone, got.DesiredQuantity)
+			}
+			if got.ScryfallID != "scry-1" || got.Treatment != "foil" {
+				t.Errorf("expected printing and finish to carry over, got %+v", got)
+			}
+
+			want := map[models.DeckZone]int{models.ZoneMain: tc.wantMain}
+			if tc.wantSide > 0 {
+				want[models.ZoneSide] = tc.wantSide
+			}
+			if zones := deckZoneQuantities(t, db, deck.ID); fmt.Sprint(zones) != fmt.Sprint(want) {
+				t.Errorf("expected zones %v, got %v", want, zones)
+			}
+		})
+	}
+}
+
+func TestDeckMoveItem_SameZoneIsNoOp(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Move")
+	source := createDeckItem(t, db, deck.ID, models.ZoneSide, 2)
+
+	resp := postDeckMove(t, app, deck.ID, source.ID, models.ZoneSide, 1)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+	if zones := deckZoneQuantities(t, db, deck.ID); zones[models.ZoneSide] != 2 || len(zones) != 1 {
+		t.Errorf("expected side x2 unchanged, got %v", zones)
+	}
+}
+
+func TestDeckMoveItem_Rejections(t *testing.T) {
+	cases := []struct {
+		name       string
+		zone       models.DeckZone
+		qty        int
+		otherDeck  bool
+		wantStatus int
+	}{
+		{"quantity above desired", models.ZoneMain, 3, false, http.StatusBadRequest},
+		{"zero quantity", models.ZoneMain, 0, false, http.StatusBadRequest},
+		{"invalid zone", "graveyard", 1, false, http.StatusBadRequest},
+		{"item in another deck", models.ZoneMain, 1, true, http.StatusNotFound},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app, db := setupDeckTestApp(t)
+			deck := createTestDeck(t, db, "Move")
+			source := createDeckItem(t, db, deck.ID, models.ZoneSide, 2)
+			deckID := deck.ID
+			if tc.otherDeck {
+				deckID = createTestDeck(t, db, "Other").ID
+			}
+
+			resp := postDeckMove(t, app, deckID, source.ID, tc.zone, tc.qty)
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Errorf("expected status %d, got %d", tc.wantStatus, resp.StatusCode)
+			}
+			if zones := deckZoneQuantities(t, db, deck.ID); zones[models.ZoneSide] != 2 || len(zones) != 1 {
+				t.Errorf("expected side x2 unchanged, got %v", zones)
+			}
+		})
 	}
 }

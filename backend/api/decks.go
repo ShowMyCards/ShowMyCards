@@ -746,6 +746,118 @@ func (h *DeckHandler) UpdateItem(c fiber.Ctx) error {
 	return c.JSON(item)
 }
 
+// MoveDeckItemRequest represents the request body for moving copies of a deck
+// item to another zone.
+//
+// tygo:export
+type MoveDeckItemRequest struct {
+	Zone     models.DeckZone `json:"zone"`
+	Quantity int             `json:"quantity"`
+}
+
+var (
+	errMoveItemNotFound    = errors.New("deck item not found")
+	errMoveQuantityTooHigh = errors.New("quantity exceeds the item's desired quantity")
+)
+
+// MoveItem moves some or all copies of a deck item to another zone in a single
+// transaction. If the target zone already holds the same card (oracle, pinned
+// printing and finish), the copies merge into that row rather than colliding
+// on the unique index; otherwise a row is created, or the item itself is moved
+// when every copy goes. The source row is reduced, and deleted when emptied.
+// Responds with the resulting target row.
+func (h *DeckHandler) MoveItem(c fiber.Ctx) error {
+	deckID := fiber.Params[int](c, "id")
+	if deckID == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid deck id")
+	}
+
+	itemID := fiber.Params[int](c, "item_id")
+	if itemID == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid item id")
+	}
+
+	var req MoveDeckItemRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	if !req.Zone.IsValid() {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "zone must be one of main, side, command, maybe")
+	}
+	if req.Quantity < 1 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity must be at least 1")
+	}
+
+	var target models.DeckItem
+	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		var source models.DeckItem
+		if err := tx.Where("id = ? AND deck_id = ?", itemID, deckID).First(&source).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errMoveItemNotFound
+			}
+			return err
+		}
+		if source.Zone == req.Zone {
+			target = source
+			return nil
+		}
+		if req.Quantity > source.DesiredQuantity {
+			return errMoveQuantityTooHigh
+		}
+
+		err := tx.Where("deck_id = ? AND oracle_id = ? AND scryfall_id = ? AND treatment = ? AND zone = ?",
+			deckID, source.OracleID, source.ScryfallID, source.Treatment, req.Zone).First(&target).Error
+		switch {
+		case err == nil:
+			// Same card already in the target zone: merge into it.
+			target.DesiredQuantity += req.Quantity
+			if err := tx.Save(&target).Error; err != nil {
+				return err
+			}
+		case !errors.Is(err, gorm.ErrRecordNotFound):
+			return err
+		case req.Quantity == source.DesiredQuantity:
+			// Moving every copy and nothing to merge with: move the row itself.
+			source.Zone = req.Zone
+			if err := tx.Save(&source).Error; err != nil {
+				return err
+			}
+			target = source
+			return nil
+		default:
+			target = models.DeckItem{
+				DeckID:          source.DeckID,
+				OracleID:        source.OracleID,
+				ScryfallID:      source.ScryfallID,
+				Treatment:       source.Treatment,
+				Zone:            req.Zone,
+				DesiredQuantity: req.Quantity,
+			}
+			if err := tx.Create(&target).Error; err != nil {
+				return err
+			}
+		}
+
+		source.DesiredQuantity -= req.Quantity
+		if source.DesiredQuantity == 0 {
+			return tx.Delete(&source).Error
+		}
+		return tx.Save(&source).Error
+	})
+
+	switch {
+	case errors.Is(err, errMoveItemNotFound):
+		return utils.ReturnError(c, fiber.StatusNotFound, err.Error())
+	case errors.Is(err, errMoveQuantityTooHigh):
+		return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+	case err != nil:
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to move deck item", "database move failed", err)
+	}
+
+	return c.JSON(target)
+}
+
 // DeleteItem removes an item from a deck.
 func (h *DeckHandler) DeleteItem(c fiber.Ctx) error {
 	deckID := fiber.Params[int](c, "id")

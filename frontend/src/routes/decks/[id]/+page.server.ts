@@ -172,6 +172,40 @@ export const actions: Actions = {
 		}
 	},
 
+	// Move some or all copies of a deck item to another zone. The backend merges
+	// into an existing row for the same card in that zone.
+	moveItem: async ({ params, request, fetch }) => {
+		const { id } = params;
+		const data = await request.formData();
+		const itemId = data.get('item_id') as string;
+		const zone = data.get('zone') as string;
+		const quantity = parseInt((data.get('quantity') as string) ?? '', 10);
+
+		if (!itemId || !zone) {
+			return fail(400, { error: 'Item ID and zone are required' });
+		}
+		if (!Number.isInteger(quantity) || quantity < 1) {
+			return fail(400, { error: 'Quantity must be at least 1' });
+		}
+
+		try {
+			const response = await fetch(`${BACKEND_URL}/api/decks/${id}/items/${itemId}/move`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ zone, quantity })
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				return fail(response.status, { error: errorData.error || 'Failed to move card' });
+			}
+
+			return { success: true, action: 'move' };
+		} catch {
+			return fail(500, { error: 'Failed to move card' });
+		}
+	},
+
 	// Remove a card from the deck.
 	deleteItem: async ({ params, request, fetch }) => {
 		const { id } = params;

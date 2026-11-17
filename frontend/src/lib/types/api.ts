@@ -354,6 +354,15 @@ export interface UpdateDeckItemRequest {
 	scryfall_id?: string;
 	treatment?: string;
 }
+/**
+ * MoveDeckItemRequest represents the request body for moving copies of a deck
+ * item to another zone.
+ * tygo:export
+ */
+export interface MoveDeckItemRequest {
+	zone: import('./models').DeckZone;
+	quantity: number /* int */;
+}
 
 //////////
 // source: health.go
