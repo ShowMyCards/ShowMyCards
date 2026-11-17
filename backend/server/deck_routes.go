@@ -2,14 +2,15 @@ package server
 
 import (
 	"backend/api"
+	"backend/services"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
 )
 
 // DeckRoutes registers deck routes.
-func DeckRoutes(app *fiber.App, db *gorm.DB) {
-	handler := api.NewDeckHandler(db)
+func DeckRoutes(app *fiber.App, db *gorm.DB, settingsService *services.SettingsService) {
+	handler := api.NewDeckHandler(db, settingsService)
 
 	decks := app.Group("/api/decks")
 	decks.Get("/", handler.List)

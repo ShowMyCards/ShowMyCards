@@ -15,7 +15,7 @@ func setupResolveTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
-	if err := db.AutoMigrate(&Card{}); err != nil {
+	if err := db.AutoMigrate(&Card{}, &Set{}, &StorageLocation{}, &Inventory{}); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 	for _, stmt := range []string{
@@ -100,5 +100,118 @@ func TestGetScryfallCardsByNames(t *testing.T) {
 	}
 	if _, ok := got["nonexistent card"]; ok {
 		t.Errorf("expected nonexistent card to be absent")
+	}
+}
+
+// seedPrintingVariety adds several printings of one card ("oracle-op"), each
+// with a treatment or set type that should rank below a plain printing.
+func seedPrintingVariety(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	sets := []Set{
+		{ScryfallID: "set-mh3", Code: "mh3", Name: "Modern Horizons 3", SetType: "draft_innovation"},
+		{ScryfallID: "set-pmh3", Code: "pmh3", Name: "MH3 Promos", SetType: "promo"},
+		{ScryfallID: "set-unf", Code: "unf", Name: "Unfinity", SetType: "funny"},
+		{ScryfallID: "set-plst", Code: "plst", Name: "The List", SetType: "masters"},
+		{ScryfallID: "set-old", Code: "old", Name: "Old Expansion", SetType: "expansion"},
+	}
+	if err := db.Create(&sets).Error; err != nil {
+		t.Fatalf("failed to seed sets: %v", err)
+	}
+	card := func(id, set, lang, released, extra string) Card {
+		return Card{ScryfallID: id, OracleID: "oracle-op", RawJSON: `{"id":"` + id +
+			`","oracle_id":"oracle-op","name":"Ocelot Pride","set":"` + set +
+			`","collector_number":"1","lang":"` + lang + `","released_at":"` + released + `"` + extra + `}`}
+	}
+	cards := []Card{
+		// Newer, but each one has something that should push it down.
+		card("op-es-plain", "mh3", "es", "2024-06-14", ""),
+		card("op-borderless", "mh3", "en", "2024-06-14", `,"full_art":true,"border_color":"borderless","frame_effects":["inverted"]`),
+		card("op-boosterfun", "mh3", "en", "2024-06-14", `,"promo_types":["boosterfun"]`),
+		card("op-promo", "pmh3", "en", "2026-01-23", `,"promo":true`),
+		card("op-funny", "unf", "en", "2026-02-01", ""),
+		card("op-list", "plst", "en", "2026-03-01", ""),
+		card("op-digital", "mh3", "en", "2026-04-01", `,"digital":true`),
+		// Plain printings: the newer one should win.
+		card("op-old-plain", "old", "en", "2020-01-01", `,"frame_effects":["legendary"]`),
+		card("op-plain", "mh3", "en", "2024-06-14", ""),
+	}
+	if err := db.Create(&cards).Error; err != nil {
+		t.Fatalf("failed to seed cards: %v", err)
+	}
+}
+
+func TestGetPreferredCardsByOracle_PrefersPlainNewestPrinting(t *testing.T) {
+	db := setupResolveTestDB(t)
+	seedPrintingVariety(t, db)
+
+	got, err := GetPreferredCardsByOracle(db, []string{"oracle-op", "oracle-missing"}, "en", true)
+	if err != nil {
+		t.Fatalf("GetPreferredCardsByOracle: %v", err)
+	}
+	if card := got["oracle-op"]; card.ID != "op-plain" {
+		t.Errorf("expected op-plain, got %q", card.ID)
+	}
+	if _, ok := got["oracle-missing"]; ok {
+		t.Error("expected an unknown oracle to be absent")
+	}
+}
+
+func TestGetPreferredCardsByOracle_PrefersRequestedLanguage(t *testing.T) {
+	db := setupResolveTestDB(t)
+	seedPrintingVariety(t, db)
+
+	got, err := GetPreferredCardsByOracle(db, []string{"oracle-op"}, "es", false)
+	if err != nil {
+		t.Fatalf("GetPreferredCardsByOracle: %v", err)
+	}
+	if card := got["oracle-op"]; card.ID != "op-es-plain" {
+		t.Errorf("expected the Spanish printing for lang=es, got %q", card.ID)
+	}
+
+	// A language with no printings falls back to English, not to Spanish.
+	got, err = GetPreferredCardsByOracle(db, []string{"oracle-op"}, "ja", false)
+	if err != nil {
+		t.Fatalf("GetPreferredCardsByOracle: %v", err)
+	}
+	if card := got["oracle-op"]; card.ID != "op-plain" {
+		t.Errorf("expected the English fallback for lang=ja, got %q", card.ID)
+	}
+}
+
+func TestGetPreferredCardsByOracle_PrefersOwnedPrinting(t *testing.T) {
+	db := setupResolveTestDB(t)
+	seedPrintingVariety(t, db)
+	owned := Inventory{ScryfallID: "op-borderless", OracleID: "oracle-op", Treatment: "nonfoil", Quantity: 1}
+	if err := db.Create(&owned).Error; err != nil {
+		t.Fatalf("failed to seed inventory: %v", err)
+	}
+
+	got, err := GetPreferredCardsByOracle(db, []string{"oracle-op"}, "en", true)
+	if err != nil {
+		t.Fatalf("GetPreferredCardsByOracle: %v", err)
+	}
+	if card := got["oracle-op"]; card.ID != "op-borderless" {
+		t.Errorf("expected the owned printing, got %q", card.ID)
+	}
+
+	got, err = GetPreferredCardsByOracle(db, []string{"oracle-op"}, "en", false)
+	if err != nil {
+		t.Fatalf("GetPreferredCardsByOracle: %v", err)
+	}
+	if card := got["oracle-op"]; card.ID != "op-plain" {
+		t.Errorf("expected ownership to be ignored without preferOwned, got %q", card.ID)
+	}
+}
+
+func TestGetScryfallCardsByNames_PrefersPlainPrinting(t *testing.T) {
+	db := setupResolveTestDB(t)
+	seedPrintingVariety(t, db)
+
+	got, err := GetScryfallCardsByNames(db, []string{"Ocelot Pride"}, "en")
+	if err != nil {
+		t.Fatalf("GetScryfallCardsByNames: %v", err)
+	}
+	if card := got["ocelot pride"]; card.ID != "op-plain" {
+		t.Errorf("expected op-plain, got %q", card.ID)
 	}
 }

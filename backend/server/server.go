@@ -115,7 +115,7 @@ func (s *Server) setupRoutes() {
 	SortingRulesRoutes(s.app, s.db.DB)
 	InventoryRoutes(s.app, s.db.DB)
 	ListRoutes(s.app, s.db.DB)
-	DeckRoutes(s.app, s.db.DB)
+	DeckRoutes(s.app, s.db.DB, s.settingsService)
 	SearchRoutes(s.app, s.scryfall, s.db.DB, s.settingsService)
 	SettingsRoutes(s.app, s.settingsService)
 	JobsRoutes(s.app, s.jobService)

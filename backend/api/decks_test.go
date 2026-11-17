@@ -31,12 +31,13 @@ func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		&models.DeckItem{},
 		&models.Inventory{},
 		&models.Card{},
+		&models.Set{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
 	app := fiber.New()
-	handler := NewDeckHandler(db)
+	handler := NewDeckHandler(db, nil)
 
 	app.Get("/api/decks", handler.List)
 	app.Get("/api/decks/for-card/:scryfall_id", handler.DecksForCard)

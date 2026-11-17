@@ -19,13 +19,16 @@ import (
 type DeckHandler struct {
 	db         *gorm.DB
 	allocation *services.AllocationService
+	settings   *services.SettingsService
 }
 
-// NewDeckHandler creates a new deck handler.
-func NewDeckHandler(db *gorm.DB) *DeckHandler {
+// NewDeckHandler creates a new deck handler. settings may be nil, in which case
+// any-printing items are shown in English.
+func NewDeckHandler(db *gorm.DB, settings *services.SettingsService) *DeckHandler {
 	return &DeckHandler{
 		db:         db,
 		allocation: services.NewAllocationService(db),
+		settings:   settings,
 	}
 }
 
@@ -554,8 +557,10 @@ func (h *DeckHandler) enrichDeckItems(ctx context.Context, items []models.DeckIt
 }
 
 // representativeCardsByOracle returns one Scryfall card per Oracle ID for the
-// any-printing items in the slice, so they can be enriched with a name and set
-// even though no specific printing was pinned.
+// any-printing items in the slice, so they can be shown with a name, set and
+// image even though no specific printing was pinned. It prefers a printing the
+// user owns, then the default search language, then the most "default" looking
+// printing (see models.GetPreferredCardsByOracle).
 func (h *DeckHandler) representativeCardsByOracle(ctx context.Context, items []models.DeckItem) map[string]scryfall.Card {
 	oracleIDs := make([]string, 0, len(items))
 	seen := make(map[string]bool)
@@ -565,33 +570,23 @@ func (h *DeckHandler) representativeCardsByOracle(ctx context.Context, items []m
 			oracleIDs = append(oracleIDs, item.OracleID)
 		}
 	}
-
-	out := make(map[string]scryfall.Card, len(oracleIDs))
 	if len(oracleIDs) == 0 {
-		return out
+		return map[string]scryfall.Card{}
 	}
 
-	// Fetch the first card row for each Oracle ID. cards.oracle_id is indexed.
-	var cards []models.Card
-	if err := h.db.WithContext(ctx).
-		Where("oracle_id IN ?", oracleIDs).
-		Find(&cards).Error; err != nil {
+	lang := "en"
+	if h.settings != nil {
+		if v, err := h.settings.Get(ctx, "scryfall_default_language"); err == nil && v != "" {
+			lang = v
+		}
+	}
+
+	cards, err := models.GetPreferredCardsByOracle(h.db.WithContext(ctx), oracleIDs, lang, true)
+	if err != nil {
 		slog.Warn("failed to fetch representative cards for deck enrichment", "component", "decks", "error", err)
-		return out
+		return map[string]scryfall.Card{}
 	}
-
-	for _, card := range cards {
-		if _, ok := out[card.OracleID]; ok {
-			continue // keep the first representative printing per Oracle
-		}
-		sc, err := card.ToScryfallCard()
-		if err != nil {
-			slog.Warn("failed to unmarshal representative card", "component", "decks", "scryfall_id", card.ScryfallID, "error", err)
-			continue
-		}
-		out[card.OracleID] = sc
-	}
-	return out
+	return cards
 }
 
 // CreateDeckItemRequest represents a single item to add to a deck.
