@@ -29,7 +29,7 @@ describe('Banners', () => {
 
 	it('renders nothing when the API returns no banners', async () => {
 		listMock.mockResolvedValue([]);
-		render(Banners);
+		await render(Banners);
 
 		await vi.waitFor(() => expect(listMock).toHaveBeenCalled());
 		await expect.element(page.getByRole('status')).not.toBeInTheDocument();
@@ -37,7 +37,7 @@ describe('Banners', () => {
 
 	it('renders a banner returned by the API', async () => {
 		listMock.mockResolvedValue([makeBanner({ message: 'Sync running' })]);
-		render(Banners);
+		await render(Banners);
 
 		await expect.element(page.getByText('Sync running')).toBeInTheDocument();
 	});
@@ -46,7 +46,7 @@ describe('Banners', () => {
 		listMock.mockResolvedValue([
 			makeBanner({ id: 'job-failed:bulk_data_import:7', message: 'Sync failed', dismissible: true })
 		]);
-		render(Banners);
+		await render(Banners);
 
 		await expect.element(page.getByText('Sync failed')).toBeInTheDocument();
 		await page.getByRole('button', { name: /dismiss/i }).click();
@@ -61,7 +61,7 @@ describe('Banners', () => {
 		listMock.mockResolvedValue([
 			makeBanner({ id: 'job-failed:bulk_data_import:7', message: 'Sync failed', dismissible: true })
 		]);
-		render(Banners);
+		await render(Banners);
 
 		await vi.waitFor(() => expect(listMock).toHaveBeenCalled());
 		await expect.element(page.getByText('Sync failed')).not.toBeInTheDocument();

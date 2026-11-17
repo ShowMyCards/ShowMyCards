@@ -58,7 +58,7 @@ describe('DeckCardActions', () => {
 
 	it('moves a single copy as soon as a zone is picked', async () => {
 		mockActions();
-		render(DeckCardActions, { item: makeItem(), deckWants: 1 });
+		await render(DeckCardActions, { item: makeItem(), deckWants: 1 });
 
 		await page.getByLabelText('Card actions for Ocelot Pride').click();
 		await page.getByLabelText('Zone').selectOptions('main');
@@ -70,7 +70,7 @@ describe('DeckCardActions', () => {
 
 	it('asks how many to move when there is more than one copy', async () => {
 		mockActions();
-		render(DeckCardActions, { item: makeItem({ desired_quantity: 3 }), deckWants: 3 });
+		await render(DeckCardActions, { item: makeItem({ desired_quantity: 3 }), deckWants: 3 });
 
 		await page.getByLabelText('Card actions for Ocelot Pride').click();
 		await page.getByLabelText('Zone').selectOptions('main');
@@ -87,7 +87,7 @@ describe('DeckCardActions', () => {
 
 	it('cancelling a pending move restores the current zone', async () => {
 		mockActions();
-		render(DeckCardActions, { item: makeItem({ desired_quantity: 2 }), deckWants: 2 });
+		await render(DeckCardActions, { item: makeItem({ desired_quantity: 2 }), deckWants: 2 });
 
 		await page.getByLabelText('Card actions for Ocelot Pride').click();
 		await page.getByLabelText('Zone').selectOptions('main');
@@ -99,8 +99,8 @@ describe('DeckCardActions', () => {
 	});
 
 	it('keeps only one row menu open at a time', async () => {
-		render(DeckCardActions, { item: makeItem(), deckWants: 1 });
-		render(DeckCardActions, { item: makeItem({ id: 2, name: 'Sol Ring' }), deckWants: 1 });
+		await render(DeckCardActions, { item: makeItem(), deckWants: 1 });
+		await render(DeckCardActions, { item: makeItem({ id: 2, name: 'Sol Ring' }), deckWants: 1 });
 
 		await page.getByLabelText('Card actions for Ocelot Pride').click();
 		await page.getByLabelText('Card actions for Sol Ring').click();
@@ -111,7 +111,7 @@ describe('DeckCardActions', () => {
 	});
 
 	it('closes on Escape and on a click outside the menu', async () => {
-		render(DeckCardActions, { item: makeItem(), deckWants: 1 });
+		await render(DeckCardActions, { item: makeItem(), deckWants: 1 });
 		const menu = menus()[0] as HTMLDetailsElement;
 		const toggle = page.getByLabelText('Card actions for Ocelot Pride');
 
