@@ -3,10 +3,12 @@
 package utils
 
 import (
+	"errors"
 	"log/slog"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"github.com/gofiber/fiber/v3"
+	"gorm.io/gorm"
 )
 
 // ErrorResponse standard error format
@@ -27,6 +29,13 @@ func LogAndReturnError(c fiber.Ctx, statusCode int, userMsg, logMsg string, err 
 // ReturnError returns error without logging (for validation errors)
 func ReturnError(c fiber.Ctx, statusCode int, message string) error {
 	return c.Status(statusCode).JSON(ErrorResponse{Error: message})
+}
+
+// IsDuplicateKey reports whether err is a unique-constraint violation.
+// It relies on gorm.Config{TranslateError: true}, which maps driver-specific
+// constraint errors to gorm.ErrDuplicatedKey.
+func IsDuplicateKey(err error) bool {
+	return errors.Is(err, gorm.ErrDuplicatedKey)
 }
 
 // EnhancedErrorResponse includes additional error context

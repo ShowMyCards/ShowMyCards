@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -371,7 +370,7 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 					CollectedQuantity: item.CollectedQuantity,
 				}
 				if err := tx.Create(&newItem).Error; err != nil {
-					if isDuplicateError(err) {
+					if utils.IsDuplicateKey(err) {
 						response.Warnings = append(response.Warnings,
 							fmt.Sprintf("skipped duplicate list item %s in list %q",
 								item.ScryfallID, list.Name))
@@ -404,7 +403,7 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 				StorageLocationID: storageLocID,
 			}
 			if err := tx.Create(&newInv).Error; err != nil {
-				if isDuplicateError(err) {
+				if utils.IsDuplicateKey(err) {
 					response.Warnings = append(response.Warnings,
 						fmt.Sprintf("skipped duplicate inventory item %s (treatment: %s)",
 							inv.ScryfallID, inv.Treatment))
@@ -438,7 +437,7 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 					DesiredQuantity: item.DesiredQuantity,
 				}
 				if err := tx.Create(&newItem).Error; err != nil {
-					if isDuplicateError(err) {
+					if utils.IsDuplicateKey(err) {
 						response.Warnings = append(response.Warnings,
 							fmt.Sprintf("skipped duplicate deck item %s (zone: %s) in deck %q",
 								item.OracleID, item.Zone, deck.Name))
@@ -461,13 +460,6 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 	}
 
 	return c.JSON(response)
-}
-
-// isDuplicateError checks if a GORM error is a UNIQUE constraint violation.
-// NOTE: This matches the SQLite error string. If the database backend changes,
-// this function must be updated to match the new driver's constraint error format.
-func isDuplicateError(err error) bool {
-	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // migrations maps each version to a function that migrates data to the next version.
