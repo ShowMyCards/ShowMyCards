@@ -8,7 +8,7 @@
         "@lucide/svelte": "0.577.0",
         "@tailwindcss/typography": "0.5.20",
         "@thisux/sveltednd": "0.0.20",
-        "theme-change": "2.5.2",
+        "theme-change": "3.0.4",
       },
       "devDependencies": {
         "@eslint/js": "10.0.1",
@@ -482,7 +482,7 @@
 
     "tapable": ["tapable@2.3.3", "", {}, "sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A=="],
 
-    "theme-change": ["theme-change@2.5.2", "", {}, "sha512-UOLweDXAKIKDio6XVElNSlhDCRM8XtOk3rih/NImOldhiOkjZqrAmmEBjiWBVipfXt0WOETVNY7ym4W+UwjcxQ=="],
+    "theme-change": ["theme-change@3.0.4", "", {}, "sha512-tPknw142u0yX7M63rXOU1gc2N3cw61iLUtuvh5OKxXTA4/B5SOXxOeS+JT8Ig14SCjs5T2rY41aLFDeTRclV5w=="],
 
     "tinybench": ["tinybench@2.9.0", "", {}, "sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg=="],
 
