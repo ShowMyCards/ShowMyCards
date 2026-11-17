@@ -10,13 +10,15 @@
 		FormField,
 		DeckView,
 		DeckAddResultCard,
+		CardListExportModal,
+		deckExportLines,
 		notifications,
 		getActionError,
 		type EnhancedCardResult,
 		type EnrichedDeckItem
 	} from '#lib';
 	import type { DeckGroupMode, DeckSortMode } from '#lib/utils/deck-grouping.ts';
-	import { ArrowLeft, Pencil, Trash2, Search, Info } from '@lucide/svelte';
+	import { ArrowLeft, ClipboardCopy, Pencil, Trash2, Search, Info } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -30,6 +32,7 @@
 	let isSaving = $state(false);
 	let showDeleteModal = $state(false);
 	let isDeleting = $state(false);
+	let showExportModal = $state(false);
 
 	function startEdit() {
 		if (!data.deck) return;
@@ -124,6 +127,9 @@
 		{ key: 'maybe' as const, title: 'Maybe' }
 	];
 
+	const exportAll = $derived(deckExportLines(data.items, 'all'));
+	const exportMissing = $derived(deckExportLines(data.items, 'missing'));
+
 	function zoneCardCount(list: EnrichedDeckItem[]): number {
 		return list.reduce((sum, item) => sum + item.desired_quantity, 0);
 	}
@@ -139,6 +145,15 @@
 			{#snippet actions()}
 				<a href={resolve('/decks')} class="btn bg-base-100 btn-sm"
 					><ArrowLeft class="w-4 h-4" /> Back</a>
+
+				<button
+					onclick={() => (showExportModal = true)}
+					class="btn bg-base-100 btn-sm"
+					title="Export card list"
+					aria-label="Export card list"
+					disabled={totalItems === 0}>
+					<ClipboardCopy class="w-4 h-4" />
+				</button>
 
 				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit deck"
 					><Pencil class="w-4 h-4" /></button>
@@ -292,6 +307,13 @@
 		</EmptyState>
 	{/if}
 </div>
+
+<CardListExportModal
+	open={showExportModal}
+	onClose={() => (showExportModal = false)}
+	title="Export {data.deck?.name ?? 'deck'}"
+	all={exportAll}
+	missing={exportMissing} />
 
 <!-- Edit Deck Modal -->
 
