@@ -11,13 +11,15 @@
 		selection,
 		audio
 	} from '#lib';
-	import { FolderInput } from '@lucide/svelte';
+	import { FolderInput, LayersPlus } from '@lucide/svelte';
+	import AddToDeckModal from './AddToDeckModal.svelte';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import CardInventoryLocations from './CardInventoryLocations.svelte';
 	import { deserialize, type ActionResult } from '$app/forms';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { ByOracleResponse, ExistingPrintingInfo } from '#lib/types/api.ts';
 
@@ -28,7 +30,8 @@
 		selectable = false,
 		readOnly = false,
 		showLocations = false,
-		onSplitMove
+		onSplitMove,
+		deck
 	}: {
 		card: EnhancedCardResult;
 		onremove?: (cardId: string) => void;
@@ -37,6 +40,8 @@
 		readOnly?: boolean;
 		showLocations?: boolean;
 		onSplitMove?: (inv: Inventory, available: number) => void;
+		/** Optional deck-availability summary; renders a "free for decks" indicator when set. */
+		deck?: { owned: number; decked: number; free: number };
 	} = $props();
 
 	// Selected storage location for manual override (default to auto)
@@ -58,6 +63,15 @@
 
 	let adding = $state(false);
 	let removing = $state(false);
+
+	// "Add to deck" dialog, mounted only while open so closed tiles stay light.
+	let showDeckModal = $state(false);
+
+	// Refresh the "free for decks" indicator when this tile shows one; other views
+	// (e.g. search) have nothing deck-related to reload.
+	function handleAddedToDeck() {
+		if (deck) refreshAll();
+	}
 
 	// Printing conflict modal state
 	let showConflictModal = $state(false);
@@ -347,7 +361,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="card bg-base-200 p-2 shadow-lg hover:shadow-xl transition-all relative"
+	class="group card bg-base-200 p-2 shadow-lg hover:shadow-xl transition-all relative"
 	class:ring-2={isKeyboardTarget || isSelected}
 	class:ring-primary={isKeyboardTarget && !isSelected}
 	class:ring-accent={isSelected}
@@ -364,6 +378,15 @@
 				onchange={handleSelectionChange} />
 		</div>
 	{/if}
+	<!-- Add to deck: revealed on hover/focus with a fine pointer, always shown on touch -->
+	<button
+		type="button"
+		class="btn btn-circle btn-sm absolute top-3 right-3 z-10 border-base-300 bg-base-100/85 shadow backdrop-blur-sm transition-opacity opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+		title="Add to deck"
+		aria-label="Add {card.name} to deck"
+		onclick={() => (showDeckModal = true)}>
+		<LayersPlus class="h-4 w-4" />
+	</button>
 	<!-- Clickable image to card details -->
 	<a href={resolve(`cards/${card.id}`)} class="block">
 		{#if card.image_uri}
@@ -397,6 +420,19 @@
 				</div>
 			{/if}
 		</div>
+
+		{#if deck}
+			<div
+				class="mb-2 flex items-center gap-2 text-xs"
+				title="Copies not committed to any deck (finish is not yet part of this count)">
+				<span class="badge badge-sm {deck.free > 0 ? 'badge-success' : 'badge-ghost'}">
+					{deck.free} free for decks
+				</span>
+				{#if deck.decked > 0}
+					<span class="opacity-60">{deck.decked} decked</span>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Storage location override dropdown -->
 		{#if !readOnly && storageLocations.length > 0}
@@ -468,6 +504,23 @@
 		</div>
 	</div>
 </div>
+
+{#if showDeckModal}
+	<AddToDeckModal
+		open
+		cards={[
+			{
+				oracle_id: card.oracle_id,
+				scryfall_id: card.id,
+				name: getDisplayName(card),
+				set_name: card.set_name,
+				image_uri: card.image_uri,
+				copies: 1
+			}
+		]}
+		onClose={() => (showDeckModal = false)}
+		onAdded={handleAddedToDeck} />
+{/if}
 
 {#if !readOnly}
 	<PrintingConflictModal

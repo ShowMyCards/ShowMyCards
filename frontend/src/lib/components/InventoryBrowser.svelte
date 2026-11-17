@@ -19,6 +19,7 @@
 		currency,
 		usePersistedViewMode,
 		type EnhancedCardResult,
+		type InventoryCard,
 		type Inventory,
 		type StorageLocation
 	} from '#lib';
@@ -30,7 +31,7 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		cards: EnhancedCardResult[];
+		cards: InventoryCard[];
 		allLocations: StorageLocation[];
 		error?: string;
 		emptyMessage?: string;
@@ -79,6 +80,9 @@
 
 	// Client-side filtering state
 	let filterText = $state('');
+	// "Available for deck building": show only cards with at least one free copy
+	// (owned − deck demand). Filtered client-side from each card's deck block.
+	let deckAvailableOnly = $state(false);
 	let sortOrder = $state<'recent' | 'price-desc' | 'price-asc'>('recent');
 	const PAGE_SIZE = 24;
 	let currentPage = $state(1);
@@ -112,8 +116,12 @@
 	/**
 	 * Filter cards by search text (name, set, treatment)
 	 */
-	function filterCards(cardsList: EnhancedCardResult[]): EnhancedCardResult[] {
+	function filterCards(cardsList: InventoryCard[]): InventoryCard[] {
 		let filtered = cardsList.filter((c) => !removedCardIds.has(c.id));
+
+		if (deckAvailableOnly) {
+			filtered = filtered.filter((c) => c.deck.free >= 1);
+		}
 
 		if (filterText.trim()) {
 			const search = filterText.toLowerCase().trim();
@@ -203,8 +211,16 @@
 					<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
 				</div>
 			</div>
+			<label class="flex w-fit cursor-pointer items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="checkbox checkbox-primary checkbox-sm"
+					bind:checked={deckAvailableOnly}
+					onchange={() => (currentPage = 1)} />
+				Available for deck building
+			</label>
 			<div class="text-sm opacity-70">
-				{#if filterText}
+				{#if filterText || deckAvailableOnly}
 					Showing {filteredCards.length} of {cards.length} {readOnly ? 'printings' : 'cards'}
 				{:else}
 					{cards.length}
@@ -229,8 +245,15 @@
 		<EmptyState message={emptyMessage}
 			><a href={resolve('search')} class="btn btn-primary">Search for Cards</a></EmptyState>
 	{:else if filteredCards.length === 0}
-		<EmptyState message="No cards match your filter">
-			<p class="text-sm opacity-70">Try adjusting your search criteria</p>
+		<EmptyState
+			message={deckAvailableOnly
+				? 'No cards available for deck building'
+				: 'No cards match your filter'}>
+			<p class="text-sm opacity-70">
+				{deckAvailableOnly
+					? 'Every copy you own is committed to a deck.'
+					: 'Try adjusting your search criteria'}
+			</p>
 		</EmptyState>
 	{:else if view.viewMode === 'grid'}
 		<!-- Grid View -->
@@ -247,6 +270,7 @@
 			{#each paginatedCards as card (`${card.id}-${card.inventory.total_quantity}`)}
 				<CardResultCard
 					{card}
+					deck={card.deck}
 					{readOnly}
 					{showLocations}
 					onremove={handleRemove}
@@ -289,6 +313,7 @@
 						<th scope="col">Language</th>
 						<th scope="col">Treatment(s)</th>
 						<th scope="col">Qty</th>
+						<th scope="col">Decks</th>
 						{#if showPriceSort}<th scope="col">Price</th>{/if}
 						{#if showLocations}<th scope="col">Storage Locations</th>{/if}
 						{#if !readOnly}<th scope="col">Actions</th>{/if}
@@ -348,6 +373,13 @@
 							</td>
 
 							<td><span class="badge badge-primary">{totalQty}</span></td>
+							<td>
+								<span
+									class="badge badge-sm {card.deck.free > 0 ? 'badge-success' : 'badge-ghost'}"
+									title="{card.deck.free} free / {card.deck.decked} decked">
+									{card.deck.free} free
+								</span>
+							</td>
 
 							{#if showPriceSort}
 								{@const price = getInventoryUnitPrice(card, currency.current)}
@@ -389,7 +421,7 @@
 	{/if}
 
 	{#if !readOnly}
-		<BulkActionsBar locations={allLocations} onComplete={handleBulkComplete} />
+		<BulkActionsBar locations={allLocations} {cards} onComplete={handleBulkComplete} />
 
 		<SplitMoveModal
 			open={!!moveTarget}

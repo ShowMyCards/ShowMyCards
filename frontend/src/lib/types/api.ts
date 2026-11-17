@@ -85,7 +85,7 @@ export interface DashboardStats {
  * CurrentExportVersion is the latest export format version.
  * Bump this when the export schema changes and add a migration function.
  */
-export const CurrentExportVersion = 1;
+export const CurrentExportVersion = 2;
 /**
  * DataHandler handles data import and export endpoints
  */
@@ -101,6 +101,7 @@ export interface ExportData {
 	sorting_rules: ExportSortingRule[];
 	inventory: ExportInventoryItem[];
 	lists: ExportList[];
+	decks: ExportDeck[];
 }
 /**
  * ExportStorageLocation represents a storage location in export format
@@ -155,6 +156,29 @@ export interface ExportListItem {
 	collected_quantity: number /* int */;
 }
 /**
+ * ExportDeck represents a deck with its items in export format
+ * tygo:export
+ */
+export interface ExportDeck {
+	ref_id: number /* uint */;
+	name: string;
+	description?: string;
+	items: ExportDeckItem[];
+}
+/**
+ * ExportDeckItem represents a deck item in export format. Cards are referenced
+ * by their natural keys (oracle_id, plus an optional pinned scryfall_id and
+ * treatment), so no ID remapping is needed beyond the parent deck.
+ * tygo:export
+ */
+export interface ExportDeckItem {
+	oracle_id: string;
+	scryfall_id: string; // empty = any printing
+	treatment: string; // empty = any finish
+	zone: import('./models').DeckZone;
+	desired_quantity: number /* int */;
+}
+/**
  * ImportResponse represents the result of an import operation
  * tygo:export
  */
@@ -164,6 +188,8 @@ export interface ImportResponse {
 	inventory_items_created: number /* int */;
 	lists_created: number /* int */;
 	list_items_created: number /* int */;
+	decks_created: number /* int */;
+	deck_items_created: number /* int */;
 	warnings?: string[];
 }
 
@@ -178,8 +204,12 @@ export interface DeckHandler {}
  * DeckSummary represents a deck with summary statistics.
  * AggregateShortfall is the under-owned shortfall — the number of cards the deck
  * wants that the user does not physically own (Σ max(0, desired − owned_O) over
- * the deck's demand-zone items). It is independent of other decks; the
- * cross-deck over-commitment signal lives on the deck-detail items endpoint.
+ * the deck's demand-zone items). It is independent of other decks.
+ * AggregateOverCommitted is the cross-deck signal: the number of distinct cards
+ * the deck could cover on its own but that are wanted by other decks too, so the
+ * owned copies cannot satisfy every deck at once. A card that is already
+ * under-owned counts toward the shortfall instead, never here. Both signals are
+ * shown to the user; neither picks a winning deck.
  * See FR98/IMPLEMENTATION_PLAN.md §2.
  * tygo:export
  */
@@ -192,6 +222,7 @@ export interface DeckSummary {
 	total_items: number /* int */;
 	total_cards_demand: number /* int */;
 	aggregate_shortfall: number /* int */;
+	aggregate_over_committed: number /* int */;
 }
 /**
  * CreateDeckRequest represents the request body for creating a deck.
@@ -208,6 +239,19 @@ export interface CreateDeckRequest {
 export interface UpdateDeckRequest {
 	name: string;
 	description: string;
+}
+/**
+ * DeckCardUsage describes one deck item that uses a given card, for the card
+ * detail "in decks" section.
+ * tygo:export
+ */
+export interface DeckCardUsage {
+	deck_id: number /* uint */;
+	deck_name: string;
+	zone: import('./models').DeckZone;
+	desired_quantity: number /* int */;
+	scryfall_id: string; // "" = any printing
+	treatment: string;
 }
 /**
  * EnrichedDeckItem represents a deck item enriched with card data and
@@ -240,6 +284,20 @@ export interface EnrichedDeckItem {
 	rarity?: string;
 	finishes?: string[];
 	/**
+	 * Display fields for deck-view grouping, sorting and rendering (mana pips /
+	 * card images). Derived from the same representative card, no extra queries.
+	 */
+	cmc?: number /* float64 */;
+	type_line?: string;
+	mana_cost?: string;
+	image_uri?: string;
+	/**
+	 * PrintingID is the Scryfall id of the printing shown for this item — the
+	 * pinned printing, or a representative printing for any-printing items — used
+	 * to link to the card detail page.
+	 */
+	printing_id?: string;
+	/**
 	 * Availability (populated by the allocation service in 1b).
 	 */
 	owned: number /* int */;
@@ -250,8 +308,10 @@ export interface EnrichedDeckItem {
  * DeckItemsResponse represents the items in a deck, grouped by zone, with
  * aggregate availability information.
  * AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
- * owned_O) over demand-zone items). Maybe-board items are returned but never
- * contribute to the shortfall.
+ * owned_O) over demand-zone items). AggregateOverCommitted is the number of
+ * distinct demand-zone cards the deck covers alone but that other decks want too
+ * (see DeckSummary). Maybe-board items are returned but never contribute to
+ * either.
  * tygo:export
  */
 export interface DeckItemsResponse {
@@ -261,6 +321,7 @@ export interface DeckItemsResponse {
 	side: EnrichedDeckItem[];
 	maybe: EnrichedDeckItem[];
 	aggregate_shortfall: number /* int */;
+	aggregate_over_committed: number /* int */;
 }
 /**
  * CreateDeckItemRequest represents a single item to add to a deck.
@@ -331,11 +392,33 @@ export interface UpdateInventoryRequest {
 	clear_storage?: boolean;
 }
 /**
+ * DeckAvailability summarises how many of a card's owned copies are committed to
+ * decks. All three counts are Oracle-level (shared across the card's printings):
+ * Owned is total owned, Decked is copies locked by demand-zone deck items
+ * (owned − free), and Free is copies not committed to any deck. Finish is not yet
+ * part of this calculation (an M1 limitation, see the allocation service).
+ * tygo:export
+ */
+export interface DeckAvailability {
+	owned: number /* int */;
+	decked: number /* int */;
+	free: number /* int */;
+}
+/**
+ * InventoryCard is an inventory card result enriched with its deck-availability
+ * summary. The deck block is inventory-specific and kept off the search-shared
+ * EnhancedCardResult.
+ * tygo:export
+ */
+export interface InventoryCard extends EnhancedCardResult {
+	deck: DeckAvailability;
+}
+/**
  * InventoryCardsResponse represents paginated card results with inventory data
  * tygo:export
  */
 export interface InventoryCardsResponse {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 	page: number /* int */;
 	page_size: number /* int */;
 	total_cards: number /* int */;
@@ -550,6 +633,50 @@ export interface UpdateListItemRequest {
 }
 
 //////////
+// source: resolve.go
+
+/**
+ * MaxResolveItems bounds a single resolve batch.
+ */
+export const MaxResolveItems = 1000;
+/**
+ * ResolveItem is a single decklist line to resolve against the locally-ingested
+ * Scryfall bulk data. Provide Set + CollectorNumber to pin a specific printing,
+ * or Name to resolve any printing of a card.
+ * tygo:export
+ */
+export interface ResolveItem {
+	set?: string;
+	collector_number?: string;
+	name?: string;
+}
+/**
+ * ResolveRequest is a batch of lines to resolve locally.
+ * tygo:export
+ */
+export interface ResolveRequest {
+	items: ResolveItem[];
+	language?: string;
+}
+/**
+ * ResolveResult is the outcome for one requested item, aligned by index with the
+ * request. Found is false when the card is not in the local database, in which
+ * case the caller should fall back to the live Scryfall search for that line.
+ * tygo:export
+ */
+export interface ResolveResult {
+	found: boolean;
+	card?: CardResult;
+}
+/**
+ * ResolveResponse holds per-item results in request order.
+ * tygo:export
+ */
+export interface ResolveResponse {
+	results: ResolveResult[];
+}
+
+//////////
 // source: scheduler.go
 
 /**
@@ -579,11 +706,12 @@ export interface SchedulerHandler {}
  */
 export interface SearchHandler {}
 /**
- * SearchResponse wraps search results with pagination metadata
+ * SearchResponse wraps search results with pagination metadata. Each result
+ * carries its inventory data and per-Oracle deck availability.
  * tygo:export
  */
 export interface SearchResponse {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 	page: number /* int */;
 	total_cards: number /* int */;
 	has_more: boolean;

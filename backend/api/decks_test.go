@@ -31,14 +31,16 @@ func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		&models.DeckItem{},
 		&models.Inventory{},
 		&models.Card{},
+		&models.Set{},
 	); err != nil {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
 	app := fiber.New()
-	handler := NewDeckHandler(db)
+	handler := NewDeckHandler(db, nil)
 
 	app.Get("/api/decks", handler.List)
+	app.Get("/api/decks/for-card/:scryfall_id", handler.DecksForCard)
 	app.Get("/api/decks/:id", handler.Get)
 	app.Post("/api/decks", handler.Create)
 	app.Put("/api/decks/:id", handler.Update)
@@ -615,6 +617,173 @@ func TestDeckListItems_OverCommittedDistinctFromUnderOwned(t *testing.T) {
 	}
 }
 
+// Aggregate over-committed tests. aggregate_over_committed is the deck-level twin
+// of the per-item over_committed flag: it counts the distinct cards a deck covers
+// alone but that other decks want too. Both endpoints that expose deck-level
+// totals (List and ListItems) must agree.
+
+func seedDeckItem(t *testing.T, db *gorm.DB, deckID uint, oracleID string, zone models.DeckZone, qty int) {
+	t.Helper()
+	item := models.DeckItem{DeckID: deckID, OracleID: oracleID, Zone: zone, DesiredQuantity: qty}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("failed to create deck item for %s: %v", oracleID, err)
+	}
+}
+
+func fetchDeckSummaries(t *testing.T, app *fiber.App) map[uint]DeckSummary {
+	t.Helper()
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/api/decks", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var list []DeckSummary
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("failed to decode deck list: %v", err)
+	}
+	byID := make(map[uint]DeckSummary, len(list))
+	for _, s := range list {
+		byID[s.ID] = s
+	}
+	return byID
+}
+
+func fetchDeckItems(t *testing.T, app *fiber.App, deckID uint) DeckItemsResponse {
+	t.Helper()
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/decks/%d/items", deckID), nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var got DeckItemsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode deck items: %v", err)
+	}
+	return got
+}
+
+// assertDeckTotals checks the deck-level totals on both endpoints at once.
+func assertDeckTotals(t *testing.T, app *fiber.App, deck models.Deck, wantShortfall, wantOverCommitted int) {
+	t.Helper()
+
+	summary, ok := fetchDeckSummaries(t, app)[deck.ID]
+	if !ok {
+		t.Fatalf("deck %q missing from list", deck.Name)
+	}
+	if summary.AggregateShortfall != wantShortfall || summary.AggregateOverCommitted != wantOverCommitted {
+		t.Errorf("deck %q list: shortfall=%d over_committed=%d, want shortfall=%d over_committed=%d",
+			deck.Name, summary.AggregateShortfall, summary.AggregateOverCommitted, wantShortfall, wantOverCommitted)
+	}
+
+	items := fetchDeckItems(t, app, deck.ID)
+	if items.AggregateShortfall != wantShortfall || items.AggregateOverCommitted != wantOverCommitted {
+		t.Errorf("deck %q items: shortfall=%d over_committed=%d, want shortfall=%d over_committed=%d",
+			deck.Name, items.AggregateShortfall, items.AggregateOverCommitted, wantShortfall, wantOverCommitted)
+	}
+}
+
+// The reported bug: a card owned once and wanted by two decks. Each deck covers it
+// alone (no shortfall), so both used to read "You own everything this deck needs"
+// even though one copy cannot serve both.
+func TestDeckAggregateOverCommitted_OneCopyWantedByTwoDecks(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deckA := createTestDeck(t, db, "Byrke Commander")
+	deckB := createTestDeck(t, db, "Foo")
+
+	createDeckTestCard(t, db, "scry-swan", "oracle-swan", "Salvation Swan", "blb", "rare")
+	addDeckInventory(t, db, "oracle-swan", "scry-swan", 1)
+	seedDeckItem(t, db, deckA.ID, "oracle-swan", models.ZoneMain, 1)
+	seedDeckItem(t, db, deckB.ID, "oracle-swan", models.ZoneMain, 1)
+
+	// A card only deck A wants, with enough copies: uncontested, must not count.
+	createDeckTestCard(t, db, "scry-solo", "oracle-solo", "Solo Card", "lea", "common")
+	addDeckInventory(t, db, "oracle-solo", "scry-solo", 1)
+	seedDeckItem(t, db, deckA.ID, "oracle-solo", models.ZoneMain, 1)
+
+	assertDeckTotals(t, app, deckA, 0, 1)
+	assertDeckTotals(t, app, deckB, 0, 1)
+
+	// The per-item flag agrees with the aggregate.
+	for _, item := range fetchDeckItems(t, app, deckB.ID).Main {
+		if item.OracleID == "oracle-swan" && !item.OverCommitted {
+			t.Error("Salvation Swan row should be flagged over_committed")
+		}
+	}
+}
+
+// Nothing shared and nothing short: both totals are zero, so the UI may say
+// "You own everything this deck needs".
+func TestDeckAggregateOverCommitted_ZeroWhenUncontested(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deckA := createTestDeck(t, db, "A")
+	deckB := createTestDeck(t, db, "B")
+
+	// Own 2, two decks want 1 each: exactly enough for both.
+	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
+	addDeckInventory(t, db, "oracle-bolt", "scry-bolt", 2)
+	seedDeckItem(t, db, deckA.ID, "oracle-bolt", models.ZoneMain, 1)
+	seedDeckItem(t, db, deckB.ID, "oracle-bolt", models.ZoneMain, 1)
+
+	assertDeckTotals(t, app, deckA, 0, 0)
+	assertDeckTotals(t, app, deckB, 0, 0)
+}
+
+// under_owned and over_committed stay disjoint at the deck level, like they do per
+// item: a card the deck cannot cover alone is shortfall only; the deck that could
+// cover it alone is over-committed only.
+func TestDeckAggregateOverCommitted_DisjointFromShortfall(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deckA := createTestDeck(t, db, "A")
+	deckB := createTestDeck(t, db, "B")
+
+	// Own 1. Deck A wants 2 (short 1 on its own); deck B wants 1 (fits alone).
+	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
+	addDeckInventory(t, db, "oracle-bolt", "scry-bolt", 1)
+	seedDeckItem(t, db, deckA.ID, "oracle-bolt", models.ZoneMain, 2)
+	seedDeckItem(t, db, deckB.ID, "oracle-bolt", models.ZoneMain, 1)
+
+	assertDeckTotals(t, app, deckA, 1, 0)
+	assertDeckTotals(t, app, deckB, 0, 1)
+}
+
+// A card on a deck's maybe board is not committed demand, so it must not make
+// that deck read as "shared", even while other decks genuinely conflict over it.
+func TestDeckAggregateOverCommitted_IgnoresMaybeBoard(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deckA := createTestDeck(t, db, "A")
+	deckB := createTestDeck(t, db, "B")
+	deckMaybe := createTestDeck(t, db, "Maybe only")
+
+	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
+	addDeckInventory(t, db, "oracle-bolt", "scry-bolt", 1)
+	seedDeckItem(t, db, deckA.ID, "oracle-bolt", models.ZoneMain, 1)
+	seedDeckItem(t, db, deckB.ID, "oracle-bolt", models.ZoneMain, 1)
+	seedDeckItem(t, db, deckMaybe.ID, "oracle-bolt", models.ZoneMaybe, 1)
+
+	assertDeckTotals(t, app, deckA, 0, 1)
+	assertDeckTotals(t, app, deckB, 0, 1)
+	assertDeckTotals(t, app, deckMaybe, 0, 0)
+}
+
+// A card split across two demand zones of one deck is one shared card, not two.
+func TestDeckAggregateOverCommitted_SplitZonesCountOnce(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deckA := createTestDeck(t, db, "A")
+	deckB := createTestDeck(t, db, "B")
+
+	// Own 3. Deck A wants 2 main + 1 side (combined 3, fits alone); deck B wants 1.
+	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
+	addDeckInventory(t, db, "oracle-bolt", "scry-bolt", 3)
+	seedDeckItem(t, db, deckA.ID, "oracle-bolt", models.ZoneMain, 2)
+	seedDeckItem(t, db, deckA.ID, "oracle-bolt", models.ZoneSide, 1)
+	seedDeckItem(t, db, deckB.ID, "oracle-bolt", models.ZoneMain, 1)
+
+	assertDeckTotals(t, app, deckA, 0, 1)
+	assertDeckTotals(t, app, deckB, 0, 1)
+}
+
 func TestDeckListItems_NotFound(t *testing.T) {
 	app, _ := setupDeckTestApp(t)
 
@@ -899,5 +1068,55 @@ func TestDeckDeleteItem_NotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
+func TestDecksForCard(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+
+	// Card "printP" with Oracle "oracleO".
+	createDeckTestCard(t, db, "printP", "oracleO", "Sol Ring", "cmm", "rare")
+	deck := createTestDeck(t, db, "My Deck")
+
+	items := []models.DeckItem{
+		{DeckID: deck.ID, OracleID: "oracleO", ScryfallID: "", Zone: models.ZoneMain, DesiredQuantity: 1},        // any-printing → included
+		{DeckID: deck.ID, OracleID: "oracleO", ScryfallID: "printP", Zone: models.ZoneSide, DesiredQuantity: 2},  // pinned to this printing → included
+		{DeckID: deck.ID, OracleID: "oracleO", ScryfallID: "printQ", Zone: models.ZoneMaybe, DesiredQuantity: 1}, // pinned to a different printing → excluded
+	}
+	for i := range items {
+		if err := db.Create(&items[i]).Error; err != nil {
+			t.Fatalf("failed to seed deck item: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/decks/for-card/printP", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var usage []DeckCardUsage
+	if err := json.NewDecoder(resp.Body).Decode(&usage); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+
+	if len(usage) != 2 {
+		t.Fatalf("expected 2 usages (any-printing + this printing), got %d: %+v", len(usage), usage)
+	}
+	zones := map[models.DeckZone]bool{}
+	for _, u := range usage {
+		zones[u.Zone] = true
+		if u.DeckName != "My Deck" {
+			t.Errorf("expected deck name 'My Deck', got %q", u.DeckName)
+		}
+	}
+	if !zones[models.ZoneMain] || !zones[models.ZoneSide] {
+		t.Errorf("expected main + side usages, got %+v", zones)
+	}
+	if zones[models.ZoneMaybe] {
+		t.Errorf("item pinned to a different printing should be excluded")
 	}
 }

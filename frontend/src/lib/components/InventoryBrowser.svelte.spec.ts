@@ -173,7 +173,11 @@ describe('InventoryBrowser', () => {
 		await expect
 			.element(page.getByRole('button', { name: '−', exact: true }))
 			.not.toBeInTheDocument();
-		await expect.element(page.getByRole('checkbox')).not.toBeInTheDocument();
+		// No selection checkboxes: the deck-availability filter is the only one.
+		await expect
+			.element(page.getByRole('checkbox', { name: 'Available for deck building' }))
+			.toBeInTheDocument();
+		expect(page.getByRole('checkbox').elements()).toHaveLength(1);
 		await expect
 			.element(page.getByRole('button', { name: 'Move copies to another location' }))
 			.not.toBeInTheDocument();
@@ -210,7 +214,11 @@ describe('InventoryBrowser', () => {
 		await expect
 			.element(page.getByRole('columnheader', { name: 'Actions' }))
 			.not.toBeInTheDocument();
-		await expect.element(page.getByRole('checkbox')).not.toBeInTheDocument();
+		// No selection checkboxes: the deck-availability filter is the only one.
+		await expect
+			.element(page.getByRole('checkbox', { name: 'Available for deck building' }))
+			.toBeInTheDocument();
+		expect(page.getByRole('checkbox').elements()).toHaveLength(1);
 	});
 
 	it('updates the location breakdown after refreshed data without changing the total quantity', async () => {

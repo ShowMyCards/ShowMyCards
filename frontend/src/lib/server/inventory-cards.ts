@@ -1,10 +1,10 @@
 import { BACKEND_URL } from '#lib/config.ts';
-import type { EnhancedCardResult, InventoryCardsResponse } from '#lib';
+import type { InventoryCard, InventoryCardsResponse } from '#lib';
 
 /** Load the complete collection, merging printings split across inventory-record pages. */
 export async function fetchAllInventoryCards(
 	fetch: typeof globalThis.fetch
-): Promise<EnhancedCardResult[]> {
+): Promise<InventoryCard[]> {
 	async function fetchPage(page: number): Promise<InventoryCardsResponse> {
 		const response = await fetch(`${BACKEND_URL}/api/inventory/cards?page=${page}&page_size=50`);
 		if (!response.ok) {
@@ -14,7 +14,7 @@ export async function fetchAllInventoryCards(
 	}
 
 	const firstPage = await fetchPage(1);
-	const cards = new Map<string, EnhancedCardResult>();
+	const cards = new Map<string, InventoryCard>();
 	const inventoryIds = new Set<number>();
 
 	function mergePage(page: InventoryCardsResponse) {

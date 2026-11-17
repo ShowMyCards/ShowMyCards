@@ -204,6 +204,178 @@ func GetEnglishPricesByPrint(db *gorm.DB, keys []PrintKey) (map[string]scryfall.
 	return result, nil
 }
 
+// GetScryfallCardsByPrints resolves printings by (set_code, collector_number) in
+// the given language, returning parsed cards keyed by "set|collector_number".
+//
+// The collector number is matched literally against the stored value, so promo /
+// stamp suffixes (e.g. "33p", "115s") — which Scryfall's cn: search normalises
+// away, causing live lookups to miss — resolve correctly here. Set codes are
+// lower-cased by the caller to match Scryfall's stored form. Backed by
+// idx_cards_print_lookup.
+func GetScryfallCardsByPrints(db *gorm.DB, keys []PrintKey, lang string) (map[string]scryfall.Card, error) {
+	result := make(map[string]scryfall.Card)
+	if len(keys) == 0 {
+		return result, nil
+	}
+	if lang == "" {
+		lang = "en"
+	}
+
+	// Dedupe input pairs for the IN clause.
+	seen := make(map[string]bool, len(keys))
+	pairs := make([][]any, 0, len(keys))
+	for _, k := range keys {
+		if seen[k.String()] {
+			continue
+		}
+		seen[k.String()] = true
+		pairs = append(pairs, []any{k.SetCode, k.CollectorNumber})
+	}
+
+	var cards []Card
+	if err := db.Where("lang = ? AND (set_code, collector_number) IN ?", lang, pairs).
+		Find(&cards).Error; err != nil {
+		return nil, fmt.Errorf("fetching cards by print: %w", err)
+	}
+
+	for _, c := range cards {
+		sc, err := c.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", c.ScryfallID, "error", err)
+			continue
+		}
+		key := PrintKey{SetCode: sc.Set, CollectorNumber: sc.CollectorNumber}
+		if _, ok := result[key.String()]; !ok {
+			result[key.String()] = sc
+		}
+	}
+	return result, nil
+}
+
+// preferredPrintingOrder ranks printings of one card from the most to the least
+// "default" looking, approximating the printing Scryfall shows for a card
+// rather than whichever row happens to come first. The query must alias cards
+// as c and LEFT JOIN sets as s. Lower sorts first:
+//
+//  1. paper before digital-only printings
+//  2. regular set types (core, expansion, masters, ...) before promo, box, The
+//     List and other sets, and those before novelty sets (funny, memorabilia,
+//     tokens, ...)
+//  3. fewer special treatments: promo, full art, borderless, oversized,
+//     promo_types such as boosterfun, and showcase/extended/inverted/etched frames
+//  4. newest release first, then Scryfall ID so the choice is stable
+//
+// Frame effects that every printing of a card shares (legendary, miracle, ...)
+// are deliberately not counted, so older printings without them aren't favoured.
+const preferredPrintingOrder = `
+	CASE WHEN COALESCE(json_extract(c.raw_json, '$.digital'), 0) THEN 1 ELSE 0 END,
+	CASE
+		-- Scryfall types The List as masters, but its reprints carry a stamp.
+		WHEN json_extract(c.raw_json, '$.set') = 'plst' THEN 1
+		WHEN s.set_type IN ('core', 'expansion', 'masters', 'draft_innovation', 'commander', 'starter') THEN 0
+		WHEN s.set_type IN ('funny', 'memorabilia', 'token', 'minigame', 'alchemy', 'vanguard',
+			'planechase', 'archenemy', 'treasure_chest') THEN 2
+		ELSE 1
+	END,
+	COALESCE(json_extract(c.raw_json, '$.promo'), 0)
+		+ COALESCE(json_extract(c.raw_json, '$.full_art'), 0)
+		+ COALESCE(json_extract(c.raw_json, '$.oversized'), 0)
+		+ (COALESCE(json_extract(c.raw_json, '$.border_color'), '') = 'borderless')
+		+ (json_array_length(COALESCE(json_extract(c.raw_json, '$.promo_types'), '[]')) > 0)
+		+ EXISTS (
+			SELECT 1 FROM json_each(COALESCE(json_extract(c.raw_json, '$.frame_effects'), '[]'))
+			WHERE value IN ('showcase', 'extendedart', 'inverted', 'etched', 'shatteredglass', 'textured', 'fullart')
+		),
+	json_extract(c.raw_json, '$.released_at') DESC,
+	c.scryfall_id`
+
+// firstCardPerPartition runs a window query that keeps the best-ranked card in
+// each partition. where and args filter the cards (aliased c); orderPrefix and
+// prefixArgs add ranking terms ahead of preferredPrintingOrder.
+func firstCardPerPartition(db *gorm.DB, partitionBy, orderPrefix string, prefixArgs []any, where string, args ...any) ([]Card, error) {
+	query := `
+		SELECT scryfall_id, oracle_id, raw_json FROM (
+			SELECT c.scryfall_id, c.oracle_id, c.raw_json,
+				ROW_NUMBER() OVER (PARTITION BY ` + partitionBy + ` ORDER BY ` + orderPrefix + preferredPrintingOrder + `) AS rn
+			FROM cards c
+			LEFT JOIN sets s ON s.code = json_extract(c.raw_json, '$.set')
+			WHERE ` + where + `
+		) WHERE rn = 1`
+
+	var cards []Card
+	if err := db.Raw(query, append(prefixArgs, args...)...).Scan(&cards).Error; err != nil {
+		return nil, err
+	}
+	return cards, nil
+}
+
+// GetScryfallCardsByNames resolves cards by exact name in the given language,
+// returning one representative printing per name keyed by the lower-cased name.
+// The representative is the most "default" printing (see preferredPrintingOrder).
+// Names that do not match exactly (e.g. double-faced front names, or differing
+// case/punctuation) are simply absent, so callers fall back to Scryfall for those.
+func GetScryfallCardsByNames(db *gorm.DB, names []string, lang string) (map[string]scryfall.Card, error) {
+	result := make(map[string]scryfall.Card)
+	if len(names) == 0 {
+		return result, nil
+	}
+	if lang == "" {
+		lang = "en"
+	}
+
+	cards, err := firstCardPerPartition(db, "c.name", "", nil, "c.lang = ? AND c.name IN ?", lang, names)
+	if err != nil {
+		return nil, fmt.Errorf("fetching cards by name: %w", err)
+	}
+
+	for _, c := range cards {
+		sc, err := c.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", c.ScryfallID, "error", err)
+			continue
+		}
+		result[strings.ToLower(sc.Name)] = sc
+	}
+	return result, nil
+}
+
+// GetPreferredCardsByOracle returns one printing per Oracle ID, for showing a
+// card that isn't pinned to a printing (e.g. an "any printing" deck item).
+// When preferOwned is set, printings with inventory come first. Then printings
+// in lang come first, then English, then preferredPrintingOrder decides.
+func GetPreferredCardsByOracle(db *gorm.DB, oracleIDs []string, lang string, preferOwned bool) (map[string]scryfall.Card, error) {
+	result := make(map[string]scryfall.Card, len(oracleIDs))
+	if len(oracleIDs) == 0 {
+		return result, nil
+	}
+	if lang == "" {
+		lang = "en"
+	}
+
+	orderPrefix := ""
+	if preferOwned {
+		orderPrefix = `CASE WHEN EXISTS (
+			SELECT 1 FROM inventories i WHERE i.scryfall_id = c.scryfall_id AND i.quantity > 0
+		) THEN 0 ELSE 1 END, `
+	}
+	orderPrefix += `CASE json_extract(c.raw_json, '$.lang') WHEN ? THEN 0 WHEN 'en' THEN 1 ELSE 2 END, `
+
+	cards, err := firstCardPerPartition(db, "c.oracle_id", orderPrefix, []any{lang}, "c.oracle_id IN ?", oracleIDs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching preferred printings: %w", err)
+	}
+
+	for _, c := range cards {
+		sc, err := c.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", c.ScryfallID, "error", err)
+			continue
+		}
+		result[c.OracleID] = sc
+	}
+	return result, nil
+}
+
 // GetScryfallCardsByIDs fetches cards by their Scryfall IDs, unmarshals them,
 // and returns a map of Scryfall ID to parsed scryfall.Card.
 // Cards that fail to unmarshal are logged and skipped.

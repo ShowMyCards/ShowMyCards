@@ -58,16 +58,16 @@ func (h *testSearchHandler) Search(c fiber.Ctx) error {
 		})
 	}
 
-	cards := make([]EnhancedCardResult, len(result.Cards))
+	cards := make([]InventoryCard, len(result.Cards))
 	for i, card := range result.Cards {
-		cards[i] = EnhancedCardResult{
+		cards[i] = InventoryCard{EnhancedCardResult: EnhancedCardResult{
 			CardResult: BuildCardResult(card),
 			Inventory: CardInventoryData{
 				ThisPrinting:   []models.Inventory{},
 				OtherPrintings: []models.Inventory{},
 				TotalQuantity:  0,
 			},
-		}
+		}}
 	}
 
 	return c.JSON(SearchResponse{

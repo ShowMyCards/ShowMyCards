@@ -37,15 +37,20 @@ export interface StorageLocationWithCount {
 	card_count: number;
 }
 
-// Inventory cards response with runtime-accurate card results
-export interface InventoryCardsResponse extends Omit<Generated.InventoryCardsResponse, 'data'> {
-	data: EnhancedCardResult[];
+// Inventory card: runtime-accurate result enriched with deck availability
+export interface InventoryCard extends EnhancedCardResult {
+	deck: Generated.DeckAvailability;
 }
 
-// Override SearchResponse to use runtime EnhancedCardResult
+// Inventory cards response with runtime-accurate card results
+export interface InventoryCardsResponse extends Omit<Generated.InventoryCardsResponse, 'data'> {
+	data: InventoryCard[];
+}
+
+// Override SearchResponse to use runtime InventoryCard (results carry deck availability)
 export interface SearchResponse extends Omit<Generated.SearchResponse, 'data'> {
-	data: EnhancedCardResult[];
+	data: InventoryCard[];
 }
 
 // Re-export other generated types as-is
-export type { CardResult, CardPrices, EvaluateRequest } from './api';
+export type { CardResult, CardPrices, EvaluateRequest, DeckAvailability } from './api';

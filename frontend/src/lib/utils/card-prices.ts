@@ -32,11 +32,11 @@ export function getInventoryUnitPrice(
 }
 
 /** Sort numerically, keeping unavailable prices last and ties in their original order. */
-export function sortInventoryCardsByPrice(
-	cards: EnhancedCardResult[],
+export function sortInventoryCardsByPrice<T extends EnhancedCardResult>(
+	cards: T[],
 	currency: Currency,
 	direction: 'asc' | 'desc'
-): EnhancedCardResult[] {
+): T[] {
 	return cards
 		.map((card) => ({ card, price: getInventoryUnitPrice(card, currency) }))
 		.sort((a, b) => {

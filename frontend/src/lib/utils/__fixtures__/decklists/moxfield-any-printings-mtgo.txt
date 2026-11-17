@@ -1,0 +1,92 @@
+1 Afterlife Insurance
+1 Agadeem's Awakening
+1 Al Bhed Salvagers
+1 Anafenza, Unyielding Lineage
+1 Anguished Unmaking
+1 Anointed Procession
+1 Arcane Signet
+1 Ashnod's Altar
+1 Athreos, God of Passage
+1 Balin's Tomb
+1 Bartolomé del Presidio
+1 Bastion of Remembrance
+1 Bitterblossom
+1 Blasphemous Edict
+1 Bleachbone Verge
+1 Blood Artist
+1 Boggart Trawler
+1 Bojuka Bog
+1 Bolas's Citadel
+1 Brightclimb Pathway
+1 Caves of Koilos
+1 Command Tower
+1 Cruel Celebrant
+1 Damn
+1 Dark Ritual
+1 Deadly Dispute
+1 Demonic Tutor
+1 Diabolic Intent
+1 Doomed Traveler
+1 Drivnod, Carnage Dominus
+1 Eiganjo, Seat of the Empire
+1 Elas il-Kor, Sadistic Pilgrim
+1 Elenda, the Dusk Rose
+1 Elspeth, Storm Slayer
+1 Enlightened Tutor
+1 Esper Sentinel
+1 Fabled Passage
+1 Fetid Heath
+1 Fountainport
+1 Godless Shrine
+1 Grave Pact
+1 Gravecrawler
+1 Grim Haruspex
+1 Guide of Souls
+1 Heliod, Sun-Crowned
+1 Isolated Chapel
+1 Judge Magister Gabranth
+1 Liliana, Dreadhorde General
+1 Luminous Broodmoth
+1 Marionette Apprentice
+1 Marsh Flats
+1 Ministrant of Obligation
+1 Mondrak, Glory Dominus
+1 Ocelot Pride
+1 Orcish Bowmasters
+1 Path to Exile
+1 Phyrexian Altar
+1 Phyrexian Tower
+1 Pitiless Plunderer
+4 Plains
+1 Prismatic Vista
+1 Reassembling Skeleton
+1 Sephiroth, Fabled SOLDIER
+1 Shadowy Backstreet
+1 Shattered Sanctum
+1 Skullclamp
+1 Smothering Tithe
+1 Sol Ring
+1 Sothera, the Supervoid
+7 Swamp
+1 Swords to Plowshares
+1 Syr Vondam, Sunstar Exemplar
+1 Takenuma, Abandoned Mire
+1 Teferi's Protection
+1 Teysa, Orzhov Scion
+1 The Dead Marshes
+1 The Meathook Massacre
+1 The One Ring
+1 Toxic Deluge
+1 Umbral Collar Zealot
+1 Vampiric Tutor
+1 Vault of Champions
+1 Village Rites
+1 Viscera Seer
+1 Voice of Victory
+1 Walking Ballista
+1 Warren Soultrader
+1 Witch Enchanter
+1 Yawgmoth, Thran Physician
+1 Zulaport Cutthroat
+
+1 Teysa Karlov

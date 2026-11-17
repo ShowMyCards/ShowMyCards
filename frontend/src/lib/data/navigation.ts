@@ -6,6 +6,7 @@ import {
 	Archive,
 	Scale,
 	ListTodo,
+	Layers,
 	Grid2x2,
 	Activity,
 	Download
@@ -36,6 +37,11 @@ export const menuItems: MenuItem[] = [
 		name: 'Lists',
 		href: '/lists',
 		icon: ListTodo
+	},
+	{
+		name: 'Decks',
+		href: '/decks',
+		icon: Layers
 	},
 	{
 		name: 'Storage Locations',
