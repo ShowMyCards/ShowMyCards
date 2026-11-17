@@ -49,7 +49,7 @@ describe('InventoryBrowser', () => {
 				),
 				inventoryCard('legacy', [inventoryItem(7, { treatment: '' })], { name: 'Legacy Card' })
 			];
-			render(InventoryBrowser, { cards: ownedCards, allLocations: [], header, readOnly });
+			await render(InventoryBrowser, { cards: ownedCards, allLocations: [], header, readOnly });
 			await page.getByRole('button', { name: 'Table view' }).click();
 
 			const nonfoilOnly = page.getByRole('row').filter({ hasText: 'Counterspell' });
@@ -75,7 +75,7 @@ describe('InventoryBrowser', () => {
 				prices: { usd: String(index + 1) }
 			})
 		);
-		render(InventoryBrowser, {
+		await render(InventoryBrowser, {
 			cards: manyCards,
 			allLocations: [],
 			header,
@@ -129,7 +129,7 @@ describe('InventoryBrowser', () => {
 			}),
 			inventoryCard('three', [inventoryItem(3)], { name: 'Unknown price', prices: {} })
 		];
-		render(InventoryBrowser, {
+		await render(InventoryBrowser, {
 			cards: pricedCards,
 			allLocations: [],
 			header,
@@ -152,7 +152,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('shows quantities and location links in the read-only grid without edit controls or shortcuts', async () => {
-		render(InventoryBrowser, {
+		await render(InventoryBrowser, {
 			cards,
 			allLocations: [],
 			header,
@@ -188,7 +188,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('shows aggregate quantities and storage in the read-only table', async () => {
-		render(InventoryBrowser, {
+		await render(InventoryBrowser, {
 			cards,
 			allLocations: [],
 			header,
@@ -222,7 +222,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('updates the location breakdown after refreshed data without changing the total quantity', async () => {
-		const screen = render(InventoryBrowser, {
+		const screen = await render(InventoryBrowser, {
 			cards: [cards[0]],
 			allLocations: [],
 			header,
@@ -241,7 +241,7 @@ describe('InventoryBrowser', () => {
 		const manyCards = Array.from({ length: 25 }, (_, index) =>
 			inventoryCard(`printing-${index}`, [inventoryItem(index + 1)], { name: `Card ${index}` })
 		);
-		render(InventoryBrowser, { cards: manyCards, allLocations: [], header, readOnly: true });
+		await render(InventoryBrowser, { cards: manyCards, allLocations: [], header, readOnly: true });
 		await expect.element(page.getByRole('button', { name: 'Page 1 of 2' })).toBeInTheDocument();
 		await page.getByRole('button', { name: '»' }).click();
 		await expect
@@ -260,7 +260,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('filters by set and by owned treatments beyond the first finish', async () => {
-		render(InventoryBrowser, { cards, allLocations: [], header, readOnly: true });
+		await render(InventoryBrowser, { cards, allLocations: [], header, readOnly: true });
 		const filter = page.getByPlaceholder('Filter by name, set, or treatment...');
 		await filter.fill('Beta');
 		await expect
@@ -276,7 +276,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('shows a load error rather than an empty collection', async () => {
-		render(InventoryBrowser, {
+		await render(InventoryBrowser, {
 			cards: [],
 			allLocations: [],
 			header,
@@ -288,7 +288,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('shows an empty state for an empty collection', async () => {
-		render(InventoryBrowser, { cards: [], allLocations: [], header, readOnly: true });
+		await render(InventoryBrowser, { cards: [], allLocations: [], header, readOnly: true });
 		await expect.element(page.getByText('No cards found')).toBeInTheDocument();
 		await expect
 			.element(page.getByRole('link', { name: 'Search for Cards' }))
@@ -296,7 +296,7 @@ describe('InventoryBrowser', () => {
 	});
 
 	it('keeps edit controls available by default', async () => {
-		const screen = render(InventoryBrowser, { cards: [cards[0]], allLocations: [], header });
+		const screen = await render(InventoryBrowser, { cards: [cards[0]], allLocations: [], header });
 		await expect
 			.element(page.getByRole('button', { name: '+', exact: true }).first())
 			.toBeInTheDocument();
