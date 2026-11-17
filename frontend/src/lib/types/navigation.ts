@@ -1,7 +1,7 @@
-import { type Icon as IconType } from '@lucide/svelte';
+import type { LucideIcon } from '@lucide/svelte';
 
 export type MenuItem = {
 	name: string;
 	href: string;
-	icon: typeof IconType;
+	icon: LucideIcon;
 };
