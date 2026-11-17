@@ -19,7 +19,7 @@ import (
 func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
@@ -1118,5 +1118,95 @@ func TestDecksForCard(t *testing.T) {
 	}
 	if zones[models.ZoneMaybe] {
 		t.Errorf("item pinned to a different printing should be excluded")
+	}
+}
+
+// Duplicate (unique-index) conflict tests — #156
+
+func postDeckBatch(t *testing.T, app *fiber.App, deckID uint, items []CreateDeckItemRequest) *http.Response {
+	t.Helper()
+	body, _ := json.Marshal(CreateDeckItemsBatchRequest{Items: items})
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/decks/%d/items/batch", deckID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	return resp
+}
+
+func TestDeckCreateItemsBatch_DuplicateOfExistingConflicts(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Dupes")
+	existing := models.DeckItem{DeckID: deck.ID, OracleID: "oracle-1", Zone: models.ZoneMain, DesiredQuantity: 1}
+	if err := db.Create(&existing).Error; err != nil {
+		t.Fatalf("create item failed: %v", err)
+	}
+
+	resp := postDeckBatch(t, app, deck.ID, []CreateDeckItemRequest{
+		{OracleID: "oracle-2", Zone: models.ZoneMain, DesiredQuantity: 1},
+		{OracleID: "oracle-1", Zone: models.ZoneMain, DesiredQuantity: 2},
+	})
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected status %d, got %d", http.StatusConflict, resp.StatusCode)
+	}
+
+	// The batch is transactional: the non-duplicate item must not be left behind.
+	var count int64
+	db.Model(&models.DeckItem{}).Where("deck_id = ?", deck.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("expected only the pre-existing item after rollback, got %d", count)
+	}
+}
+
+func TestDeckCreateItemsBatch_DuplicateWithinRequestConflicts(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Dupes")
+
+	item := CreateDeckItemRequest{OracleID: "oracle-1", ScryfallID: "scry-1", Treatment: "foil", Zone: models.ZoneSide, DesiredQuantity: 1}
+	resp := postDeckBatch(t, app, deck.ID, []CreateDeckItemRequest{item, item})
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected status %d, got %d", http.StatusConflict, resp.StatusCode)
+	}
+	var count int64
+	db.Model(&models.DeckItem{}).Where("deck_id = ?", deck.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("expected no items after rollback, got %d", count)
+	}
+}
+
+func TestDeckUpdateItem_ZoneCollisionConflicts(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Collide")
+	inMain := models.DeckItem{DeckID: deck.ID, OracleID: "oracle-1", Zone: models.ZoneMain, DesiredQuantity: 1}
+	inSide := models.DeckItem{DeckID: deck.ID, OracleID: "oracle-1", Zone: models.ZoneSide, DesiredQuantity: 2}
+	if err := db.Create(&inMain).Error; err != nil {
+		t.Fatalf("create item failed: %v", err)
+	}
+	if err := db.Create(&inSide).Error; err != nil {
+		t.Fatalf("create item failed: %v", err)
+	}
+
+	zone := models.ZoneMain
+	body, _ := json.Marshal(UpdateDeckItemRequest{Zone: &zone})
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/decks/%d/items/%d", deck.ID, inSide.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected status %d, got %d", http.StatusConflict, resp.StatusCode)
+	}
+	var reloaded models.DeckItem
+	db.First(&reloaded, inSide.ID)
+	if reloaded.Zone != models.ZoneSide {
+		t.Errorf("expected item to stay in side zone, got %s", reloaded.Zone)
 	}
 }

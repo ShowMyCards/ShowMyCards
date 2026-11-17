@@ -662,6 +662,10 @@ func (h *DeckHandler) CreateItemsBatch(c fiber.Ctx) error {
 		return tx.Create(&items).Error
 	})
 	if err != nil {
+		if utils.IsDuplicateKey(err) {
+			return utils.ReturnError(c, fiber.StatusConflict,
+				"one or more cards already exist in this deck and zone")
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to create deck items", "database insert failed", err)
 	}
@@ -731,6 +735,10 @@ func (h *DeckHandler) UpdateItem(c fiber.Ctx) error {
 	}
 
 	if err := h.db.WithContext(c.RequestCtx()).Save(&item).Error; err != nil {
+		if utils.IsDuplicateKey(err) {
+			return utils.ReturnError(c, fiber.StatusConflict,
+				"a card with that printing and finish already exists in that zone")
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to update deck item", "database update failed", err)
 	}

@@ -40,6 +40,9 @@ func NewClient(dbPath string) (*Client, error) {
 	// Connect to database with silent logger (only logs errors)
 	db, err := gorm.Open(sqlite.Open(dbPath+sqliteParams), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Error),
+		// Translate driver errors into GORM sentinels (e.g. gorm.ErrDuplicatedKey)
+		// so handlers can detect constraint violations without string matching.
+		TranslateError: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)

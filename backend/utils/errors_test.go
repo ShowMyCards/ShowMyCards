@@ -3,12 +3,14 @@ package utils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"testing"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"github.com/gofiber/fiber/v3"
+	"gorm.io/gorm"
 )
 
 func TestHandleScryfallError_NotFound(t *testing.T) {
@@ -256,3 +258,21 @@ func TestMapScryfallStatus(t *testing.T) {
 	}
 }
 
+func TestIsDuplicateKey(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"sentinel", gorm.ErrDuplicatedKey, true},
+		{"wrapped", fmt.Errorf("insert failed: %w", gorm.ErrDuplicatedKey), true},
+		{"other gorm error", gorm.ErrRecordNotFound, false},
+		{"plain error", errors.New("UNIQUE constraint failed"), false},
+		{"nil", nil, false},
+	}
+	for _, tc := range cases {
+		if got := IsDuplicateKey(tc.err); got != tc.want {
+			t.Errorf("%s: IsDuplicateKey = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
