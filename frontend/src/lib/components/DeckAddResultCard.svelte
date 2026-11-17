@@ -3,7 +3,7 @@
 	import { notifications, getActionError } from '#lib';
 	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
-	import { Plus } from '@lucide/svelte';
+	import { Info, Plus } from '@lucide/svelte';
 
 	let { card }: { card: EnhancedCardResult } = $props();
 
@@ -17,6 +17,9 @@
 	let zone = $state('main');
 	let qty = $state(1);
 	let pin = $state(false);
+
+	const PIN_HELP =
+		'Only this exact printing counts toward the deck. Leave it unpinned and any printing of the card you own fills the slot.';
 	let adding = $state(false);
 
 	const imageUri = $derived(card.image_uri ?? '');
@@ -95,10 +98,16 @@
 		</label>
 
 		<label
-			class="flex items-center gap-1 text-xs cursor-pointer"
-			title="Require this exact printing">
-			<input type="checkbox" bind:checked={pin} class="checkbox checkbox-sm" />
+			class="tooltip tooltip-top flex items-center gap-1 text-xs cursor-pointer"
+			data-tip={PIN_HELP}>
+			<input
+				type="checkbox"
+				bind:checked={pin}
+				class="checkbox checkbox-sm"
+				aria-describedby="pin-help-{card.id}" />
 			<span class="opacity-70">Pin printing</span>
+			<Info class="h-3 w-3 opacity-50" aria-hidden="true" />
+			<span id="pin-help-{card.id}" class="sr-only">{PIN_HELP}</span>
 		</label>
 
 		<button onclick={add} disabled={adding} class="btn btn-sm btn-primary ml-auto">

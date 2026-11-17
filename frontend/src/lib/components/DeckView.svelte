@@ -1,5 +1,7 @@
 <script lang="ts">
-	import type { EnrichedDeckItem } from '#lib';
+	import { isFoilTreatment, type EnrichedDeckItem } from '#lib';
+	import { Pin, Sparkles } from '@lucide/svelte';
+	import CardImage from './CardImage.svelte';
 	import ManaCost from './ManaCost.svelte';
 	import DeckCardActions from './DeckCardActions.svelte';
 	import { groupCards, type DeckGroupMode, type DeckSortMode } from '#lib/utils/deck-grouping.ts';
@@ -35,6 +37,21 @@
 		return 'opacity-60';
 	}
 
+	// An empty treatment means "any finish", which isFoilTreatment would count as foil.
+	function isFoil(item: EnrichedDeckItem): boolean {
+		return !!item.treatment && isFoilTreatment(item.treatment);
+	}
+
+	function pinnedTitle(item: EnrichedDeckItem): string {
+		const where = [
+			item.set_code?.toUpperCase(),
+			item.collector_number && `#${item.collector_number}`
+		]
+			.filter(Boolean)
+			.join(' ');
+		return `Pinned to ${where || 'a specific printing'}; other printings don't count for this slot`;
+	}
+
 	function cardHref(item: EnrichedDeckItem): string | undefined {
 		return item.printing_id ? resolve(`cards/${item.printing_id}`) : undefined;
 	}
@@ -42,7 +59,11 @@
 
 {#snippet cardImage(item: EnrichedDeckItem)}
 	{#if item.image_uri}
-		<img src={item.image_uri} alt={item.name} loading="lazy" class="w-full rounded-xl shadow" />
+		<CardImage
+			src={item.image_uri}
+			alt={item.name ?? ''}
+			isFoil={isFoil(item)}
+			class="aspect-5/7 shadow" />
 	{:else}
 		<div
 			class="bg-base-300 flex aspect-5/7 items-center justify-center rounded-xl p-2 text-center text-xs opacity-60">
@@ -85,7 +106,8 @@
 				<div class="rounded-box border-base-300 bg-base-100 divide-base-300 divide-y border">
 					{#each g.items as item (item.id)}
 						{@const href = cardHref(item)}
-						<div class="flex items-center gap-2 px-3 py-1 text-sm">
+						<div
+							class="hover:bg-base-300/70 even:bg-base-200/60 first:rounded-t-box last:rounded-b-box flex items-center gap-2 px-3 py-1 text-sm transition-colors">
 							<span class="w-5 shrink-0 text-right tabular-nums {qtyClass(item)}">
 								{item.desired_quantity}
 							</span>
@@ -95,6 +117,17 @@
 									class="hover:text-primary flex-1 truncate">{item.name || 'Unknown card'}</a>
 							{:else}
 								<span class="flex-1 truncate">{item.name || 'Unknown card'}</span>
+							{/if}
+							{#if isFoil(item)}
+								{@const finish = item.treatment === 'etched' ? 'Etched' : 'Foil'}
+								<span class="text-warning shrink-0" title={finish}>
+									<Sparkles class="h-3 w-3" aria-label={finish} />
+								</span>
+							{/if}
+							{#if item.scryfall_id}
+								<span class="shrink-0 opacity-50" title={pinnedTitle(item)}>
+									<Pin class="h-3 w-3" aria-label={pinnedTitle(item)} />
+								</span>
 							{/if}
 							<ManaCost cost={item.mana_cost} class="shrink-0" />
 							<DeckCardActions {item} {...getRollup(item)} />
