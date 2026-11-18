@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { BACKEND_URL } from '#lib';
 import { fail, redirect } from '@sveltejs/kit';
-import type { Deck, DeckItemsResponse } from '#lib';
+import type { Deck, DeckItemsResponse, FormatLegality } from '#lib';
 import { upsertDeckItems } from '#lib/server/deck-items.ts';
 
 const emptyItems: DeckItemsResponse = {
@@ -14,20 +14,36 @@ const emptyItems: DeckItemsResponse = {
 	aggregate_over_committed: 0
 };
 
+// Format legality is auxiliary: when it fails the panel shows an inline error
+// (null) and the rest of the page still loads, so this never rejects.
+async function loadLegality(
+	fetch: typeof globalThis.fetch,
+	id: string
+): Promise<FormatLegality[] | null> {
+	try {
+		const response = await fetch(`${BACKEND_URL}/api/decks/${id}/legality`);
+		return response.ok ? ((await response.json()) as FormatLegality[]) : null;
+	} catch {
+		return null;
+	}
+}
+
 export const load: PageServerLoad = async ({ params, fetch }) => {
 	const { id } = params;
 
 	try {
-		// Load deck metadata and grouped items in parallel.
-		const [deckResponse, itemsResponse] = await Promise.all([
+		// Load deck metadata, grouped items and format legality in parallel.
+		const [deckResponse, itemsResponse, legality] = await Promise.all([
 			fetch(`${BACKEND_URL}/api/decks/${id}`),
-			fetch(`${BACKEND_URL}/api/decks/${id}/items`)
+			fetch(`${BACKEND_URL}/api/decks/${id}/items`),
+			loadLegality(fetch, id)
 		]);
 
 		if (!deckResponse.ok) {
 			return {
 				deck: null,
 				items: emptyItems,
+				legality: null,
 				error: 'Failed to load deck'
 			};
 		}
@@ -38,6 +54,7 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 			return {
 				deck,
 				items: emptyItems,
+				legality: null,
 				error: 'Failed to load deck items'
 			};
 		}
@@ -46,12 +63,14 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 
 		return {
 			deck,
-			items
+			items,
+			legality
 		};
 	} catch {
 		return {
 			deck: null,
 			items: emptyItems,
+			legality: null,
 			error: 'Failed to load deck'
 		};
 	}

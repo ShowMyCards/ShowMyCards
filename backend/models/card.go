@@ -376,6 +376,36 @@ func GetPreferredCardsByOracle(db *gorm.DB, oracleIDs []string, lang string, pre
 	return result, nil
 }
 
+// GetAnyCardsByOracle returns one arbitrary printing per Oracle ID, for
+// Oracle-level data that is the same on every printing: legalities, English
+// name, type line, rules text, keywords and color identity. Unlike
+// GetPreferredCardsByOracle it does not rank printings, so it reads a single
+// row per Oracle (found through the oracle_id index) instead of every printing.
+func GetAnyCardsByOracle(db *gorm.DB, oracleIDs []string) (map[string]scryfall.Card, error) {
+	result := make(map[string]scryfall.Card, len(oracleIDs))
+	if len(oracleIDs) == 0 {
+		return result, nil
+	}
+
+	var cards []Card
+	if err := db.Raw(`
+		SELECT scryfall_id, oracle_id, raw_json FROM cards
+		WHERE rowid IN (SELECT MIN(rowid) FROM cards WHERE oracle_id IN ? GROUP BY oracle_id)`,
+		oracleIDs).Scan(&cards).Error; err != nil {
+		return nil, fmt.Errorf("fetching cards by oracle: %w", err)
+	}
+
+	for _, c := range cards {
+		sc, err := c.ToScryfallCard()
+		if err != nil {
+			slog.Warn("failed to unmarshal card", "scryfall_id", c.ScryfallID, "error", err)
+			continue
+		}
+		result[c.OracleID] = sc
+	}
+	return result, nil
+}
+
 // GetScryfallCardsByIDs fetches cards by their Scryfall IDs, unmarshals them,
 // and returns a map of Scryfall ID to parsed scryfall.Card.
 // Cards that fail to unmarshal are logged and skipped.

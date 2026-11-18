@@ -324,6 +324,18 @@ export interface DeckItemsResponse {
 	aggregate_over_committed: number /* int */;
 }
 /**
+ * FormatLegality is a deck's verdict for one format. Reasons lists why the deck
+ * is not legal, one line per kind of violation; it is empty when Legal.
+ * tygo:export
+ */
+export interface FormatLegality {
+	format: string; // Scryfall legalities key
+	name: string;
+	group: string;
+	legal: boolean;
+	reasons: string[];
+}
+/**
  * CreateDeckItemRequest represents a single item to add to a deck.
  * tygo:export
  */

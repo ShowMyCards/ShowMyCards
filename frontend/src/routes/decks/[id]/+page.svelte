@@ -9,6 +9,7 @@
 		Modal,
 		FormField,
 		DeckView,
+		DeckLegality,
 		DeckAddResultCard,
 		notifications,
 		getActionError,
@@ -62,6 +63,11 @@
 			data.items.main.length +
 			data.items.side.length +
 			data.items.maybe.length
+	);
+	// Maybe-board cards are not part of the deck, so a deck holding only those
+	// has nothing to check.
+	const legalityEmpty = $derived(
+		data.items.command.length + data.items.main.length + data.items.side.length === 0
 	);
 
 	// Roll demand-zone rows up per Oracle so a card split across zones (e.g. 3 main
@@ -191,6 +197,8 @@
 				availability is a later milestone.
 			</span>
 		</div>
+
+		<DeckLegality formats={data.legality} empty={legalityEmpty} />
 
 		<!-- View controls -->
 		{#if totalItems > 0}

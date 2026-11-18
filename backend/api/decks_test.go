@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
 	"backend/models"
 
+	scryfall "github.com/BlueMonday/go-scryfall"
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -42,6 +44,7 @@ func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app.Get("/api/decks", handler.List)
 	app.Get("/api/decks/for-card/:scryfall_id", handler.DecksForCard)
 	app.Get("/api/decks/:id", handler.Get)
+	app.Get("/api/decks/:id/legality", handler.Legality)
 	app.Post("/api/decks", handler.Create)
 	app.Put("/api/decks/:id", handler.Update)
 	app.Delete("/api/decks/:id", handler.Delete)
@@ -1347,5 +1350,105 @@ func TestDeckMoveItem_Rejections(t *testing.T) {
 				t.Errorf("expected side x2 unchanged, got %v", zones)
 			}
 		})
+	}
+}
+
+// Legality endpoint tests. The rules themselves are covered in backend/legality;
+// these check the wiring: card lookup by Oracle, maybe board, missing data.
+
+// createLegalityTestCard stores a printing that is legal in every format.
+func createLegalityTestCard(t *testing.T, db *gorm.DB, scryfallID, oracleID, name, typeLine string) {
+	t.Helper()
+	var legalities scryfall.Legalities
+	v := reflect.ValueOf(&legalities).Elem()
+	for i := range v.NumField() {
+		v.Field(i).SetString(string(scryfall.LegalityLegal))
+	}
+	card, err := models.FromScryfallCard(scryfall.Card{
+		ID: scryfallID, OracleID: oracleID, Name: name, Lang: "en",
+		TypeLine: typeLine, Legalities: legalities,
+	})
+	if err != nil {
+		t.Fatalf("failed to build test card: %v", err)
+	}
+	if err := db.Create(card).Error; err != nil {
+		t.Fatalf("failed to create test card: %v", err)
+	}
+}
+
+func fetchDeckLegality(t *testing.T, app *fiber.App, deckID uint) map[string]FormatLegality {
+	t.Helper()
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/decks/%d/legality", deckID), nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var got []FormatLegality
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode legality: %v", err)
+	}
+	if len(got) != 14 || got[0].Format != "standard" || got[13].Format != "standardbrawl" {
+		t.Fatalf("expected 14 formats from standard to standardbrawl, got %+v", got)
+	}
+	byFormat := make(map[string]FormatLegality, len(got))
+	for _, f := range got {
+		byFormat[f.Format] = f
+	}
+	return byFormat
+}
+
+func TestDeckLegality_ChecksDeckCards(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Mono Blue")
+
+	createLegalityTestCard(t, db, "island-1", "island", "Island", "Basic Land — Island")
+	createLegalityTestCard(t, db, "opt-1", "opt", "Opt", "Instant")
+	seedDeckItem(t, db, deck.ID, "island", models.ZoneMain, 56)
+	// Pinned to a printing that is not stored locally: resolved through its Oracle.
+	pinned := models.DeckItem{DeckID: deck.ID, OracleID: "opt", ScryfallID: "opt-unknown-printing", Zone: models.ZoneMain, DesiredQuantity: 4}
+	if err := db.Create(&pinned).Error; err != nil {
+		t.Fatalf("failed to create pinned item: %v", err)
+	}
+	// Unknown card on the maybe board: ignored, so no "No card data" reason.
+	seedDeckItem(t, db, deck.ID, "unknown", models.ZoneMaybe, 1)
+
+	got := fetchDeckLegality(t, app, deck.ID)
+
+	if modern := got["modern"]; !modern.Legal || modern.Reasons == nil || len(modern.Reasons) != 0 {
+		t.Errorf("expected modern legal with empty reasons, got %+v", modern)
+	}
+	if cmdr := got["commander"]; cmdr.Legal || cmdr.Name != "Commander" || cmdr.Group != "Commander" {
+		t.Errorf("expected commander not legal, got %+v", cmdr)
+	}
+}
+
+func TestDeckLegality_MissingCardData(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Unknown")
+	seedDeckItem(t, db, deck.ID, "not-imported-yet", models.ZoneMain, 1)
+
+	got := fetchDeckLegality(t, app, deck.ID)
+
+	modern := got["modern"]
+	if modern.Legal || len(modern.Reasons) == 0 || modern.Reasons[0] != "No card data yet: 1 card" {
+		t.Errorf("expected missing-data reason first, got %+v", modern)
+	}
+}
+
+func TestDeckLegality_NotFound(t *testing.T) {
+	app, _ := setupDeckTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/api/decks/999/legality", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }

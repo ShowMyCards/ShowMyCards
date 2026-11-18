@@ -1,6 +1,7 @@
 package api
 
 import (
+	"backend/legality"
 	"backend/models"
 	"backend/services"
 	"backend/utils"
@@ -462,6 +463,69 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 	// so a card split across zones is counted once against the owned pool.
 	resp.AggregateShortfall, resp.AggregateOverCommitted = deckDemandTotals(deckDemandByOracle, availability)
 
+	return c.JSON(resp)
+}
+
+// FormatLegality is a deck's verdict for one format. Reasons lists why the deck
+// is not legal, one line per kind of violation; it is empty when Legal.
+//
+// tygo:export
+type FormatLegality struct {
+	Format  string   `json:"format"` // Scryfall legalities key
+	Name    string   `json:"name"`
+	Group   string   `json:"group"`
+	Legal   bool     `json:"legal"`
+	Reasons []string `json:"reasons"`
+}
+
+// Legality checks the deck against every supported format and returns one
+// FormatLegality per format, in display order. Maybe-board items are ignored.
+func (h *DeckHandler) Legality(c fiber.Ctx) error {
+	id := fiber.Params[int](c, "id")
+	if id == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid id")
+	}
+
+	db := h.db.WithContext(c.RequestCtx())
+
+	var deck models.Deck
+	if err := db.First(&deck, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ReturnError(c, fiber.StatusNotFound, "deck not found")
+		}
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch deck", "database query failed", err)
+	}
+
+	var items []models.DeckItem
+	if err := db.Where("deck_id = ? AND zone <> ?", deck.ID, models.ZoneMaybe).Find(&items).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch deck items", "database query failed", err)
+	}
+
+	// Legality and rules text are the same for every printing of a card, so any
+	// one printing per Oracle is enough, pinned or not; GetAnyCardsByOracle skips
+	// the costly printing ranking used for display. A missing Oracle in the
+	// result means the card has no local data yet.
+	oracleIDs := make([]string, 0, len(items))
+	seen := make(map[string]bool)
+	for _, item := range items {
+		if !seen[item.OracleID] {
+			seen[item.OracleID] = true
+			oracleIDs = append(oracleIDs, item.OracleID)
+		}
+	}
+	cards, err := models.GetAnyCardsByOracle(db, oracleIDs)
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to check deck legality", "card query failed", err)
+	}
+
+	results := legality.Check(items, cards)
+	resp := make([]FormatLegality, len(results))
+	for i, r := range results {
+		resp[i] = FormatLegality(r)
+	}
 	return c.JSON(resp)
 }
 
