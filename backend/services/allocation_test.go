@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"backend/models"
@@ -229,4 +230,104 @@ func TestAllocation_MultipleOraclesIndependent(t *testing.T) {
 
 	assertAvail(t, m.OracleAvailabilityFor("oracle-1"), 4, 2, 2, false)
 	assertAvail(t, m.OracleAvailabilityFor("oracle-2"), 1, 3, 0, true)
+}
+
+func computeConflicts(t *testing.T, db *gorm.DB, oracleID string) []Conflict {
+	t.Helper()
+	m, err := NewAllocationService(db).ComputeAvailability(context.Background())
+	if err != nil {
+		t.Fatalf("ComputeAvailability failed: %v", err)
+	}
+	return m.Conflicts(oracleID)
+}
+
+func assertConflicts(t *testing.T, got, want []Conflict) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("conflicts:\n got  %+v\n want %+v", got, want)
+	}
+}
+
+func TestConflicts_WholeCardListsDecksSummedAcrossPrintingsAndZones(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	beta := newDeck(t, db, "Beta")
+	alpha := newDeck(t, db, "Alpha")
+
+	addInventory(t, db, "oracle-1", "scry-A", 2)
+	addInventory(t, db, "oracle-1", "scry-B", 1)
+	addDeckItem(t, db, beta.ID, "oracle-1", "", models.ZoneMain, 1)
+	addDeckItem(t, db, alpha.ID, "oracle-1", "", models.ZoneMain, 2)
+	addDeckItem(t, db, alpha.ID, "oracle-1", "", models.ZoneSide, 1)
+	addDeckItem(t, db, alpha.ID, "oracle-1", "scry-B", models.ZoneMain, 1)
+	addDeckItem(t, db, beta.ID, "oracle-1", "", models.ZoneMaybe, 5) // never demand
+
+	// Owned 3, wanted 5; scry-B is pinned once and owned once, so no printing entry.
+	assertConflicts(t, computeConflicts(t, db, "oracle-1"), []Conflict{{
+		Owned:  3,
+		Wanted: 5,
+		Decks: []DeckDemand{
+			{DeckID: alpha.ID, DeckName: "Alpha", Quantity: 4},
+			{DeckID: beta.ID, DeckName: "Beta", Quantity: 1},
+		},
+	}})
+}
+
+// The Swamp case: the card's total fits, but two decks pin one printing more
+// often than it is owned. Only the pinning decks are listed, not a deck that
+// wants any printing of the card.
+func TestConflicts_PinnedPrintingListsOnlyPinningDecks(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	x := newDeck(t, db, "X")
+	y := newDeck(t, db, "Y")
+	z := newDeck(t, db, "Z")
+
+	addInventory(t, db, "oracle-1", "scry-de", 4)
+	addInventory(t, db, "oracle-1", "scry-en", 5)
+	addDeckItem(t, db, x.ID, "oracle-1", "scry-de", models.ZoneMain, 3)
+	addDeckItem(t, db, y.ID, "oracle-1", "scry-de", models.ZoneMain, 2)
+	addDeckItem(t, db, y.ID, "oracle-1", "scry-en", models.ZoneMain, 1)
+	addDeckItem(t, db, z.ID, "oracle-1", "", models.ZoneMain, 1)
+
+	assertConflicts(t, computeConflicts(t, db, "oracle-1"), []Conflict{{
+		ScryfallID: "scry-de",
+		Owned:      4,
+		Wanted:     5,
+		Decks: []DeckDemand{
+			{DeckID: x.ID, DeckName: "X", Quantity: 3},
+			{DeckID: y.ID, DeckName: "Y", Quantity: 2},
+		},
+	}})
+}
+
+func TestConflicts_NoneWhenNotOverCommitted(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	deck := newDeck(t, db, "Fine")
+
+	addInventory(t, db, "oracle-1", "scry-A", 3)
+	addDeckItem(t, db, deck.ID, "oracle-1", "scry-A", models.ZoneMain, 3)
+
+	if got := computeConflicts(t, db, "oracle-1"); got != nil {
+		t.Errorf("expected no conflicts, got %+v", got)
+	}
+	if got := computeConflicts(t, db, "oracle-unknown"); got != nil {
+		t.Errorf("expected no conflicts for an unknown Oracle, got %+v", got)
+	}
+}
+
+func TestConflicts_WholeCardFirstThenPrintingsByID(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	deck := newDeck(t, db, "Both")
+
+	addInventory(t, db, "oracle-1", "scry-B", 1)
+	addDeckItem(t, db, deck.ID, "oracle-1", "scry-B", models.ZoneMain, 2)
+	addDeckItem(t, db, deck.ID, "oracle-1", "scry-A", models.ZoneMain, 1)
+
+	decks := func(qty int) []DeckDemand {
+		return []DeckDemand{{DeckID: deck.ID, DeckName: "Both", Quantity: qty}}
+	}
+	assertConflicts(t, computeConflicts(t, db, "oracle-1"), []Conflict{
+		{Owned: 1, Wanted: 3, Decks: decks(3)},
+		{ScryfallID: "scry-A", Owned: 0, Wanted: 1, Decks: decks(1)},
+		{ScryfallID: "scry-B", Owned: 1, Wanted: 2, Decks: decks(2)},
+	})
 }

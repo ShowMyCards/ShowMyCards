@@ -63,6 +63,7 @@ export { default as ListCard } from './components/ListCard.svelte';
 export { default as DeckCard } from './components/DeckCard.svelte';
 export { default as DeckView } from './components/DeckView.svelte';
 export { default as DeckCardActions } from './components/DeckCardActions.svelte';
+export { default as DeckSharedCards } from './components/DeckSharedCards.svelte';
 export { default as ManaCost } from './components/ManaCost.svelte';
 export { default as DeckAddResultCard } from './components/DeckAddResultCard.svelte';
 export { default as AddToDeckModal } from './components/AddToDeckModal.svelte';
@@ -181,7 +182,10 @@ export type {
 	CreateDeckItemRequest,
 	CreateDeckItemsBatchRequest,
 	UpdateDeckItemRequest,
-	DeckCardUsage
+	DeckCardUsage,
+	SharedCard,
+	AllocationConflict,
+	ConflictDeck
 } from './types/api';
 
 // Re-export local card-resolution API types
