@@ -1,10 +1,6 @@
 <script lang="ts">
 	import { notifications } from '#lib';
-	import {
-		formatExportLines,
-		type CardListExport,
-		type CardListExportMode
-	} from '#lib/utils/card-list-export.ts';
+	import { formatExportLines, type CardListExportChoice } from '#lib/utils/card-list-export.ts';
 	import { copyText } from '#lib/utils/clipboard.ts';
 	import { Copy } from '@lucide/svelte';
 	import Modal from './Modal.svelte';
@@ -12,27 +8,27 @@
 	interface Props {
 		open: boolean;
 		onClose: () => void;
-		/** Every wanted card. */
-		all: CardListExport;
-		/** Only the cards still to get (not owned / not collected). */
-		missing: CardListExport;
+		/** What to export, e.g. "Only missing" and "All cards". The first opens; one hides the switch. */
+		choices: CardListExportChoice[];
 		title?: string;
 	}
 
-	let { open, onClose, all, missing, title = 'Export card list' }: Props = $props();
+	let { open, onClose, choices, title = 'Export card list' }: Props = $props();
 
 	const uid = $props.id();
 
-	// Opens on the buying view every time; reset on close rather than persisted.
-	let mode = $state<CardListExportMode>('missing');
+	// Opens on the first choice every time; reset on close rather than persisted.
+	let selected = $state(0);
 	let textarea = $state<HTMLTextAreaElement>();
 
-	const current = $derived(mode === 'all' ? all : missing);
+	const choice = $derived(choices[selected] ?? choices[0]);
+	const current = $derived(choice.export);
 	const text = $derived(formatExportLines(current.lines));
 	const cardCount = $derived(current.lines.reduce((sum, line) => sum + line.quantity, 0));
+	const hasExpansions = $derived(current.lines.some((line) => line.expansion));
 
 	function close() {
-		mode = 'missing';
+		selected = 0;
 		onClose();
 	}
 
@@ -49,22 +45,19 @@
 
 <Modal {open} onClose={close} {title} boxClass="max-w-xl">
 	<div class="space-y-4">
-		<div class="join" role="radiogroup" aria-label="Cards to export">
-			<input
-				type="radio"
-				name="{uid}-mode"
-				class="join-item btn btn-sm"
-				aria-label="Only missing"
-				value="missing"
-				bind:group={mode} />
-			<input
-				type="radio"
-				name="{uid}-mode"
-				class="join-item btn btn-sm"
-				aria-label="All cards"
-				value="all"
-				bind:group={mode} />
-		</div>
+		{#if choices.length > 1}
+			<div class="join" role="radiogroup" aria-label="Cards to export">
+				{#each choices as option, index (option.label)}
+					<input
+						type="radio"
+						name="{uid}-choice"
+						class="join-item btn btn-sm"
+						aria-label={option.label}
+						value={index}
+						bind:group={selected} />
+				{/each}
+			</div>
+		{/if}
 
 		{#if current.lines.length > 0}
 			<textarea
@@ -76,13 +69,15 @@
 				value={text}></textarea>
 			<p class="text-xs opacity-70">
 				{current.lines.length} line{current.lines.length === 1 ? '' : 's'} · {cardCount}
-				card{cardCount === 1 ? '' : 's'}. Formatted for Cardmarket Wants lists. Expansions
-				Cardmarket names differently are added as any printing.
+				card{cardCount === 1 ? '' : 's'}. Formatted for Cardmarket Wants lists.
+				{#if hasExpansions}
+					Expansions Cardmarket names differently are added as any printing.
+				{/if}
 			</p>
 		{:else}
 			<div
 				class="rounded-box border border-dashed border-base-300 p-6 text-center text-sm opacity-70">
-				{mode === 'missing' ? 'Nothing missing: you have every card.' : 'No cards to export.'}
+				{choice.empty ?? 'No cards to export.'}
 			</div>
 		{/if}
 

@@ -1,7 +1,7 @@
 import { page, userEvent } from 'vitest/browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { CardListExport } from '#lib/utils/card-list-export.ts';
+import type { CardListExport, CardListExportChoice } from '#lib/utils/card-list-export.ts';
 import CardListExportModal from './CardListExportModal.svelte';
 
 const all: CardListExport = {
@@ -21,6 +21,18 @@ const pinned: CardListExport = {
 };
 const nothingMissing: CardListExport = { lines: [], skipped: 0 };
 
+/** The deck and list pages' switch. */
+function missingOrAll(missingCards: CardListExport, allCards = all): CardListExportChoice[] {
+	return [
+		{
+			label: 'Only missing',
+			export: missingCards,
+			empty: 'Nothing missing: you have every card.'
+		},
+		{ label: 'All cards', export: allCards }
+	];
+}
+
 function exported() {
 	return page.getByRole('textbox', { name: 'Exported card list' });
 }
@@ -29,7 +41,11 @@ describe('CardListExportModal', () => {
 	afterEach(() => vi.restoreAllMocks());
 
 	it('opens on the missing cards', async () => {
-		await render(CardListExportModal, { open: true, onClose: () => {}, all, missing });
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: missingOrAll(missing)
+		});
 
 		await expect.element(page.getByRole('radio', { name: 'Only missing' })).toBeChecked();
 		await expect.element(exported()).toHaveValue('2 Lightning Bolt');
@@ -37,7 +53,11 @@ describe('CardListExportModal', () => {
 	});
 
 	it('shows pinned expansions in Cardmarket syntax', async () => {
-		await render(CardListExportModal, { open: true, onClose: () => {}, all, missing: pinned });
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: missingOrAll(pinned)
+		});
 
 		await expect
 			.element(exported())
@@ -48,7 +68,11 @@ describe('CardListExportModal', () => {
 	});
 
 	it('switches to every card', async () => {
-		await render(CardListExportModal, { open: true, onClose: () => {}, all, missing });
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: missingOrAll(missing)
+		});
 
 		await page.getByRole('radio', { name: 'All cards' }).click();
 
@@ -57,7 +81,11 @@ describe('CardListExportModal', () => {
 
 	it('copies the shown text to the clipboard', async () => {
 		const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
-		await render(CardListExportModal, { open: true, onClose: () => {}, all, missing });
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: missingOrAll(missing)
+		});
 
 		await page.getByRole('button', { name: 'Copy' }).click();
 
@@ -68,8 +96,7 @@ describe('CardListExportModal', () => {
 		await render(CardListExportModal, {
 			open: true,
 			onClose: () => {},
-			all,
-			missing: nothingMissing
+			choices: missingOrAll(nothingMissing)
 		});
 
 		await expect.element(page.getByText('Nothing missing', { exact: false })).toBeVisible();
@@ -81,8 +108,7 @@ describe('CardListExportModal', () => {
 		await render(CardListExportModal, {
 			open: true,
 			onClose: () => {},
-			all,
-			missing: { ...missing, skipped: 2 }
+			choices: missingOrAll({ ...missing, skipped: 2 })
 		});
 
 		await expect.element(page.getByText('2 items were left out', { exact: false })).toBeVisible();
@@ -90,7 +116,11 @@ describe('CardListExportModal', () => {
 
 	it('reopens on the missing cards after closing', async () => {
 		const onClose = vi.fn();
-		const { rerender } = await render(CardListExportModal, { open: true, onClose, all, missing });
+		const { rerender } = await render(CardListExportModal, {
+			open: true,
+			onClose,
+			choices: missingOrAll(missing)
+		});
 
 		await page.getByRole('radio', { name: 'All cards' }).click();
 		await userEvent.click(page.getByRole('button', { name: 'Close', exact: true }));
@@ -101,5 +131,29 @@ describe('CardListExportModal', () => {
 
 		await expect.element(page.getByRole('radio', { name: 'Only missing' })).toBeChecked();
 		await expect.element(exported()).toHaveValue('2 Lightning Bolt');
+	});
+
+	it('hides the switch when there is only one choice', async () => {
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: [{ label: 'All cards', export: all }]
+		});
+
+		await expect.element(exported()).toHaveValue('1 Fire // Ice\n4 Lightning Bolt');
+		await expect.element(page.getByRole('radio')).not.toBeInTheDocument();
+	});
+
+	it('mentions expansion fallbacks only when a line names an expansion', async () => {
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: missingOrAll(missing)
+		});
+
+		await expect.element(exported()).toBeVisible();
+		await expect
+			.element(page.getByText('Expansions Cardmarket names differently', { exact: false }))
+			.not.toBeInTheDocument();
 	});
 });

@@ -213,6 +213,7 @@ export type { AddToDeckCard, BuildDeckItemsOptions } from './utils/deck-add';
 export { deckExportLines, listExportLines, formatExportLines } from './utils/card-list-export';
 export type {
 	CardListExport,
+	CardListExportChoice,
 	CardListExportLine,
 	CardListExportMode,
 	DeckExportItems

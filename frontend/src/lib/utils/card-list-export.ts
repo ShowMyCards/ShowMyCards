@@ -143,6 +143,14 @@ export function listExportLines(
 	return { lines: lines.sorted(), skipped: items.length - named.length };
 }
 
+/** One option of the export dialog's switch, e.g. "Only missing" or "All cards". */
+export interface CardListExportChoice {
+	label: string;
+	export: CardListExport;
+	/** Shown when the choice has no lines. Defaults to "No cards to export." */
+	empty?: string;
+}
+
 /** Render export lines as newline-separated "<quantity> <name> [(<expansion>)]" text. */
 export function formatExportLines(lines: CardListExportLine[]): string {
 	return lines

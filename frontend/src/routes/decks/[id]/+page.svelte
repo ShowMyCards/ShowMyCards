@@ -312,8 +312,14 @@
 	open={showExportModal}
 	onClose={() => (showExportModal = false)}
 	title="Export {data.deck?.name ?? 'deck'}"
-	all={exportAll}
-	missing={exportMissing} />
+	choices={[
+		{
+			label: 'Only missing',
+			export: exportMissing,
+			empty: 'Nothing missing: you have every card.'
+		},
+		{ label: 'All cards', export: exportAll }
+	]} />
 
 <!-- Edit Deck Modal -->
 
