@@ -473,7 +473,6 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 type FormatLegality struct {
 	Format  string   `json:"format"` // Scryfall legalities key
 	Name    string   `json:"name"`
-	Group   string   `json:"group"`
 	Legal   bool     `json:"legal"`
 	Reasons []string `json:"reasons"`
 }

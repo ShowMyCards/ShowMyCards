@@ -13,9 +13,7 @@ const items = {
 	aggregate_shortfall: 0,
 	aggregate_over_committed: 0
 };
-const legality = [
-	{ format: 'modern', name: 'Modern', group: 'Constructed', legal: true, reasons: [] }
-];
+const legality = [{ format: 'modern', name: 'Modern', legal: true, reasons: [] }];
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 

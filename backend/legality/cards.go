@@ -117,9 +117,9 @@ func copyLimit(c scryfall.Card, defaultLimit int) int {
 	return defaultLimit
 }
 
-// canLead reports whether the card may be a commander under the rule
-// (CR 903.3, 903.3a, 903.12c).
-func canLead(c scryfall.Card, rule commanderRule) bool {
+// canLead reports whether the card may be a commander (CR 903.3, 903.3a).
+// Planeswalkers qualify only through "can be your commander".
+func canLead(c scryfall.Card) bool {
 	_, text, power := frontFace(c)
 	if strings.Contains(text, "can be your commander") {
 		return true
@@ -134,7 +134,7 @@ func canLead(c scryfall.Card, rule commanderRule) bool {
 	case slices.Contains(subtypes, "Spacecraft"):
 		return power != nil // only Spacecraft with a power/toughness box
 	}
-	return rule == legendaryOrWalker && slices.Contains(types, "Planeswalker")
+	return false
 }
 
 func isPlaneswalker(c scryfall.Card) bool {
@@ -161,8 +161,8 @@ func isDoctor(c scryfall.Card) bool {
 
 // leadsWithBackground reports whether chooser may be a commander with the
 // Background bg as its second commander (CR 702.124k).
-func leadsWithBackground(chooser, bg scryfall.Card, rule commanderRule) bool {
-	return hasKeyword(chooser, "Choose a background") && canLead(chooser, rule) && isBackground(bg)
+func leadsWithBackground(chooser, bg scryfall.Card) bool {
+	return hasKeyword(chooser, "Choose a background") && canLead(chooser) && isBackground(bg)
 }
 
 type partnerKind int

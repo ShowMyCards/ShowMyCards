@@ -331,7 +331,6 @@ export interface DeckItemsResponse {
 export interface FormatLegality {
 	format: string; // Scryfall legalities key
 	name: string;
-	group: string;
 	legal: boolean;
 	reasons: string[];
 }

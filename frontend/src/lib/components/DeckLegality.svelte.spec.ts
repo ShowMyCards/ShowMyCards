@@ -4,28 +4,25 @@ import { render } from 'vitest-browser-svelte';
 import type { FormatLegality } from '#lib';
 import DeckLegality from './DeckLegality.svelte';
 
-function format(key: string, name: string, group: string, reasons: string[] = []): FormatLegality {
-	return { format: key, name, group, legal: reasons.length === 0, reasons };
+function format(key: string, name: string, reasons: string[] = []): FormatLegality {
+	return { format: key, name, legal: reasons.length === 0, reasons };
 }
 
 const formats = [
-	format('standard', 'Standard', 'Constructed', ['Banned: Black Lotus']),
-	format('modern', 'Modern', 'Constructed'),
-	format('commander', 'Commander', 'Commander', [
-		'No commander',
-		'Deck has 60 cards (needs exactly 100)'
-	]),
-	format('brawl', 'Brawl', 'Arena', ['No commander'])
+	format('standard', 'Standard', ['Banned: Black Lotus']),
+	format('modern', 'Modern'),
+	format('commander', 'Commander', ['No commander', 'Deck has 60 cards (needs exactly 100)']),
+	format('oathbreaker', 'Oathbreaker', [
+		'Command zone needs one planeswalker and one instant or sorcery'
+	])
 ];
 
 describe('DeckLegality', () => {
-	it('shows groups and formats in the given order', async () => {
+	it('shows formats in the given order', async () => {
 		const screen = await render(DeckLegality, { formats, empty: false });
 
 		const text = screen.container.textContent ?? '';
-		const order = ['Constructed', 'Standard', 'Modern', 'Commander', 'Arena', 'Brawl'].map((s) =>
-			text.indexOf(s)
-		);
+		const order = ['Standard', 'Modern', 'Commander', 'Oathbreaker'].map((s) => text.indexOf(s));
 		expect(order).toEqual([...order].sort((a, b) => a - b));
 		expect(order).not.toContain(-1);
 	});
@@ -66,7 +63,7 @@ describe('DeckLegality', () => {
 		await expect.element(page.getByText('Banned: Black Lotus')).toBeVisible();
 
 		await screen.rerender({
-			formats: [format('standard', 'Standard', 'Constructed'), ...formats.slice(1)]
+			formats: [format('standard', 'Standard'), ...formats.slice(1)]
 		});
 
 		await expect.element(page.getByText('Banned: Black Lotus')).not.toBeInTheDocument();

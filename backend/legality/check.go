@@ -24,11 +24,7 @@
 //     the Hunger Tide) are not recognised.
 //   - Companion deckbuilding conditions are not checked; one companion may sit
 //     in the sideboard of a commander format.
-//   - Standard Brawl's rule that a colorless commander allows any number of one
-//     basic land type is not implemented.
 //   - Partner oathbreakers are not supported.
-//   - Scryfall's "competitivebrawl" is not checked: go-scryfall v0.11.0 drops it
-//     when cards are stored (models.FromScryfallCard).
 package legality
 
 import (
@@ -48,7 +44,6 @@ const maxNames = 10
 type Result struct {
 	Format  string
 	Name    string
-	Group   string
 	Legal   bool
 	Reasons []string
 }
@@ -65,7 +60,6 @@ func Check(items []models.DeckItem, cards map[string]scryfall.Card) []Result {
 		results[i] = Result{
 			Format:  f.key,
 			Name:    f.name,
-			Group:   f.group,
 			Legal:   len(reasons) == 0,
 			Reasons: reasons,
 		}
@@ -184,7 +178,7 @@ func (d deck) checkConstructed(f format, r *reasons) {
 }
 
 func (d deck) checkCommander(f format, r *reasons) {
-	identity, ok := d.checkCommandZone(f, r)
+	identity, ok := d.checkCommandZone(r)
 	d.checkExactSize(f, r)
 	d.checkNoSideboard(r)
 	d.checkCopies(f, r, 1, d.main, d.command)
@@ -196,7 +190,7 @@ func (d deck) checkCommander(f format, r *reasons) {
 // checkCommandZone validates the commander(s) and returns their combined color
 // identity. ok is false when the command zone is invalid or has cards without
 // data, in which case color identity is not checked.
-func (d deck) checkCommandZone(f format, r *reasons) (identity map[scryfall.Color]bool, ok bool) {
+func (d deck) checkCommandZone(r *reasons) (identity map[scryfall.Color]bool, ok bool) {
 	leaders, known := d.expand(d.command)
 	switch n := d.command.total(); {
 	case n == 0:
@@ -210,14 +204,14 @@ func (d deck) checkCommandZone(f format, r *reasons) (identity map[scryfall.Colo
 	}
 
 	if len(leaders) == 2 &&
-		(leadsWithBackground(leaders[0], leaders[1], f.commander) ||
-			leadsWithBackground(leaders[1], leaders[0], f.commander)) {
+		(leadsWithBackground(leaders[0], leaders[1]) ||
+			leadsWithBackground(leaders[1], leaders[0])) {
 		return identityOf(leaders), true
 	}
 
 	var invalid []string
 	for _, c := range leaders {
-		if !canLead(c, f.commander) {
+		if !canLead(c) {
 			invalid = append(invalid, c.Name)
 		}
 	}

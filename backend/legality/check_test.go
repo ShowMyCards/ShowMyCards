@@ -121,29 +121,24 @@ func expect(t *testing.T, results map[string]legality.Result, format string, wan
 
 func TestCheck_FormatsInOrder(t *testing.T) {
 	results := legality.Check(nil, nil)
-	want := []struct{ key, name, group string }{
-		{"standard", "Standard", "Constructed"},
-		{"pioneer", "Pioneer", "Constructed"},
-		{"modern", "Modern", "Constructed"},
-		{"legacy", "Legacy", "Constructed"},
-		{"vintage", "Vintage", "Constructed"},
-		{"pauper", "Pauper", "Constructed"},
-		{"future", "Future Standard", "Constructed"},
-		{"commander", "Commander", "Commander"},
-		{"oathbreaker", "Oathbreaker", "Commander"},
-		{"alchemy", "Alchemy", "Arena"},
-		{"historic", "Historic", "Arena"},
-		{"timeless", "Timeless", "Arena"},
-		{"brawl", "Brawl", "Arena"},
-		{"standardbrawl", "Standard Brawl", "Arena"},
+	want := []struct{ key, name string }{
+		{"standard", "Standard"},
+		{"pioneer", "Pioneer"},
+		{"modern", "Modern"},
+		{"legacy", "Legacy"},
+		{"vintage", "Vintage"},
+		{"pauper", "Pauper"},
+		{"future", "Future Standard"},
+		{"commander", "Commander"},
+		{"oathbreaker", "Oathbreaker"},
 	}
 	if len(results) != len(want) {
 		t.Fatalf("got %d formats, want %d", len(results), len(want))
 	}
 	for i, w := range want {
 		r := results[i]
-		if r.Format != w.key || r.Name != w.name || r.Group != w.group {
-			t.Errorf("format %d = %s/%s/%s, want %s/%s/%s", i, r.Format, r.Name, r.Group, w.key, w.name, w.group)
+		if r.Format != w.key || r.Name != w.name {
+			t.Errorf("format %d = %s/%s, want %s/%s", i, r.Format, r.Name, w.key, w.name)
 		}
 	}
 }
@@ -151,7 +146,7 @@ func TestCheck_FormatsInOrder(t *testing.T) {
 func TestCheck_Constructed(t *testing.T) {
 	t.Run("legal 60-card deck", func(t *testing.T) {
 		results := newDeck().fill(models.ZoneMain, 60).check()
-		for _, f := range []string{"standard", "pioneer", "modern", "legacy", "vintage", "pauper", "future", "alchemy", "historic", "timeless"} {
+		for _, f := range []string{"standard", "pioneer", "modern", "legacy", "vintage", "pauper", "future"} {
 			expect(t, results, f)
 		}
 		expect(t, results, "commander", "No commander", "Deck has 60 cards (needs exactly 100)")
@@ -277,8 +272,8 @@ func TestCheck_Commander(t *testing.T) {
 	t.Run("legal 99 plus commander", func(t *testing.T) {
 		results := commanderDeck(legend("Leader", G)).check()
 		expect(t, results, "commander")
-		expect(t, results, "brawl")
-		expect(t, results, "standardbrawl", "Deck has 100 cards (needs exactly 60)")
+		expect(t, results, "oathbreaker",
+			"Command zone needs one planeswalker and one instant or sorcery", "Deck has 100 cards (needs exactly 60)")
 	})
 
 	t.Run("no commander", func(t *testing.T) {
@@ -307,36 +302,32 @@ func TestCheck_Commander(t *testing.T) {
 	})
 
 	t.Run("eligibility", func(t *testing.T) {
-		walker := card("Jace", typeLine("Legendary Planeswalker — Jace"))
 		tests := []struct {
-			name      string
-			leader    scryfall.Card
-			commander []string
-			brawl     []string
+			name   string
+			leader scryfall.Card
+			want   []string
 		}{
 			{"non-legendary creature", card("Grizzly Bears", typeLine("Creature — Bear")),
-				[]string{"Not a valid commander: Grizzly Bears"}, []string{"Not a valid commander: Grizzly Bears"}},
-			{"planeswalker only leads Brawl", walker,
-				[]string{"Not a valid commander: Jace"}, nil},
+				[]string{"Not a valid commander: Grizzly Bears"}},
+			{"plain planeswalker cannot lead", card("Jace", typeLine("Legendary Planeswalker — Jace")),
+				[]string{"Not a valid commander: Jace"}},
 			{"can be your commander", card("Daretti", typeLine("Legendary Planeswalker — Daretti"),
-				text("Daretti can be your commander.")), nil, nil},
-			{"legendary vehicle", card("Parhelion II", typeLine("Legendary Artifact — Vehicle")), nil, nil},
-			{"legendary spacecraft with power", card("Ship", typeLine("Legendary Artifact — Spacecraft"), power("5")), nil, nil},
+				text("Daretti can be your commander.")), nil},
+			{"legendary vehicle", card("Parhelion II", typeLine("Legendary Artifact — Vehicle")), nil},
+			{"legendary spacecraft with power", card("Ship", typeLine("Legendary Artifact — Spacecraft"), power("5")), nil},
 			{"legendary spacecraft without power", card("Station", typeLine("Legendary Artifact — Spacecraft")),
-				[]string{"Not a valid commander: Station"}, []string{"Not a valid commander: Station"}},
+				[]string{"Not a valid commander: Station"}},
 			{"double-faced card with legendary front", card("Front // Back", faces(
 				scryfall.CardFace{TypeLine: "Legendary Creature — Human"},
-				scryfall.CardFace{TypeLine: "Legendary Planeswalker — Human"})), nil, nil},
+				scryfall.CardFace{TypeLine: "Legendary Planeswalker — Human"})), nil},
 			{"double-faced card with legendary back only", card("Plain // Legend", faces(
 				scryfall.CardFace{TypeLine: "Creature — Human"},
 				scryfall.CardFace{TypeLine: "Legendary Creature — Human"})),
-				[]string{"Not a valid commander: Plain // Legend"}, []string{"Not a valid commander: Plain // Legend"}},
+				[]string{"Not a valid commander: Plain // Legend"}},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				results := commanderDeck(tt.leader).check()
-				expect(t, results, "commander", tt.commander...)
-				expect(t, results, "brawl", tt.brawl...)
+				expect(t, commanderDeck(tt.leader).check(), "commander", tt.want...)
 			})
 		}
 	})
@@ -521,14 +512,4 @@ func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 			check()
 		expect(t, results, "commander")
 	})
-}
-
-func TestCheck_StandardBrawl(t *testing.T) {
-	results := newDeck().
-		add(card("Jace", typeLine("Legendary Planeswalker — Jace")), models.ZoneCommand, 1).
-		fill(models.ZoneMain, 59).
-		check()
-	expect(t, results, "standardbrawl")
-	expect(t, results, "brawl", "Deck has 60 cards (needs exactly 100)")
-	expect(t, results, "commander", "Not a valid commander: Jace", "Deck has 60 cards (needs exactly 100)")
 }

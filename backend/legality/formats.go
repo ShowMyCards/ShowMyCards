@@ -2,13 +2,6 @@ package legality
 
 import scryfall "github.com/BlueMonday/go-scryfall"
 
-// Display groups, in the order the frontend shows them.
-const (
-	groupConstructed = "Constructed"
-	groupCommander   = "Commander"
-	groupArena       = "Arena"
-)
-
 // commanderRule says whether a format has a command zone and what may lead it.
 type commanderRule int
 
@@ -20,9 +13,6 @@ const (
 	// legendary formats (Commander) are exactly `size` singleton cards led by
 	// a legendary creature, Vehicle or Spacecraft (CR 903.3, 903.5).
 	legendary
-	// legendaryOrWalker formats (Brawl, Standard Brawl) also allow a
-	// planeswalker as commander (CR 903.12c).
-	legendaryOrWalker
 	// oathbreaker is exactly `size` singleton cards led by a planeswalker plus
 	// an instant or sorcery signature spell (oathbreakermtg.org/rules 906).
 	oathbreaker
@@ -32,7 +22,6 @@ const (
 type format struct {
 	key       string // Scryfall legalities key
 	name      string // display name
-	group     string
 	legality  func(scryfall.Legalities) scryfall.Legality
 	size      int // minimum (noCommander) or exact (all others) deck size
 	commander commanderRule
@@ -40,28 +29,19 @@ type format struct {
 
 // formats lists every checked format in display order.
 //
-// Only formats with an official rules source are listed. Dropped formats can
-// be added back as rows: Premodern (PreModern), Penny Dreadful (Penny) and Old
-// School (OldSchool) as noCommander rows of size 60; Duel Commander (Duel) and
-// PreDH (PreDH) as legendary rows of size 100; Tiny Leaders
-// (TinyLeadersReborn) as a legendary row of size 50. Pauper Commander and
-// Gladiator need rules of their own (uncommon commander; 100-card singleton
-// without a commander).
+// Only paper formats with an official rules source are listed. The MTG Arena
+// formats (Alchemy, Historic, Timeless, Brawl, Standard Brawl) are left out on
+// purpose: the app tracks physical cards, which cannot be played on Arena.
 var formats = []format{
-	{"standard", "Standard", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Standard }, 60, noCommander},
-	{"pioneer", "Pioneer", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Pioneer }, 60, noCommander},
-	{"modern", "Modern", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Modern }, 60, noCommander},
-	{"legacy", "Legacy", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Legacy }, 60, noCommander},
-	{"vintage", "Vintage", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Vintage }, 60, noCommander},
-	{"pauper", "Pauper", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Pauper }, 60, noCommander},
-	{"future", "Future Standard", groupConstructed, func(l scryfall.Legalities) scryfall.Legality { return l.Future }, 60, noCommander},
-	{"commander", "Commander", groupCommander, func(l scryfall.Legalities) scryfall.Legality { return l.Commander }, 100, legendary},
-	{"oathbreaker", "Oathbreaker", groupCommander, func(l scryfall.Legalities) scryfall.Legality { return l.Oathbreaker }, 60, oathbreaker},
-	{"alchemy", "Alchemy", groupArena, func(l scryfall.Legalities) scryfall.Legality { return l.Alchemy }, 60, noCommander},
-	{"historic", "Historic", groupArena, func(l scryfall.Legalities) scryfall.Legality { return l.Historic }, 60, noCommander},
-	{"timeless", "Timeless", groupArena, func(l scryfall.Legalities) scryfall.Legality { return l.Timeless }, 60, noCommander},
-	{"brawl", "Brawl", groupArena, func(l scryfall.Legalities) scryfall.Legality { return l.Brawl }, 100, legendaryOrWalker},
-	{"standardbrawl", "Standard Brawl", groupArena, func(l scryfall.Legalities) scryfall.Legality { return l.StandardBrawl }, 60, legendaryOrWalker},
+	{"standard", "Standard", func(l scryfall.Legalities) scryfall.Legality { return l.Standard }, 60, noCommander},
+	{"pioneer", "Pioneer", func(l scryfall.Legalities) scryfall.Legality { return l.Pioneer }, 60, noCommander},
+	{"modern", "Modern", func(l scryfall.Legalities) scryfall.Legality { return l.Modern }, 60, noCommander},
+	{"legacy", "Legacy", func(l scryfall.Legalities) scryfall.Legality { return l.Legacy }, 60, noCommander},
+	{"vintage", "Vintage", func(l scryfall.Legalities) scryfall.Legality { return l.Vintage }, 60, noCommander},
+	{"pauper", "Pauper", func(l scryfall.Legalities) scryfall.Legality { return l.Pauper }, 60, noCommander},
+	{"future", "Future Standard", func(l scryfall.Legalities) scryfall.Legality { return l.Future }, 60, noCommander},
+	{"commander", "Commander", func(l scryfall.Legalities) scryfall.Legality { return l.Commander }, 100, legendary},
+	{"oathbreaker", "Oathbreaker", func(l scryfall.Legalities) scryfall.Legality { return l.Oathbreaker }, 60, oathbreaker},
 }
 
 const (

@@ -1391,8 +1391,8 @@ func fetchDeckLegality(t *testing.T, app *fiber.App, deckID uint) map[string]For
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("failed to decode legality: %v", err)
 	}
-	if len(got) != 14 || got[0].Format != "standard" || got[13].Format != "standardbrawl" {
-		t.Fatalf("expected 14 formats from standard to standardbrawl, got %+v", got)
+	if len(got) != 9 || got[0].Format != "standard" || got[8].Format != "oathbreaker" {
+		t.Fatalf("expected 9 formats from standard to oathbreaker, got %+v", got)
 	}
 	byFormat := make(map[string]FormatLegality, len(got))
 	for _, f := range got {
@@ -1421,7 +1421,7 @@ func TestDeckLegality_ChecksDeckCards(t *testing.T) {
 	if modern := got["modern"]; !modern.Legal || modern.Reasons == nil || len(modern.Reasons) != 0 {
 		t.Errorf("expected modern legal with empty reasons, got %+v", modern)
 	}
-	if cmdr := got["commander"]; cmdr.Legal || cmdr.Name != "Commander" || cmdr.Group != "Commander" {
+	if cmdr := got["commander"]; cmdr.Legal || cmdr.Name != "Commander" {
 		t.Errorf("expected commander not legal, got %+v", cmdr)
 	}
 }
