@@ -66,16 +66,19 @@ func frontTypes(c scryfall.Card) (types, subtypes []string) {
 	return splitTypeLine(typeLine)
 }
 
-// isToken reports whether the card is a token or an emblem: a reminder of
-// something the deck creates, not a card in it. Most tokens have a token
-// layout, but a few (e.g. Role tokens) only carry the Token supertype.
-func isToken(c scryfall.Card) bool {
+// isNonDeckCard reports whether the card is a printed reminder rather than a
+// card a deck is built from: tokens, emblems, counter and marker cards (e.g.
+// Poison Counter, Experience), art cards and Jumpstart theme cards. Most have a
+// dedicated layout; the rest carry the Token supertype (e.g. Role tokens) or
+// Scryfall's "Card" type line, which no game card has.
+func isNonDeckCard(c scryfall.Card) bool {
 	switch c.Layout {
-	case scryfall.LayoutToken, scryfall.LayoutDoubleFacedToken, scryfall.LayoutEmblem:
+	case scryfall.LayoutToken, scryfall.LayoutDoubleFacedToken, scryfall.LayoutEmblem,
+		scryfall.LayoutArtSeries, scryfall.Layout("front_card"):
 		return true
 	}
 	types, _ := frontTypes(c)
-	return slices.Contains(types, "Token")
+	return slices.Contains(types, "Token") || slices.Contains(types, "Card")
 }
 
 func hasKeyword(c scryfall.Card, keyword string) bool {

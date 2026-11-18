@@ -491,11 +491,14 @@ func TestCheck_Oathbreaker(t *testing.T) {
 	})
 }
 
-func TestCheck_IgnoresTokensAndEmblems(t *testing.T) {
+func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 	notLegalAnywhere := legal(func(l *scryfall.Legalities) { *l = scryfall.Legalities{} })
 	fish := card("Fish", layout(scryfall.LayoutToken), typeLine("Token Creature — Fish"), colors(U), notLegalAnywhere)
 	role := card("Monster Role", layout(scryfall.LayoutFlip), typeLine("Token Enchantment — Aura Role"), notLegalAnywhere)
 	emblem := card("Emblem", layout(scryfall.LayoutEmblem), typeLine("Emblem — Jace"), notLegalAnywhere)
+	poison := card("Poison Counter", layout(scryfall.LayoutNormal), typeLine("Card"), notLegalAnywhere)
+	artCard := card("Sol Ring // Sol Ring", layout(scryfall.LayoutArtSeries), typeLine("Card // Card"), notLegalAnywhere)
+	themeCard := card("Dragons", layout(scryfall.Layout("front_card")), typeLine("Card"), notLegalAnywhere)
 
 	t.Run("constructed", func(t *testing.T) {
 		results := newDeck().
@@ -511,6 +514,9 @@ func TestCheck_IgnoresTokensAndEmblems(t *testing.T) {
 			add(legend("Leader", G), models.ZoneCommand, 1).
 			fill(models.ZoneMain, 99).
 			add(fish, models.ZoneMain, 3).
+			add(poison, models.ZoneMain, 1).
+			add(artCard, models.ZoneMain, 1).
+			add(themeCard, models.ZoneMain, 1).
 			add(emblem, models.ZoneSide, 1).
 			check()
 		expect(t, results, "commander")

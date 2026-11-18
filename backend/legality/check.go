@@ -8,8 +8,10 @@
 // cards named …" exemptions), and for commander formats the command zone,
 // partner pairs and color identity.
 //
-// Tokens and emblems are ignored: they are reminders of what the deck creates,
-// not cards in it.
+// Tokens, emblems and other helper cards (counter, art and theme cards) are
+// ignored: they are reminders, not cards in the deck. Planechase planes,
+// Archenemy schemes and Vanguard cards belong to separate decks and are
+// reported as not legal.
 //
 // Sources: Comprehensive Rules 100.2a, 100.4a, 100.5, 702.124 and 903
 // (effective 2026-11-06); magic.wizards.com/en/formats; oathbreakermtg.org/rules.
@@ -105,7 +107,7 @@ func newDeck(items []models.DeckItem, cards map[string]scryfall.Card) deck {
 			continue
 		}
 		c, ok := cards[item.OracleID]
-		if ok && isToken(c) {
+		if ok && isNonDeckCard(c) {
 			continue
 		}
 		if !ok {
