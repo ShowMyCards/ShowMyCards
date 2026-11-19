@@ -1,7 +1,7 @@
 {
 	"name": "website",
 	"type": "module",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"scripts": {
 		"dev": "astro dev",
 		"build": "astro build",
@@ -17,7 +17,7 @@
 	},
 	"devDependencies": {
 		"@tailwindcss/typography": "0.5.20",
-		"@types/node": "25.9.9",
+		"@types/node": "26.6.6",
 		"wrangler": "4.161.0"
 	}
 }

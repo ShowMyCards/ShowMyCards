@@ -54,7 +54,7 @@ const props = {
 
 describe('DeckView', () => {
 	it('shows the foil overlay only for items with a foil finish', async () => {
-		const screen = render(DeckView, { ...props, view: 'grid' });
+		const screen = await render(DeckView, { ...props, view: 'grid' });
 
 		await expect.element(page.getByRole('img', { name: 'Ocelot Pride' })).toBeInTheDocument();
 		// "Any finish" ('') must not be mistaken for foil.
@@ -62,7 +62,7 @@ describe('DeckView', () => {
 	});
 
 	it('marks foil and pinned items in the text view', async () => {
-		render(DeckView, { ...props, view: 'text' });
+		await render(DeckView, { ...props, view: 'text' });
 
 		const pinned = page.getByLabelText('Pinned to MH3 #38', { exact: false });
 		await expect.element(pinned).toBeInTheDocument();
