@@ -33,12 +33,15 @@ describe('POST /decks/[id]/items', () => {
 		const fetchMock = vi
 			.fn()
 			.mockResolvedValueOnce(emptyDeck())
-			.mockResolvedValueOnce(new Response('[]', { status: 201 }));
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify([{ ...item, id: 1, zone: 'other' }]), { status: 201 })
+			);
 
 		const res = await POST(makeEvent({ items: [item] }, fetchMock));
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ success: true });
+		// The zones the backend stored the rows in (tokens always land in other).
+		expect(await res.json()).toEqual({ success: true, zones: ['other'] });
 		const [url, init] = fetchMock.mock.calls[1];
 		expect(url).toBe(`${BACKEND_URL}/api/decks/7/items/batch`);
 		expect(JSON.parse((init as RequestInit).body as string)).toEqual({ items: [item] });

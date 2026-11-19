@@ -25,6 +25,9 @@
 
 	// Maybe-board items never count as demand, so they carry no availability signal.
 	const isDemand = $derived(item.zone !== 'maybe');
+	// Tokens and other extras always stay in the Other section: no zone picker.
+	// Real cards can't be moved into Other either, so it isn't in ZONES.
+	const canMove = $derived(item.zone !== 'other');
 
 	// Writable derived: seeded from the prop, editable, resets on fresh data.
 	let qty = $derived(item.desired_quantity);
@@ -180,19 +183,21 @@
 		</div>
 
 		<!-- Zone -->
-		<div class="mb-2 flex items-center gap-2">
-			<span class="w-12 text-xs opacity-70">Zone</span>
-			<select
-				bind:value={moveZone}
-				onchange={onZoneChange}
-				disabled={saving}
-				class="select select-bordered select-xs"
-				aria-label="Zone">
-				{#each ZONES as zone (zone.value)}
-					<option value={zone.value}>{zone.label}</option>
-				{/each}
-			</select>
-		</div>
+		{#if canMove}
+			<div class="mb-2 flex items-center gap-2">
+				<span class="w-12 text-xs opacity-70">Zone</span>
+				<select
+					bind:value={moveZone}
+					onchange={onZoneChange}
+					disabled={saving}
+					class="select select-bordered select-xs"
+					aria-label="Zone">
+					{#each ZONES as zone (zone.value)}
+						<option value={zone.value}>{zone.label}</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
 
 		{#if movePending && item.desired_quantity > 1}
 			<div class="bg-base-200 rounded-box mb-2 p-2">

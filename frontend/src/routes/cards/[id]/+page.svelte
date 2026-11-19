@@ -18,7 +18,8 @@
 		command: 'Command',
 		main: 'Main',
 		side: 'Side',
-		maybe: 'Maybe'
+		maybe: 'Maybe',
+		other: 'Other'
 	};
 
 	// Group the deck usage rows by deck so each deck is listed once with its zones.

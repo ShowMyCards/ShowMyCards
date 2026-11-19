@@ -55,7 +55,10 @@ func setupBulkDataServiceTest(t *testing.T) (*BulkDataService, *JobService, *Set
 		t.Fatalf("failed to setup test db: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.Job{}, &models.Setting{}, &models.Card{}); err != nil {
+	// Deck tables and sets are migrated too: a successful import reclassifies
+	// deck extras, which reads deck items and joins sets.
+	if err := db.AutoMigrate(&models.Job{}, &models.Setting{}, &models.Card{},
+		&models.Deck{}, &models.DeckItem{}, &models.Set{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 
@@ -574,5 +577,92 @@ func TestBulkDataService_DownloadAndImport_PreservesExistingData(t *testing.T) {
 	db.Model(&models.Card{}).Count(&count)
 	if count != 2 {
 		t.Errorf("expected 2 total cards, got %d", count)
+	}
+}
+
+// Deck extras reclassification runs after a successful import only.
+
+// serveBulkData starts a mock Scryfall serving cards and points the service at it.
+func serveBulkData(t *testing.T, service *BulkDataService, cards []scryfall.Card) {
+	t.Helper()
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bulk-data" {
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(bulkDataListResponse(server.URL + "/cards.jsonl.gz")); err != nil {
+				t.Errorf("failed to write bulk data list: %v", err)
+			}
+		} else {
+			writeJSONLGzip(t, w, cards)
+		}
+	}))
+	t.Cleanup(server.Close)
+	if err := service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data"); err != nil {
+		t.Fatalf("failed to set bulk data URL: %v", err)
+	}
+}
+
+// seedTokenInMain creates a deck holding a token printing in the main zone, as
+// decks did before tokens had their own zone.
+func seedTokenInMain(t *testing.T, db *gorm.DB) models.DeckItem {
+	t.Helper()
+	deck := models.Deck{Name: "Rabbits"}
+	if err := db.Create(&deck).Error; err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+	item := models.DeckItem{DeckID: deck.ID, OracleID: "oracle-rabbit", ScryfallID: "rabbit-1", Zone: models.ZoneMain, DesiredQuantity: 2}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("failed to create deck item: %v", err)
+	}
+	return item
+}
+
+var rabbitToken = scryfall.Card{
+	ID: "rabbit-1", OracleID: "oracle-rabbit", Name: "Rabbit", Set: "tblb",
+	Layout: scryfall.LayoutToken, TypeLine: "Token Creature — Rabbit",
+}
+
+func deckItemZone(t *testing.T, db *gorm.DB, id uint) models.DeckZone {
+	t.Helper()
+	var item models.DeckItem
+	if err := db.First(&item, id).Error; err != nil {
+		t.Fatalf("failed to reload deck item: %v", err)
+	}
+	return item.Zone
+}
+
+func TestBulkDataService_DownloadAndImport_ReclassifiesDeckExtras(t *testing.T) {
+	service, jobService, _, db := setupBulkDataServiceTest(t)
+	item := seedTokenInMain(t, db)
+	serveBulkData(t, service, []scryfall.Card{rabbitToken})
+
+	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
+	if err := service.DownloadAndImport(context.Background(), job.ID); err != nil {
+		t.Fatalf("DownloadAndImport failed: %v", err)
+	}
+
+	if zone := deckItemZone(t, db, item.ID); zone != models.ZoneOther {
+		t.Errorf("token zone after import = %q, want %q", zone, models.ZoneOther)
+	}
+}
+
+func TestBulkDataService_DownloadAndImport_FailedImportDoesNotReclassify(t *testing.T) {
+	service, jobService, _, db := setupBulkDataServiceTest(t)
+	item := seedTokenInMain(t, db)
+	// The token imports fine, but the failure rate fails the whole job.
+	serveBulkData(t, service, []scryfall.Card{
+		rabbitToken,
+		{OracleID: "oracle-2", Name: "invalid-1"}, // missing ID
+		{OracleID: "oracle-3", Name: "invalid-2"},
+		{OracleID: "oracle-4", Name: "invalid-3"},
+	})
+
+	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
+	if err := service.DownloadAndImport(context.Background(), job.ID); err == nil {
+		t.Fatal("expected the import to fail on its failure rate")
+	}
+
+	if zone := deckItemZone(t, db, item.ID); zone != models.ZoneMain {
+		t.Errorf("token zone after failed import = %q, want %q", zone, models.ZoneMain)
 	}
 }

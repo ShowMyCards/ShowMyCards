@@ -46,7 +46,13 @@
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
 				await refreshAll();
-				const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
+				// Tokens and other extras are stored in Other whatever zone was picked,
+				// so name the zone the server reports.
+				const stored = result.data?.zones;
+				const used = Array.isArray(stored) && stored.length > 0 ? (stored as string[]) : [zone];
+				const zoneLabel = used
+					.map((z) => ZONES.find((o) => o.value === z)?.label ?? (z === 'other' ? 'Other' : z))
+					.join(', ');
 				notifications.success(`Added ${card.name} to ${zoneLabel}`);
 			} else if (result.type === 'failure') {
 				notifications.error(getActionError(result.data, 'Failed to add card'));

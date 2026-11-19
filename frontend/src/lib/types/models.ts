@@ -127,6 +127,17 @@ export interface Deck {
 }
 
 //////////
+// source: deck_extra.go
+
+/**
+ * ReclassifyResult reports what ReclassifyDeckExtras did.
+ */
+export interface ReclassifyResult {
+	Checked: number /* int */; // deck item rows examined
+	Moved: number /* int */; // rows moved (or merged) into their correct zone
+}
+
+//////////
 // source: deck_item.go
 
 /**
@@ -138,6 +149,12 @@ export const ZoneMain: DeckZone = 'main';
 export const ZoneSide: DeckZone = 'side';
 export const ZoneCommand: DeckZone = 'command';
 export const ZoneMaybe: DeckZone = 'maybe';
+/**
+ * ZoneOther holds tokens and other non-playable extras (emblems, helper
+ * cards, art cards, planes, ...). It is reserved for them: extras always live
+ * here and real cards never do (see IsDeckExtra and CheckExtraZone).
+ */
+export const ZoneOther: DeckZone = 'other';
 /**
  * DeckItem represents a single card entry in a deck.
  * ScryfallID is empty when the user does not pin a specific printing (any

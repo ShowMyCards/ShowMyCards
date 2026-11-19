@@ -16,21 +16,34 @@ const (
 	ZoneSide    DeckZone = "side"
 	ZoneCommand DeckZone = "command"
 	ZoneMaybe   DeckZone = "maybe"
+	// ZoneOther holds tokens and other non-playable extras (emblems, helper
+	// cards, art cards, planes, ...). It is reserved for them: extras always live
+	// here and real cards never do (see IsDeckExtra and CheckExtraZone).
+	ZoneOther DeckZone = "other"
 )
 
 // IsValid reports whether the zone is one of the recognised values.
 func (z DeckZone) IsValid() bool {
 	switch z {
-	case ZoneMain, ZoneSide, ZoneCommand, ZoneMaybe:
+	case ZoneMain, ZoneSide, ZoneCommand, ZoneMaybe, ZoneOther:
 		return true
 	}
 	return false
 }
 
-// CountsAsDemand reports whether cards in this zone lock inventory for the
+// CountsAsDemand reports whether entries in this zone lock inventory for the
 // allocation service. Maybe-board entries do not — they are aspirational and
-// must not affect the over-commitment math.
+// must not affect the over-commitment math. Extras in the other zone do: the
+// token copies a deck uses are tracked across decks like cards, just reported
+// separately.
 func (z DeckZone) CountsAsDemand() bool {
+	return z == ZoneMain || z == ZoneSide || z == ZoneCommand || z == ZoneOther
+}
+
+// CountsAsCards reports whether entries in this zone count toward a deck's
+// cards (its card total and card shortfall). Extras in the other zone are
+// items, not cards.
+func (z DeckZone) CountsAsCards() bool {
 	return z == ZoneMain || z == ZoneSide || z == ZoneCommand
 }
 
@@ -67,7 +80,7 @@ func (di *DeckItem) ValidateDeckItem(tx *gorm.DB) error {
 		return errors.New("desired_quantity must be at least 1")
 	}
 	if !di.Zone.IsValid() {
-		return errors.New("zone must be one of main, side, command, maybe")
+		return errors.New("zone must be one of main, side, command, maybe, other")
 	}
 	return nil
 }
@@ -80,4 +93,52 @@ func (di *DeckItem) BeforeCreate(tx *gorm.DB) error {
 // BeforeUpdate validates the deck item before updating a record
 func (di *DeckItem) BeforeUpdate(tx *gorm.DB) error {
 	return di.ValidateDeckItem(tx)
+}
+
+// MoveDeckItemTx moves qty copies of source into zone within tx. If the zone
+// already holds the same card (oracle, pinned printing and finish), the copies
+// merge into that row rather than colliding on the unique index; otherwise a
+// row is created, or source itself is moved when every copy goes. The source
+// row is reduced, and deleted when emptied. Returns the resulting target row.
+//
+// The caller ensures source.Zone != zone and 1 <= qty <= source.DesiredQuantity.
+func MoveDeckItemTx(tx *gorm.DB, source DeckItem, zone DeckZone, qty int) (DeckItem, error) {
+	var target DeckItem
+	err := tx.Where("deck_id = ? AND oracle_id = ? AND scryfall_id = ? AND treatment = ? AND zone = ?",
+		source.DeckID, source.OracleID, source.ScryfallID, source.Treatment, zone).First(&target).Error
+	switch {
+	case err == nil:
+		// Same card already in the target zone: merge into it.
+		target.DesiredQuantity += qty
+		if err := tx.Save(&target).Error; err != nil {
+			return DeckItem{}, err
+		}
+	case !errors.Is(err, gorm.ErrRecordNotFound):
+		return DeckItem{}, err
+	case qty == source.DesiredQuantity:
+		// Moving every copy and nothing to merge with: move the row itself.
+		source.Zone = zone
+		if err := tx.Save(&source).Error; err != nil {
+			return DeckItem{}, err
+		}
+		return source, nil
+	default:
+		target = DeckItem{
+			DeckID:          source.DeckID,
+			OracleID:        source.OracleID,
+			ScryfallID:      source.ScryfallID,
+			Treatment:       source.Treatment,
+			Zone:            zone,
+			DesiredQuantity: qty,
+		}
+		if err := tx.Create(&target).Error; err != nil {
+			return DeckItem{}, err
+		}
+	}
+
+	source.DesiredQuantity -= qty
+	if source.DesiredQuantity == 0 {
+		return target, tx.Delete(&source).Error
+	}
+	return target, tx.Save(&source).Error
 }

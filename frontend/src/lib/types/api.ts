@@ -308,10 +308,13 @@ export interface EnrichedDeckItem {
  * DeckItemsResponse represents the items in a deck, grouped by zone, with
  * aggregate availability information.
  * AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
- * owned_O) over demand-zone items). AggregateOverCommitted is the number of
- * distinct demand-zone cards the deck covers alone but that other decks want too
+ * owned_O) over card-zone items). AggregateOverCommitted is the number of
+ * distinct card-zone cards the deck covers alone but that other decks want too
  * (see DeckSummary). Maybe-board items are returned but never contribute to
  * either.
+ * Other holds tokens and other extras. They never count as cards; their
+ * ownership is reported separately: TokenShortfall and TokenOverCommitted are
+ * the same two signals computed over the other zone only.
  * tygo:export
  */
 export interface DeckItemsResponse {
@@ -320,8 +323,11 @@ export interface DeckItemsResponse {
 	main: EnrichedDeckItem[];
 	side: EnrichedDeckItem[];
 	maybe: EnrichedDeckItem[];
+	other: EnrichedDeckItem[];
 	aggregate_shortfall: number /* int */;
 	aggregate_over_committed: number /* int */;
+	token_shortfall: number /* int */;
+	token_over_committed: number /* int */;
 }
 /**
  * CreateDeckItemRequest represents a single item to add to a deck.

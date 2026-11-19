@@ -10,8 +10,11 @@ const emptyItems: DeckItemsResponse = {
 	main: [],
 	side: [],
 	maybe: [],
+	other: [],
 	aggregate_shortfall: 0,
-	aggregate_over_committed: 0
+	aggregate_over_committed: 0,
+	token_shortfall: 0,
+	token_over_committed: 0
 };
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
@@ -122,7 +125,7 @@ export const actions: Actions = {
 				return fail(result.status, { error: result.error });
 			}
 
-			return { success: true, action: 'add' };
+			return { success: true, action: 'add', zones: result.zones };
 		} catch {
 			return fail(500, { error: 'Failed to add card' });
 		}
