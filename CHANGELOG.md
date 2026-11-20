@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.4.0...v0.5.0) (2026-11-20)
+
+
+### Features
+
+* determine deck format legality ([#209](https://github.com/ShowMyCards/ShowMyCards/issues/209)) ([b89f45c](https://github.com/ShowMyCards/ShowMyCards/commit/b89f45c966162643e8a81d4389188ee3e94879bb))
+* export cards from decks and lists ([#206](https://github.com/ShowMyCards/ShowMyCards/issues/206)) ([10fd5a9](https://github.com/ShowMyCards/ShowMyCards/commit/10fd5a968e9731002c15cc2102891d2a0afad098))
+* preserve search query in the URL ([#132](https://github.com/ShowMyCards/ShowMyCards/issues/132)) ([#212](https://github.com/ShowMyCards/ShowMyCards/issues/212)) ([01f2aa0](https://github.com/ShowMyCards/ShowMyCards/commit/01f2aa068d4f8c266b778815cde8bf90ef0e49e9))
+* show reason for deck overcommitment ([#208](https://github.com/ShowMyCards/ShowMyCards/issues/208)) ([3d95c52](https://github.com/ShowMyCards/ShowMyCards/commit/3d95c5297791bca8755fbfef8276ac42b871d987))
+
 ## [0.4.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.3.0...v0.4.0) (2026-11-19)
 
 
