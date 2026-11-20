@@ -4,6 +4,9 @@ import (
 	"backend/models"
 	"backend/scryfall"
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -553,5 +556,121 @@ func TestNextRun(t *testing.T) {
 
 	if _, err := NextRun("bad", 24*time.Hour, nil, now); err == nil {
 		t.Error("expected error for invalid time")
+	}
+}
+
+// Scheduled-task job records
+
+func lastJob(t *testing.T, jobService *JobService, jobType models.JobType) *models.Job {
+	t.Helper()
+	job, err := jobService.GetLastJobByType(context.Background(), jobType)
+	if err != nil {
+		t.Fatalf("GetLastJobByType(%s) failed: %v", jobType, err)
+	}
+	if job == nil {
+		t.Fatalf("expected a %s job to be recorded", jobType)
+	}
+	return job
+}
+
+func TestScheduler_RunBackup_RecordsCompletedJob(t *testing.T) {
+	scheduler, _, jobService, settingsService, _ := setupSchedulerTest(t)
+	ctx := context.Background()
+
+	scheduler.runBackup(ctx)
+
+	job := lastJob(t, jobService, models.JobTypeDataBackup)
+	if job.Status != models.JobStatusCompleted {
+		t.Fatalf("status = %q, want completed (error: %q)", job.Status, job.Error)
+	}
+	if job.StartedAt == nil || job.CompletedAt == nil {
+		t.Error("expected started_at and completed_at to be set")
+	}
+
+	var md backupMetadata
+	if err := json.Unmarshal([]byte(job.Metadata), &md); err != nil {
+		t.Fatalf("failed to parse metadata %q: %v", job.Metadata, err)
+	}
+	if !strings.HasPrefix(md.FileName, backupFilePrefix) {
+		t.Errorf("file_name = %q, want prefix %q", md.FileName, backupFilePrefix)
+	}
+	if md.SizeBytes <= 0 {
+		t.Errorf("size_bytes = %d, want > 0", md.SizeBytes)
+	}
+	if md.Retention != DefaultBackupRetention {
+		t.Errorf("retention = %d, want %d", md.Retention, DefaultBackupRetention)
+	}
+
+	if status, _ := settingsService.Get(ctx, "data_backup_last_status"); status != TaskStatusSuccess {
+		t.Errorf("data_backup_last_status = %q, want success", status)
+	}
+	if lastRun, _ := settingsService.GetTime(ctx, "data_backup_last_run"); lastRun == nil {
+		t.Error("expected data_backup_last_run to be set")
+	}
+}
+
+func TestScheduler_RunBackup_FailureRecordsFailedJob(t *testing.T) {
+	scheduler, _, jobService, settingsService, _ := setupSchedulerTest(t)
+	ctx := context.Background()
+	scheduler.backupService = NewBackupService(stubExporter{err: errors.New("export exploded")}, settingsService, t.TempDir())
+
+	scheduler.runBackup(ctx)
+
+	job := lastJob(t, jobService, models.JobTypeDataBackup)
+	if job.Status != models.JobStatusFailed {
+		t.Fatalf("status = %q, want failed", job.Status)
+	}
+	if !strings.Contains(job.Error, "export exploded") {
+		t.Errorf("error = %q, want it to contain the cause", job.Error)
+	}
+	if status, _ := settingsService.Get(ctx, "data_backup_last_status"); status != TaskStatusFailed {
+		t.Errorf("data_backup_last_status = %q, want failed", status)
+	}
+	// last_run stays unset so catch-up retries the backup.
+	if lastRun, _ := settingsService.GetTime(ctx, "data_backup_last_run"); lastRun != nil {
+		t.Errorf("expected data_backup_last_run to stay unset, got %v", lastRun)
+	}
+}
+
+func TestScheduler_RunJobCleanup_RecordsJobAndSparesActiveJobs(t *testing.T) {
+	scheduler, _, jobService, settingsService, db := setupSchedulerTest(t)
+	ctx := context.Background()
+	old := time.Now().AddDate(0, 0, -(DefaultJobCleanupRetentionDays + 1))
+
+	finished := &models.Job{Type: models.JobTypeBulkDataImport, Status: models.JobStatusCompleted}
+	running := &models.Job{Type: models.JobTypeSetDataImport, Status: models.JobStatusInProgress}
+	db.Create(finished)
+	db.Create(running)
+	db.Model(&models.Job{}).Where("id IN ?", []uint{finished.ID, running.ID}).Update("created_at", old)
+
+	scheduler.runJobCleanup(ctx)
+
+	job := lastJob(t, jobService, models.JobTypeJobCleanup)
+	if job.Status != models.JobStatusCompleted {
+		t.Fatalf("status = %q, want completed (error: %q)", job.Status, job.Error)
+	}
+
+	var md jobCleanupMetadata
+	if err := json.Unmarshal([]byte(job.Metadata), &md); err != nil {
+		t.Fatalf("failed to parse metadata %q: %v", job.Metadata, err)
+	}
+	if md.Deleted != 1 || md.RetentionDays != DefaultJobCleanupRetentionDays {
+		t.Errorf("metadata = %+v, want deleted=1 retention_days=%d", md, DefaultJobCleanupRetentionDays)
+	}
+
+	if _, err := jobService.Get(ctx, running.ID); err != nil {
+		t.Errorf("expected the old in-progress job to survive cleanup: %v", err)
+	}
+	if status, _ := settingsService.Get(ctx, "job_cleanup_last_status"); status != TaskStatusSuccess {
+		t.Errorf("job_cleanup_last_status = %q, want success", status)
+	}
+}
+
+func TestScheduler_EveryTaskRecordsJobs(t *testing.T) {
+	scheduler, _, _, _, _ := setupSchedulerTest(t)
+	for _, task := range scheduler.Tasks() {
+		if !task.JobType.Valid() {
+			t.Errorf("task %s: JobType %q is not a valid job type", task.Name, task.JobType)
+		}
 	}
 }

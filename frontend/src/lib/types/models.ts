@@ -194,6 +194,8 @@ export type JobType = string;
 export const JobTypeBulkDataImport: JobType = 'bulk_data_import';
 export const JobTypeSetDataImport: JobType = 'set_data_import';
 export const JobTypeSymbolDataImport: JobType = 'symbol_data_import';
+export const JobTypeDataBackup: JobType = 'data_backup';
+export const JobTypeJobCleanup: JobType = 'job_cleanup';
 /**
  * JobStatus represents the status of a job
  * tygo:export

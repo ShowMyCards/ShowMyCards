@@ -559,3 +559,37 @@ func TestJobService_ListActive_ReturnsOnlyPendingAndInProgress(t *testing.T) {
 		}
 	}
 }
+
+func TestJobService_CleanupOldJobs_SparesActiveJobs(t *testing.T) {
+	service, db := setupJobServiceTest(t)
+	ctx := context.Background()
+
+	statuses := []models.JobStatus{
+		models.JobStatusPending, models.JobStatusInProgress,
+		models.JobStatusCompleted, models.JobStatusFailed, models.JobStatusCancelled,
+	}
+	for _, status := range statuses {
+		job := &models.Job{Type: models.JobTypeBulkDataImport, Status: status}
+		db.Create(job)
+		db.Model(job).Update("created_at", time.Now().AddDate(0, 0, -31))
+	}
+
+	deleted, err := service.CleanupOldJobs(ctx, 30)
+	if err != nil {
+		t.Fatalf("CleanupOldJobs failed: %v", err)
+	}
+	if deleted != 3 {
+		t.Errorf("expected 3 finished jobs deleted, got %d", deleted)
+	}
+
+	var remaining []models.Job
+	db.Find(&remaining)
+	for _, job := range remaining {
+		if job.Status != models.JobStatusPending && job.Status != models.JobStatusInProgress {
+			t.Errorf("unexpected surviving job with status %q", job.Status)
+		}
+	}
+	if len(remaining) != 2 {
+		t.Errorf("expected 2 active jobs to remain, got %d", len(remaining))
+	}
+}
