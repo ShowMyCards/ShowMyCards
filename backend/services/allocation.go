@@ -250,7 +250,9 @@ func (s *AllocationService) ComputeAvailability(ctx context.Context) (Availabili
 	return result, nil
 }
 
-// demandZones returns the zones that lock inventory (everything except maybe).
+// demandZones returns the zones that lock inventory (everything except maybe),
+// matching models.DeckZone.CountsAsDemand. Tokens in the other zone lock the
+// token copies you own, so they are tracked across decks like cards.
 func demandZones() []models.DeckZone {
-	return []models.DeckZone{models.ZoneMain, models.ZoneSide, models.ZoneCommand}
+	return []models.DeckZone{models.ZoneMain, models.ZoneSide, models.ZoneCommand, models.ZoneOther}
 }

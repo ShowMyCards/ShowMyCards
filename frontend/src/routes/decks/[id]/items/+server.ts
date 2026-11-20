@@ -23,7 +23,7 @@ export const POST: RequestHandler = async ({ params, request, fetch }) => {
 		if (!result.ok) {
 			return json({ error: result.error }, { status: result.status });
 		}
-		return json({ success: true });
+		return json({ success: true, zones: result.zones });
 	} catch {
 		return json({ error: 'Failed to add cards to deck' }, { status: 500 });
 	}

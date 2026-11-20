@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { DeckSummary } from '#lib';
+import { notifications, type DeckSummary } from '#lib';
 import AddToDeckModal from './AddToDeckModal.svelte';
 
 function deck(id: number, name: string): DeckSummary {
@@ -22,15 +22,18 @@ const sol = { oracle_id: 'sol', scryfall_id: 'cmm-1', name: 'Sol Ring', copies: 
 
 let fetchSpy: MockInstance<typeof fetch>;
 
-/** Route the deck list (via the /api proxy) and the add endpoint to canned responses. */
-function mockBackend(decks: DeckSummary[]) {
+/**
+ * Route the deck list (via the /api proxy) and the add endpoint to canned
+ * responses. storedZones is what the add endpoint reports the server stored.
+ */
+function mockBackend(decks: DeckSummary[], storedZones?: string[]) {
 	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input);
 		if (url.endsWith('/api/decks')) {
 			return new Response(JSON.stringify(decks), { status: 200 });
 		}
 		if (/\/decks\/\d+\/items$/.test(url)) {
-			return new Response(JSON.stringify({ success: true }), { status: 200 });
+			return new Response(JSON.stringify({ success: true, zones: storedZones }), { status: 200 });
 		}
 		return new Response('not found', { status: 404 });
 	});
@@ -67,6 +70,17 @@ describe('AddToDeckModal', () => {
 				]
 			}
 		});
+	});
+
+	it('reports the zone the server stored, e.g. Other for a token', async () => {
+		mockBackend([deck(7, 'Rabbits')], ['other']);
+		const success = vi.spyOn(notifications, 'success');
+		const rabbit = { oracle_id: 'rabbit', scryfall_id: 'tblb-1', name: 'Rabbit', copies: 1 };
+		await render(AddToDeckModal, { open: true, cards: [rabbit], onClose: vi.fn() });
+
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(success).toHaveBeenCalledWith('Added Rabbit to Rabbits (Other)'));
 	});
 
 	it('preselects the last deck used', async () => {

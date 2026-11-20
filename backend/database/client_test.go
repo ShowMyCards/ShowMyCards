@@ -516,3 +516,48 @@ func TestMigrate_SetNullDeletes(t *testing.T) {
 		t.Errorf("expected storage_location_id to be NULL after storage deletion, got %v", *loadedInventory.StorageLocationID)
 	}
 }
+
+// Deck extras are reclassified only after a Scryfall bulk import, never at
+// startup: reopening a database with a token still in the main zone leaves it
+// there.
+func TestNewClient_StartupDoesNotReclassifyDeckExtras(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	client, err := NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	token := &models.Card{
+		ScryfallID: "rabbit-1",
+		OracleID:   "oracle-rabbit",
+		RawJSON:    `{"id":"rabbit-1","oracle_id":"oracle-rabbit","name":"Rabbit","set":"tblb","lang":"en","layout":"token","type_line":"Token Creature — Rabbit"}`,
+	}
+	deck := &models.Deck{Name: "Rabbits"}
+	if err := client.DB.Create(token).Error; err != nil {
+		t.Fatalf("failed to create token card: %v", err)
+	}
+	if err := client.DB.Create(deck).Error; err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+	item := &models.DeckItem{DeckID: deck.ID, OracleID: "oracle-rabbit", ScryfallID: "rabbit-1", Zone: models.ZoneMain, DesiredQuantity: 1}
+	if err := client.DB.Create(item).Error; err != nil {
+		t.Fatalf("failed to create deck item: %v", err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("failed to close client: %v", err)
+	}
+
+	client, err = NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to reopen client: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	var got models.DeckItem
+	if err := client.DB.First(&got, item.ID).Error; err != nil {
+		t.Fatalf("failed to reload deck item: %v", err)
+	}
+	if got.Zone != models.ZoneMain {
+		t.Errorf("zone after restart = %q, want %q", got.Zone, models.ZoneMain)
+	}
+}

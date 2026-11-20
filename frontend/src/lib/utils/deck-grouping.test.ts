@@ -16,7 +16,8 @@ describe('typeBucket', () => {
 		expect(typeBucket('Instant')).toBe('Instants');
 		expect(typeBucket('Legendary Planeswalker — Jace')).toBe('Planeswalkers');
 		expect(typeBucket('Enchantment — Aura')).toBe('Enchantments');
-		expect(typeBucket('')).toBe('Other');
+		expect(typeBucket('Conspiracy')).toBe('Misc');
+		expect(typeBucket('')).toBe('Misc');
 	});
 });
 

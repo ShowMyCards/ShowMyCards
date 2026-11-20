@@ -14,6 +14,7 @@ func TestDeckZone_IsValid(t *testing.T) {
 		{ZoneSide, true},
 		{ZoneCommand, true},
 		{ZoneMaybe, true},
+		{ZoneOther, true},
 		{DeckZone(""), false},
 		{DeckZone("unknown"), false},
 		{DeckZone("MAIN"), false}, // case-sensitive
@@ -37,6 +38,7 @@ func TestDeckZone_CountsAsDemand(t *testing.T) {
 		{ZoneSide, true},
 		{ZoneCommand, true},
 		{ZoneMaybe, false}, // critical: maybe-board does NOT count as demand
+		{ZoneOther, true},  // tokens still lock the token copies you own
 		{DeckZone(""), false},
 		{DeckZone("unknown"), false},
 	}
@@ -45,6 +47,28 @@ func TestDeckZone_CountsAsDemand(t *testing.T) {
 		t.Run(string(tt.zone), func(t *testing.T) {
 			if got := tt.zone.CountsAsDemand(); got != tt.want {
 				t.Errorf("DeckZone(%q).CountsAsDemand() = %v, want %v", tt.zone, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeckZone_CountsAsCards(t *testing.T) {
+	tests := []struct {
+		zone DeckZone
+		want bool
+	}{
+		{ZoneMain, true},
+		{ZoneSide, true},
+		{ZoneCommand, true},
+		{ZoneMaybe, false},
+		{ZoneOther, false}, // tokens and other extras are items, never cards
+		{DeckZone(""), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.zone), func(t *testing.T) {
+			if got := tt.zone.CountsAsCards(); got != tt.want {
+				t.Errorf("DeckZone(%q).CountsAsCards() = %v, want %v", tt.zone, got, tt.want)
 			}
 		})
 	}
@@ -125,7 +149,7 @@ func TestDeckItem_ValidateDeckItem(t *testing.T) {
 				DesiredQuantity: 1,
 			},
 			expectError: true,
-			errorMsg:    "zone must be one of main, side, command, maybe",
+			errorMsg:    "zone must be one of main, side, command, maybe, other",
 		},
 		{
 			name: "Invalid - Empty Zone",
@@ -136,7 +160,7 @@ func TestDeckItem_ValidateDeckItem(t *testing.T) {
 				DesiredQuantity: 1,
 			},
 			expectError: true,
-			errorMsg:    "zone must be one of main, side, command, maybe",
+			errorMsg:    "zone must be one of main, side, command, maybe, other",
 		},
 	}
 

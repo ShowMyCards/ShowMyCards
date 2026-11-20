@@ -44,7 +44,8 @@ function deck(items: EnrichedDeckItem[]): DeckExportItems {
 		command: items.filter((i) => i.zone === 'command'),
 		main: items.filter((i) => i.zone === 'main'),
 		side: items.filter((i) => i.zone === 'side'),
-		maybe: items.filter((i) => i.zone === 'maybe')
+		maybe: items.filter((i) => i.zone === 'maybe'),
+		other: items.filter((i) => i.zone === 'other')
 	};
 }
 
@@ -84,6 +85,20 @@ describe('deckExportLines', () => {
 			],
 			skipped: 0
 		});
+	});
+
+	it('includes tokens and other extras from the Other zone', () => {
+		const rabbit = { zone: 'other' as const, oracle_id: 'rabbit', name: 'Rabbit' };
+		const items = deck([
+			deckItem({ zone: 'main', desired_quantity: 1, owned: 1 }),
+			deckItem({ ...rabbit, desired_quantity: 3, owned: 1 })
+		]);
+
+		expect(deckExportLines(items, 'all').lines).toEqual([
+			{ quantity: 1, name: 'Lightning Bolt' },
+			{ quantity: 3, name: 'Rabbit' }
+		]);
+		expect(deckExportLines(items, 'missing').lines).toEqual([{ quantity: 2, name: 'Rabbit' }]);
 	});
 
 	it('names the expansion of pinned printings only', () => {

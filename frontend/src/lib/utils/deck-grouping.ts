@@ -39,19 +39,23 @@ export const TYPE_DISPLAY_ORDER = [
 	'Artifacts',
 	'Enchantments',
 	'Lands',
-	'Other'
+	'Misc'
 ];
 
 // Mana-value buckets: 0–6, then 7+, with lands pulled into their own group.
 export const MANA_VALUE_DISPLAY_ORDER = ['0', '1', '2', '3', '4', '5', '6', '7+', 'Lands'];
 
-/** Return the type bucket for a card by Moxfield-style placement priority. */
+/**
+ * Return the type bucket for a card by Moxfield-style placement priority. Cards
+ * matching no type fall into "Misc" — "Other" is the deck section for tokens and
+ * other extras, which never reach the type grouping.
+ */
 export function typeBucket(typeLine: string | undefined): string {
 	const line = typeLine ?? '';
 	for (const { bucket, match } of TYPE_PLACEMENT) {
 		if (line.includes(match)) return bucket;
 	}
-	return 'Other';
+	return 'Misc';
 }
 
 /** Return the mana-value bucket for a card (lands are grouped separately). */

@@ -26,6 +26,15 @@
 		{ value: 'maybe', label: 'Maybe' }
 	];
 
+	// Tokens and other extras are stored in Other whatever zone was picked, so the
+	// success message names the zones the server reports, not the picked one.
+	function storedZonesLabel(stored: unknown): string {
+		const zones = Array.isArray(stored) && stored.length > 0 ? (stored as string[]) : [zone];
+		return zones
+			.map((z) => ZONES.find((o) => o.value === z)?.label ?? (z === 'other' ? 'Other' : z))
+			.join(', ');
+	}
+
 	// Remember the last deck used so repeat adds are a single click. Per-viewer
 	// convenience only, so storage failures (private mode etc.) are ignored.
 	const LAST_DECK_KEY = 'smc-last-deck-id';
@@ -147,13 +156,13 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ items })
 			});
+			const data = await response.json().catch(() => ({}));
 			if (!response.ok) {
-				const data = await response.json().catch(() => ({}));
 				throw new Error(data.error || 'Failed to add to deck');
 			}
 
 			rememberDeck(String(deck.id));
-			const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
+			const zoneLabel = storedZonesLabel(data.zones);
 			notifications.success(
 				single
 					? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
