@@ -7,6 +7,13 @@
 
 	let { deck }: { deck: DeckSummary } = $props();
 
+	// "Shared N" counts distinct cards, not copies; the title says so.
+	const sharedTitle = $derived(
+		deck.aggregate_over_committed === 1
+			? "1 card in this deck doesn't have enough copies for all your decks. Open the deck to see why."
+			: `${deck.aggregate_over_committed} cards in this deck don't have enough copies for all your decks. Open the deck to see why.`
+	);
+
 	// Edit state
 	let showEditModal = $state(false);
 	let editName = $state('');
@@ -56,9 +63,7 @@
 					{/if}
 					{#if deck.aggregate_over_committed > 0}
 						<span class="opacity-50">•</span>
-						<span
-							class="badge badge-info badge-sm"
-							title="Cards in this deck that other decks also want. You don't own enough copies for all of them.">
+						<span class="badge badge-info badge-sm" title={sharedTitle}>
 							Shared {deck.aggregate_over_committed}
 						</span>
 					{:else if deck.aggregate_shortfall === 0 && deck.total_cards_demand > 0}

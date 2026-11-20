@@ -11,6 +11,8 @@
 		ListCardTable,
 		ListSearchResults,
 		EmptyState,
+		CardListExportModal,
+		listExportLines,
 		ViewToggle,
 		CardFilter,
 		getCardTreatmentName,
@@ -21,13 +23,17 @@
 		type ScryfallCard,
 		type EnrichedListItem
 	} from '#lib';
-	import { ArrowLeft, Search } from '@lucide/svelte';
+	import { ArrowLeft, ClipboardCopy, Search } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let searchQuery = $state('');
 	let adding = $state(false);
 	let searching = $state(false);
+	let showExportModal = $state(false);
+
+	const exportAll = $derived(listExportLines(data.items, 'all'));
+	const exportMissing = $derived(listExportLines(data.items, 'missing'));
 
 	// View mode state - persisted to localStorage
 	const view = usePersistedViewMode('list-view-mode', 'table');
@@ -208,6 +214,15 @@
 			{#snippet actions()}
 				<a href={resolve('lists')} class="btn bg-base-100 btn-sm"
 					><ArrowLeft class="w-4 h-4" /> Back</a>
+
+				<button
+					onclick={() => (showExportModal = true)}
+					class="btn bg-base-100 btn-sm"
+					title="Export card list"
+					aria-label="Export card list"
+					disabled={data.items.length === 0}>
+					<ClipboardCopy class="w-4 h-4" />
+				</button>
 			{/snippet}
 		</PageHeader>
 
@@ -316,3 +331,16 @@
 			><a href={resolve('lists')} class="btn btn-primary">Back to Lists</a></EmptyState>
 	{/if}
 </div>
+
+<CardListExportModal
+	open={showExportModal}
+	onClose={() => (showExportModal = false)}
+	title="Export {data.list?.name ?? 'list'}"
+	choices={[
+		{
+			label: 'Only missing',
+			export: exportMissing,
+			empty: 'Nothing missing: you have every card.'
+		},
+		{ label: 'All cards', export: exportAll }
+	]} />

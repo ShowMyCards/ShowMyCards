@@ -11,7 +11,8 @@ const emptyItems: DeckItemsResponse = {
 	side: [],
 	maybe: [],
 	aggregate_shortfall: 0,
-	aggregate_over_committed: 0
+	aggregate_over_committed: 0,
+	shared_cards: []
 };
 
 // Format legality is auxiliary: when it fails the panel shows an inline error

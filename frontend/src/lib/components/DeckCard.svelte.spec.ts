@@ -31,6 +31,9 @@ describe('DeckCard ownership badges', () => {
 		await render(DeckCard, { deck: makeDeck({ aggregate_over_committed: 2 }) });
 
 		await expect.element(page.getByText('Shared 2')).toBeInTheDocument();
+		await expect
+			.element(page.getByText('Shared 2'))
+			.toHaveAttribute('title', expect.stringMatching(/^2 cards in this deck/));
 		await expect.element(page.getByText('Fully owned')).not.toBeInTheDocument();
 	});
 
