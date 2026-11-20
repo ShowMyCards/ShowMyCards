@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -683,6 +684,10 @@ func assertDeckTotals(t *testing.T, app *fiber.App, deck models.Deck, wantShortf
 		t.Errorf("deck %q items: shortfall=%d over_committed=%d, want shortfall=%d over_committed=%d",
 			deck.Name, items.AggregateShortfall, items.AggregateOverCommitted, wantShortfall, wantOverCommitted)
 	}
+	// shared_cards explains exactly the cards aggregate_over_committed counts.
+	if len(items.SharedCards) != wantOverCommitted {
+		t.Errorf("deck %q items: %d shared_cards, want %d", deck.Name, len(items.SharedCards), wantOverCommitted)
+	}
 }
 
 // The reported bug: a card owned once and wanted by two decks. Each deck covers it
@@ -1347,5 +1352,91 @@ func TestDeckMoveItem_Rejections(t *testing.T) {
 				t.Errorf("expected side x2 unchanged, got %v", zones)
 			}
 		})
+	}
+}
+
+// createDeckTestPrinting inserts a printing with an explicit collector number and
+// language, for tests that tell printings of one card apart.
+func createDeckTestPrinting(t *testing.T, db *gorm.DB, scryfallID, oracleID, name, set, number, lang string) {
+	t.Helper()
+	rawJSON := fmt.Sprintf(`{
+		"id": "%s", "oracle_id": "%s", "name": "%s", "set": "%s", "set_name": "%s Set",
+		"collector_number": "%s", "rarity": "common", "finishes": ["nonfoil"],
+		"lang": "%s", "layout": "normal", "released_at": "2020-01-01"
+	}`, scryfallID, oracleID, name, set, set, number, lang)
+	if err := db.Create(&models.Card{ScryfallID: scryfallID, OracleID: oracleID, RawJSON: rawJSON}).Error; err != nil {
+		t.Fatalf("failed to create test printing: %v", err)
+	}
+}
+
+func seedPinnedDeckItem(t *testing.T, db *gorm.DB, deckID uint, oracleID, scryfallID string, qty int) {
+	t.Helper()
+	item := models.DeckItem{
+		DeckID: deckID, OracleID: oracleID, ScryfallID: scryfallID, Zone: models.ZoneMain, DesiredQuantity: qty,
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("failed to create pinned deck item for %s: %v", scryfallID, err)
+	}
+}
+
+// The Swamp case: two decks pin the German printing more often than it is owned,
+// although the card's total fits. A third deck that wants any printing is still
+// flagged, and shared_cards tells it which printing and which decks are behind it.
+func TestDeckListItems_SharedCardsExplainPinnedConflict(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	x := createTestDeck(t, db, "Fluch")
+	y := createTestDeck(t, db, "Lorwyn")
+	z := createTestDeck(t, db, "Schatten")
+
+	createDeckTestPrinting(t, db, "scry-de", "oracle-swamp", "Swamp", "ecl", "271", "de")
+	createDeckTestPrinting(t, db, "scry-en", "oracle-swamp", "Swamp", "ecl", "271", "en")
+	addDeckInventory(t, db, "oracle-swamp", "scry-de", 4)
+	addDeckInventory(t, db, "oracle-swamp", "scry-en", 5)
+	seedPinnedDeckItem(t, db, x.ID, "oracle-swamp", "scry-de", 3)
+	seedPinnedDeckItem(t, db, y.ID, "oracle-swamp", "scry-de", 2)
+	seedDeckItem(t, db, z.ID, "oracle-swamp", models.ZoneMain, 1)
+
+	assertDeckTotals(t, app, z, 0, 1)
+
+	want := []SharedCard{{
+		OracleID: "oracle-swamp",
+		Name:     "Swamp",
+		Conflicts: []AllocationConflict{{
+			ScryfallID:      "scry-de",
+			SetCode:         "ecl",
+			CollectorNumber: "271",
+			Lang:            "de",
+			Owned:           4,
+			Wanted:          5,
+			Decks: []ConflictDeck{
+				{DeckID: x.ID, DeckName: "Fluch", Quantity: 3},
+				{DeckID: y.ID, DeckName: "Lorwyn", Quantity: 2},
+			},
+		}},
+	}}
+	if got := fetchDeckItems(t, app, z.ID).SharedCards; !reflect.DeepEqual(got, want) {
+		t.Errorf("shared_cards:\n got  %+v\n want %+v", got, want)
+	}
+}
+
+// A deck without over-committed cards sends an empty array, not null.
+func TestDeckListItems_SharedCardsEmptyArray(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Solo")
+	createDeckTestCard(t, db, "scry-solo", "oracle-solo", "Solo Card", "lea", "common")
+	addDeckInventory(t, db, "oracle-solo", "scry-solo", 1)
+	seedDeckItem(t, db, deck.ID, "oracle-solo", models.ZoneMain, 1)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/decks/%d/items", deck.ID), nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if got := string(raw["shared_cards"]); got != "[]" {
+		t.Errorf("shared_cards = %s, want []", got)
 	}
 }

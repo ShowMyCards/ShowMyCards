@@ -305,13 +305,48 @@ export interface EnrichedDeckItem {
 	over_committed: boolean;
 }
 /**
+ * AllocationConflict explains one reason a card is over-committed: either the
+ * decks together want more copies of the card than you own (scryfall_id ""), or
+ * decks pin one printing more often than you own it. Decks lists every deck
+ * wanting the card (or pinning the printing), which may include this deck.
+ * tygo:export
+ */
+export interface AllocationConflict {
+	scryfall_id: string; // "" = all printings of the card
+	set_code?: string;
+	collector_number?: string;
+	lang?: string;
+	owned: number /* int */;
+	wanted: number /* int */;
+	decks: ConflictDeck[];
+}
+/**
+ * ConflictDeck is one deck's share of an AllocationConflict's wanted copies.
+ * tygo:export
+ */
+export interface ConflictDeck {
+	deck_id: number /* uint */;
+	deck_name: string;
+	quantity: number /* int */;
+}
+/**
+ * SharedCard is a card the deck counts as over-committed (see
+ * AggregateOverCommitted), with the reasons why.
+ * tygo:export
+ */
+export interface SharedCard {
+	oracle_id: string;
+	name: string;
+	conflicts: AllocationConflict[];
+}
+/**
  * DeckItemsResponse represents the items in a deck, grouped by zone, with
  * aggregate availability information.
  * AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
  * owned_O) over demand-zone items). AggregateOverCommitted is the number of
- * distinct demand-zone cards the deck covers alone but that other decks want too
- * (see DeckSummary). Maybe-board items are returned but never contribute to
- * either.
+ * distinct demand-zone cards the deck covers alone but that are over-committed
+ * across decks (see DeckSummary); SharedCards lists those cards, by name, with
+ * the reasons. Maybe-board items are returned but never contribute to either.
  * tygo:export
  */
 export interface DeckItemsResponse {
@@ -322,6 +357,7 @@ export interface DeckItemsResponse {
 	maybe: EnrichedDeckItem[];
 	aggregate_shortfall: number /* int */;
 	aggregate_over_committed: number /* int */;
+	shared_cards: SharedCard[];
 }
 /**
  * CreateDeckItemRequest represents a single item to add to a deck.

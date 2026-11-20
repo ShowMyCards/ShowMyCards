@@ -10,6 +10,7 @@
 		FormField,
 		DeckView,
 		DeckAddResultCard,
+		DeckSharedCards,
 		CardListExportModal,
 		deckExportLines,
 		notifications,
@@ -186,8 +187,12 @@
 							{#if data.items.aggregate_shortfall === 0}You own every card in this deck, but{/if}
 							<span class="font-semibold">{data.items.aggregate_over_committed}</span>
 							card{data.items.aggregate_over_committed === 1 ? ' is' : 's are'}
-							also wanted by other decks. You don't have enough copies for all of them.
+							over-committed across your decks:
 						</span>
+						<!-- Keyed by deck so the open reason resets when following a deck link. -->
+						{#key data.items.deck_id}
+							<DeckSharedCards cards={data.items.shared_cards} deckId={data.items.deck_id} />
+						{/key}
 					{/if}
 				</div>
 			{:else if totalItems > 0}
