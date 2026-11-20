@@ -6,16 +6,53 @@ import {
 } from '#lib/server/inventory-actions.ts';
 import { loadStorageLocations } from '#lib/server/storage.ts';
 import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
 
-// Load storage locations for the dropdown and the saved default language
-export const load: PageServerLoad = async ({ fetch }) => {
-	const [storageLocations, defaultLanguage] = await Promise.all([
+export interface SearchResult {
+	query: string;
+	data?: SearchResponse;
+	error?: string;
+}
+
+// The search is URL-driven (`/search?q=...&lang=...`) so back-navigation,
+// reloads and bookmarks all reproduce the results.
+export const load: PageServerLoad = async ({ fetch, url }) => {
+	const query = url.searchParams.get('q')?.trim() ?? '';
+	const lang = url.searchParams.get('lang')?.trim() || null;
+
+	const [storageLocations, defaultLanguage, search] = await Promise.all([
 		loadStorageLocations(fetch),
-		loadDefaultLanguage(fetch)
+		loadDefaultLanguage(fetch),
+		query ? runSearch(fetch, query, lang) : Promise.resolve(null)
 	]);
-	return { storageLocations, defaultLanguage };
+	return { storageLocations, defaultLanguage, search, lang };
 };
+
+async function runSearch(
+	fetch: typeof globalThis.fetch,
+	query: string,
+	lang: string | null
+): Promise<SearchResult> {
+	try {
+		const url = new URL(`${BACKEND_URL}/api/search`);
+		url.searchParams.set('q', query);
+		if (lang) {
+			url.searchParams.set('lang', lang);
+		}
+
+		const response = await fetch(url.toString());
+		if (!response.ok) {
+			return { query, error: `Search failed: ${response.statusText}` };
+		}
+
+		const data: SearchResponse = await response.json();
+		return { query, data };
+	} catch (error) {
+		return {
+			query,
+			error: error instanceof Error ? error.message : 'An unknown error occurred'
+		};
+	}
+}
 
 async function loadDefaultLanguage(fetch: typeof globalThis.fetch): Promise<string> {
 	try {
@@ -31,47 +68,6 @@ async function loadDefaultLanguage(fetch: typeof globalThis.fetch): Promise<stri
 }
 
 export const actions = {
-	// Search for cards
-	search: async ({ request, fetch }) => {
-		const formData = await request.formData();
-		const query = formData.get('q');
-		const lang = formData.get('lang');
-
-		if (!query || typeof query !== 'string') {
-			return fail(400, { error: 'Search query is required' });
-		}
-
-		try {
-			const url = new URL(`${BACKEND_URL}/api/search`);
-			url.searchParams.set('q', query);
-			if (typeof lang === 'string' && lang.trim() !== '') {
-				url.searchParams.set('lang', lang.trim());
-			}
-
-			const response = await fetch(url.toString());
-
-			if (!response.ok) {
-				return {
-					success: false,
-					error: `Search failed: ${response.statusText}`
-				};
-			}
-
-			const data: SearchResponse = await response.json();
-
-			return {
-				success: true,
-				data,
-				query
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : 'An unknown error occurred'
-			};
-		}
-	},
-
 	addInventory: async ({ request, fetch }) => handleAddInventory(request, fetch),
 	deleteInventory: async ({ request, fetch }) => handleDeleteInventory(request, fetch),
 	updateInventory: async ({ request, fetch }) => handleUpdateInventory(request, fetch),

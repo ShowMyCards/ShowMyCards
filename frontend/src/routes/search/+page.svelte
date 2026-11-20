@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { browser } from '$app/env';
 	import { untrack } from 'svelte';
-	import { enhance, deserialize } from '$app/forms';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import type { ActionData, PageData } from './$types';
+	import { navigating } from '$app/state';
+	import type { PageData, Snapshot } from './$types';
 	import {
 		CardResultCard,
 		PageHeader,
@@ -26,19 +28,21 @@
 	import SearchBuilderModal from '#lib/components/SearchBuilderModal.svelte';
 	import SetIcon from '#lib/components/SetIcon.svelte';
 
-	let { form, data }: { form: ActionData; data: PageData } = $props();
+	let { data }: { data: PageData } = $props();
 
-	let searching = $state(false);
+	// The search runs in the page load, so "searching" means a navigation to
+	// /search is in flight (form submit, suggestion click, back/forward).
+	const searching = $derived(navigating.to?.url.pathname === resolve('search'));
 	let showSearchBuilder = $state(false);
-	let removedCardIds = $state(new Set<string>());
+	const removedCardIds = new SvelteSet<string>();
 	let cards = $state<InventoryCard[]>([]);
 	let suggestions = $state<string[]>([]);
 	let inputRef = $state<HTMLInputElement | null>(null);
-	// do NOT switch to $derived — selectedLang must survive
-	// form submissions, and queryText is driven by oninput. `untrack` makes
-	// the "capture, don't subscribe" intent explicit.
-	let selectedLang = $state(untrack(() => data.defaultLanguage));
-	let queryText = $state(untrack(() => form?.query || ''));
+	// do NOT switch to $derived — both are user-editable (bind:value / oninput)
+	// and are only re-seeded from the URL when a new search result arrives.
+	// `untrack` makes the "capture, don't subscribe" intent explicit.
+	let selectedLang = $state(untrack(() => data.lang ?? data.defaultLanguage));
+	let queryText = $state(untrack(() => data.search?.query ?? ''));
 
 	// Detect a typed `l:<code>` / `lang:<value>` clause (with optional `-`/`!`
 	// negation) so we can dim the dropdown and tell the user the typed clause
@@ -64,19 +68,29 @@
 		currentPage = page;
 	}
 
-	// Sync cards with form data when search results arrive
+	// Sync local state from the URL-driven search result. Runs on mount and
+	// whenever a navigation produces a new result (submit, back/forward
+	// between two searches). A browser back/forward restores page/filter state
+	// from `snapshot` after this has run.
 	$effect(() => {
-		if (form?.success && form.data?.data) {
-			cards = form.data.data;
+		const search = data.search;
+		const lang = data.lang;
+		untrack(() => {
+			cards = search?.data?.data ?? [];
+			removedCardIds.clear();
 			currentPage = 1;
-		}
+			queryText = search?.query ?? '';
+			if (inputRef) inputRef.value = queryText;
+			selectedLang = lang ?? data.defaultLanguage;
+		});
 	});
 
 	// Fetch suggestions when search returns no results
 	$effect(() => {
 		if (!browser) return;
-		if (form?.success && form.data?.data?.length === 0 && form.query) {
-			fetchSuggestions(form.query);
+		const search = data.search;
+		if (search?.data?.data?.length === 0 && search.query) {
+			fetchSuggestions(search.query);
 		} else {
 			suggestions = [];
 		}
@@ -108,15 +122,28 @@
 		}
 	}
 
-	// Display search errors if present (browser only)
-	let hasShownSearchError = $state(false);
+	// Display search errors once per search result (browser only)
+	let lastErroredSearch: PageData['search'] = null;
 	$effect(() => {
-		if (!browser || hasShownSearchError) return;
-		if (form?.error) {
-			hasShownSearchError = true;
-			notifications.error(form.error);
+		if (!browser) return;
+		const search = data.search;
+		if (search?.error && search !== lastErroredSearch) {
+			lastErroredSearch = search;
+			notifications.error(search.error);
 		}
 	});
+
+	// Restore results page and filters on browser back/forward.
+	export const snapshot: Snapshot<{
+		currentPage: number;
+		filterText: string;
+		collectionFilter: typeof collectionFilter;
+	}> = {
+		capture: () => ({ currentPage, filterText, collectionFilter }),
+		restore: (value) => {
+			({ currentPage, filterText, collectionFilter } = value);
+		}
+	};
 
 	/**
 	 * Filter cards by search text (name, set, treatment)
@@ -161,7 +188,6 @@
 
 	function handleRemove(cardId: string) {
 		removedCardIds.add(cardId);
-		removedCardIds = removedCardIds; // Trigger reactivity
 	}
 
 	/**
@@ -183,22 +209,13 @@
 
 	<div class="card bg-base-200 shadow-lg mb-6">
 		<div class="card-body">
-			<form
-				method="POST"
-				action="?/search"
-				use:enhance={() => {
-					searching = true;
-					return async ({ update }) => {
-						await update({ reset: false });
-						searching = false;
-					};
-				}}>
+			<form method="GET" action={resolve('search')} data-sveltekit-keepfocus>
 				<div class="flex flex-wrap gap-2">
 					<input
 						bind:this={inputRef}
 						type="text"
 						name="q"
-						value={form?.query || ''}
+						value={queryText}
 						oninput={(e) => (queryText = e.currentTarget.value)}
 						placeholder="Search for cards..."
 						class="input input-bordered flex-1 min-w-[12rem]"
@@ -241,13 +258,13 @@
 		</div>
 	</div>
 
-	{#if form?.success && form.data}
+	{#if data.search?.data}
 		<StatsCard
 			stats={[
 				{
 					title: 'Results Found',
-					value: form.data.total_cards || 0,
-					description: form.data.has_more ? 'Showing first page' : 'All results shown'
+					value: data.search.data.total_cards || 0,
+					description: data.search.data.has_more ? 'Showing first page' : 'All results shown'
 				},
 				{
 					title: 'Displaying',
