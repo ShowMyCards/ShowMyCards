@@ -60,11 +60,20 @@
 
 	const BACK_STORAGE_KEY = 'smc-card-back-target';
 	let backPath = $state<string | null>(null);
+	// True when the previous history entry is the origin itself (we arrived
+	// via an in-app navigation straight from it). Back then uses history.back()
+	// so the origin restores its snapshot and scroll position (e.g. search
+	// results page/filters) instead of pushing a fresh entry.
+	let originIsPreviousEntry = $state(false);
 
 	afterNavigate((navigation) => {
 		if (navigation.shallow && navigation.type === 'goto') return;
 
 		const from = navigation.from?.url;
+		originIsPreviousEntry =
+			(navigation.type === 'link' || navigation.type === 'goto') &&
+			!!from &&
+			!from.pathname.startsWith('/cards/');
 		if (from && !from.pathname.startsWith('/cards/')) {
 			// Arrived from a non-card page: this is the origin to return to.
 			backPath = from.pathname + from.search;
@@ -105,6 +114,13 @@
 			? { href: safeBackPath, label: labelForPath(new URL(safeBackPath, page.url.origin).pathname) }
 			: FALLBACK_BACK
 	);
+
+	function goBack(e: MouseEvent) {
+		if (originIsPreviousEntry && safeBackPath) {
+			e.preventDefault();
+			history.back();
+		}
+	}
 
 	// Group inventory by treatment
 	const inventoryByTreatment = $derived.by(() => {
@@ -148,7 +164,7 @@
 	<!-- Back button -->
 	<!-- href is a runtime-captured in-app path; resolve() only accepts statically known route ids -->
 	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-	<a href={back.href} class="btn btn-ghost btn-sm mb-4">
+	<a href={back.href} class="btn btn-ghost btn-sm mb-4" onclick={goBack}>
 		<ArrowLeft class="w-4 h-4" />
 		{back.label}
 	</a>
