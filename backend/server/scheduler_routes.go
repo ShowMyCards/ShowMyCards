@@ -8,7 +8,7 @@ import (
 
 // RegisterSchedulerRoutes registers scheduler-related routes
 func (s *Server) RegisterSchedulerRoutes(app *fiber.App) {
-	schedulerHandler := api.NewSchedulerHandler(s.settingsService, s.jobService)
+	schedulerHandler := api.NewSchedulerHandler(s.scheduler, s.settingsService, s.jobService)
 
 	scheduler := app.Group("/api/scheduler")
 	scheduler.Get("/tasks", schedulerHandler.GetScheduledTasks)

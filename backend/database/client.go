@@ -110,6 +110,10 @@ func migrate(db *gorm.DB) error {
 		return fmt.Errorf("auto-migrate failed: %w", err)
 	}
 
+	if err := renameSettingKeys(db); err != nil {
+		return err
+	}
+
 	// Run custom migrations for features not supported by AutoMigrate
 	if err := customMigrations(db); err != nil {
 		return err
@@ -133,6 +137,46 @@ func tableColumns(db *gorm.DB, table string) (map[string]bool, error) {
 		m[c.Name] = true
 	}
 	return m, nil
+}
+
+// settingKeyRenames maps legacy setting keys to the standardized
+// <task>_enabled / _time / _last_run / _last_status convention.
+var settingKeyRenames = []struct{ from, to string }{
+	{"bulk_data_auto_update", "bulk_data_update_enabled"},
+	{"bulk_data_last_update", "bulk_data_update_last_run"},
+	{"bulk_data_last_update_status", "bulk_data_update_last_status"},
+	{"set_data_auto_update", "set_data_update_enabled"},
+	{"set_data_last_update", "set_data_update_last_run"},
+	{"set_data_last_update_status", "set_data_update_last_status"},
+	{"symbol_data_auto_update", "symbol_data_update_enabled"},
+	{"symbol_data_last_update", "symbol_data_update_last_run"},
+	{"symbol_data_last_update_status", "symbol_data_update_last_status"},
+	{"backup_auto_create", "data_backup_enabled"},
+	{"backup_create_time", "data_backup_time"},
+	{"backup_retention_count", "data_backup_retention_count"},
+	{"backup_last_run", "data_backup_last_run"},
+	{"backup_last_run_status", "data_backup_last_status"},
+}
+
+// renameSettingKeys moves legacy setting keys to their standardized names.
+// It is idempotent: a legacy row is renamed only when the new key does not
+// already exist, and any leftover legacy row is then removed. It must run
+// before SettingsService seeds defaults so user-configured values survive.
+func renameSettingKeys(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, r := range settingKeyRenames {
+			if err := tx.Exec(
+				"UPDATE settings SET key = ? WHERE key = ? AND NOT EXISTS (SELECT 1 FROM settings WHERE key = ?)",
+				r.to, r.from, r.to,
+			).Error; err != nil {
+				return fmt.Errorf("renaming setting %s to %s: %w", r.from, r.to, err)
+			}
+			if err := tx.Exec("DELETE FROM settings WHERE key = ?", r.from).Error; err != nil {
+				return fmt.Errorf("removing legacy setting %s: %w", r.from, err)
+			}
+		}
+		return nil
+	})
 }
 
 // customMigrations handles database-specific features like generated columns

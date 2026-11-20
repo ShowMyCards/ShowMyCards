@@ -1,7 +1,9 @@
 package services
 
 import (
+	"backend/models"
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -16,37 +18,47 @@ const (
 	DefaultJobCleanupRetentionDays = 30
 )
 
-// Setting keys for the scheduled backup task.
-const (
-	settingBackupEnabled       = "backup_auto_create"
-	settingBackupTime          = "backup_create_time"
-	settingBackupLastRun       = "backup_last_run"
-	settingBackupLastRunStatus = "backup_last_run_status"
-	settingBackupRetention     = "backup_retention_count"
-)
-
-// ScheduledTask defines a task that runs on a schedule
+// ScheduledTask defines a task that runs on a schedule. Its settings keys are
+// derived from Name (see EnabledKey, TimeKey, LastRunKey, LastStatusKey), so
+// registering a task is all that is needed to surface it on the jobs screen.
 type ScheduledTask struct {
-	// Name is the unique identifier for this task
+	// Name is the unique identifier for this task and the prefix of its settings keys
 	Name string
 
-	// Interval is how often the task should run (e.g., 24*time.Hour for daily)
+	// DisplayName is the human-readable name shown in the UI
+	DisplayName string
+
+	// Description explains what the task does
+	Description string
+
+	// Interval is the minimum time between runs (e.g., 24*time.Hour for daily)
 	Interval time.Duration
 
-	// TimeOfDay is the preferred time to run (format: "HH:MM", e.g., "03:00")
-	// If empty, runs whenever interval has elapsed
-	TimeOfDay string
-
-	// EnabledSettingKey is the settings key to check if task is enabled (optional)
-	// If empty, task is always enabled
-	EnabledSettingKey string
-
-	// LastRunSettingKey is the settings key where last run time is persisted
-	LastRunSettingKey string
+	// JobType is the type of Job record the task creates, if any
+	JobType models.JobType
 
 	// Run is the function to execute when the task should run
 	Run func(ctx context.Context)
 }
+
+// EnabledKey is the settings key holding whether the task is enabled ("true"/"false").
+func (t ScheduledTask) EnabledKey() string { return t.Name + "_enabled" }
+
+// TimeKey is the settings key holding the task's time of day ("HH:MM").
+func (t ScheduledTask) TimeKey() string { return t.Name + "_time" }
+
+// LastRunKey is the settings key holding the task's last run time (RFC3339).
+func (t ScheduledTask) LastRunKey() string { return t.Name + "_last_run" }
+
+// LastStatusKey is the settings key holding the outcome of the last run.
+func (t ScheduledTask) LastStatusKey() string { return t.Name + "_last_status" }
+
+// Values written to a task's LastStatusKey.
+const (
+	TaskStatusInProgress = "in_progress"
+	TaskStatusSuccess    = "success"
+	TaskStatusFailed     = "failed"
+)
 
 // Scheduler handles scheduled tasks
 type Scheduler struct {
@@ -81,47 +93,51 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 	// Register all scheduled tasks
 	s.tasks = []ScheduledTask{
 		{
-			Name:              "bulk_data_update",
-			Interval:          24 * time.Hour,
-			TimeOfDay:         "bulk_data_update_time",
-			EnabledSettingKey: "bulk_data_auto_update",
-			LastRunSettingKey: "bulk_data_last_update",
-			Run:               s.runBulkDataUpdate,
+			Name:        "bulk_data_update",
+			DisplayName: "Card Data Update",
+			Description: "Downloads Scryfall's bulk card data and refreshes the local card database.",
+			Interval:    24 * time.Hour,
+			JobType:     models.JobTypeBulkDataImport,
+			Run:         s.runBulkDataUpdate,
 		},
 		{
-			Name:              "set_data_update",
-			Interval:          14 * 24 * time.Hour, // Every 2 weeks
-			TimeOfDay:         "set_data_update_time",
-			EnabledSettingKey: "set_data_auto_update",
-			LastRunSettingKey: "set_data_last_update",
-			Run:               s.runSetDataUpdate,
+			Name:        "set_data_update",
+			DisplayName: "Set Data Update",
+			Description: "Refreshes set information and set icons from Scryfall.",
+			Interval:    14 * 24 * time.Hour, // Every 2 weeks
+			JobType:     models.JobTypeSetDataImport,
+			Run:         s.runSetDataUpdate,
 		},
 		{
-			Name:              "symbol_data_update",
-			Interval:          30 * 24 * time.Hour, // Monthly — symbols rarely change
-			TimeOfDay:         "symbol_data_update_time",
-			EnabledSettingKey: "symbol_data_auto_update",
-			LastRunSettingKey: "symbol_data_last_update",
-			Run:               s.runSymbolDataUpdate,
+			Name:        "symbol_data_update",
+			DisplayName: "Symbol Data Update",
+			Description: "Refreshes mana and card symbols from Scryfall.",
+			Interval:    30 * 24 * time.Hour, // Monthly — symbols rarely change
+			JobType:     models.JobTypeSymbolDataImport,
+			Run:         s.runSymbolDataUpdate,
 		},
 		{
-			Name:              "job_cleanup",
-			Interval:          24 * time.Hour,
-			TimeOfDay:         "00:00", // Midnight
-			LastRunSettingKey: "job_cleanup_last_run",
-			Run:               s.runJobCleanup,
+			Name:        "job_cleanup",
+			DisplayName: "Job History Cleanup",
+			Description: "Deletes job history records older than the retention period.",
+			Interval:    24 * time.Hour,
+			Run:         s.runJobCleanup,
 		},
 		{
-			Name:              "data_backup",
-			Interval:          24 * time.Hour,
-			TimeOfDay:         settingBackupTime,
-			EnabledSettingKey: settingBackupEnabled,
-			LastRunSettingKey: settingBackupLastRun,
-			Run:               s.runBackup,
+			Name:        "data_backup",
+			DisplayName: "Data Backup",
+			Description: "Exports your collection, lists and decks to a compressed backup file.",
+			Interval:    24 * time.Hour,
+			Run:         s.runBackup,
 		},
 	}
 
 	return s
+}
+
+// Tasks returns the registered scheduled tasks.
+func (s *Scheduler) Tasks() []ScheduledTask {
+	return s.tasks
 }
 
 // Start begins the scheduler loop
@@ -182,17 +198,20 @@ func (s *Scheduler) checkTask(ctx context.Context, task ScheduledTask, isCatchup
 	defer s.runningTasks.Delete(task.Name)
 
 	// Check if task is enabled
-	if task.EnabledSettingKey != "" {
-		if !s.settingsService.GetBool(ctx, task.EnabledSettingKey, false) {
-			return
-		}
+	if !s.settingsService.GetBool(ctx, task.EnabledKey(), false) {
+		return
 	}
 
 	now := time.Now()
 
 	// For scheduled runs (not catchup), check if we're in the time window
 	if !isCatchup {
-		if !s.isInTimeWindow(ctx, task.TimeOfDay, now) {
+		timeStr, err := s.settingsService.Get(ctx, task.TimeKey())
+		if err != nil {
+			slog.Warn("failed to get time setting", "component", "scheduler", "setting", task.TimeKey(), "error", err)
+			return
+		}
+		if !isInTimeWindow(timeStr, now) {
 			return
 		}
 	}
@@ -219,32 +238,12 @@ func (s *Scheduler) checkTask(ctx context.Context, task ScheduledTask, isCatchup
 	task.Run(ctx)
 }
 
-// isInTimeWindow checks if we're within 5 minutes of the configured time
-func (s *Scheduler) isInTimeWindow(ctx context.Context, timeOfDaySetting string, now time.Time) bool {
-	// Get the time string - either from settings or use as literal
-	var timeStr string
-	if timeOfDaySetting == "" {
-		return true // No specific time required
-	}
-
-	// Check if it's a settings key or a literal time
-	if len(timeOfDaySetting) == 5 && timeOfDaySetting[2] == ':' {
-		// Looks like a literal time (e.g., "00:00")
-		timeStr = timeOfDaySetting
-	} else {
-		// It's a settings key
-		var err error
-		timeStr, err = s.settingsService.Get(ctx, timeOfDaySetting)
-		if err != nil {
-			slog.Warn("failed to get time setting", "component", "scheduler", "setting", timeOfDaySetting, "error", err)
-			return false
-		}
-	}
-
-	// Parse the time
+// isInTimeWindow reports whether now falls within the 5-minute window that
+// starts at timeStr ("HH:MM").
+func isInTimeWindow(timeStr string, now time.Time) bool {
 	targetTime, err := time.Parse("15:04", timeStr)
 	if err != nil {
-		slog.Warn("invalid time format", "component", "scheduler", "setting", timeOfDaySetting, "error", err)
+		slog.Warn("invalid time format", "component", "scheduler", "time", timeStr, "error", err)
 		return false
 	}
 
@@ -252,8 +251,35 @@ func (s *Scheduler) isInTimeWindow(ctx context.Context, timeOfDaySetting string,
 	currentMinutes := now.Hour()*60 + now.Minute()
 	targetMinutes := targetTime.Hour()*60 + targetTime.Minute()
 
-	// Check if we're within the 5-minute window
-	return currentMinutes >= targetMinutes && currentMinutes < targetMinutes+5
+	return currentMinutes >= targetMinutes && currentMinutes < targetMinutes+scheduleWindowMinutes
+}
+
+// scheduleWindowMinutes is how long after a task's time of day it may still start.
+const scheduleWindowMinutes = 5
+
+// NextRun returns the next time a task will run: the first occurrence of
+// timeStr ("HH:MM") after now at which at least interval has elapsed since
+// lastRun. It mirrors the checks in checkTask (time window + shouldRunTask).
+func NextRun(timeStr string, interval time.Duration, lastRun *time.Time, now time.Time) (time.Time, error) {
+	target, err := time.Parse("15:04", timeStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parsing time of day %q: %w", timeStr, err)
+	}
+
+	next := time.Date(now.Year(), now.Month(), now.Day(), target.Hour(), target.Minute(), 0, 0, now.Location())
+	if !next.After(now) {
+		next = next.AddDate(0, 0, 1)
+	}
+
+	if lastRun != nil {
+		// Bounded: an interval can never push the next run out more than
+		// interval/24h + 1 days.
+		for next.Sub(*lastRun) < interval {
+			next = next.AddDate(0, 0, 1)
+		}
+	}
+
+	return next, nil
 }
 
 // shouldRunTask checks if a task should run based on its interval and last run time
@@ -269,14 +295,12 @@ func (s *Scheduler) shouldRunTask(ctx context.Context, task ScheduledTask, now t
 	}
 
 	// Check persisted last run time
-	if task.LastRunSettingKey != "" {
-		lastUpdate, err := s.settingsService.GetTime(ctx, task.LastRunSettingKey)
-		if err == nil && lastUpdate != nil {
-			if time.Since(*lastUpdate) < task.Interval {
-				// Update in-memory cache
-				s.lastRun[task.Name] = *lastUpdate
-				return false
-			}
+	lastUpdate, err := s.settingsService.GetTime(ctx, task.LastRunKey())
+	if err == nil && lastUpdate != nil {
+		if time.Since(*lastUpdate) < task.Interval {
+			// Update in-memory cache
+			s.lastRun[task.Name] = *lastUpdate
+			return false
 		}
 	}
 
@@ -368,18 +392,16 @@ func (s *Scheduler) runSymbolDataUpdate(ctx context.Context) {
 }
 
 func (s *Scheduler) runJobCleanup(ctx context.Context) {
+	task, _ := s.task("job_cleanup")
 	retentionDays := s.settingsService.GetInt(ctx, "job_cleanup_retention_days", DefaultJobCleanupRetentionDays)
 	deletedCount, err := s.jobService.CleanupOldJobs(ctx, retentionDays)
 	if err != nil {
 		slog.Error("error cleaning up jobs", "component", "scheduler", "error", err)
+		s.setStatus(ctx, task, TaskStatusFailed)
 		return
 	}
 
-	// Persist completion time
-	if err := s.settingsService.SetTime(ctx, "job_cleanup_last_run", time.Now()); err != nil {
-		slog.Warn("failed to persist job_cleanup_last_run", "component", "scheduler", "error", err)
-	}
-
+	s.recordRun(ctx, task, TaskStatusSuccess)
 	slog.Info("cleaned up old jobs", "component", "scheduler", "deleted_count", deletedCount)
 }
 
@@ -387,31 +409,48 @@ func (s *Scheduler) runBackup(ctx context.Context) {
 	if s.backupService == nil {
 		return
 	}
+	task, _ := s.task("data_backup")
 
 	path, err := s.backupService.CreateBackup(ctx)
 	if err != nil {
 		slog.Error("error creating data backup", "component", "scheduler", "error", err)
-		if setErr := s.settingsService.Set(ctx, settingBackupLastRunStatus, "failed: "+err.Error()); setErr != nil {
-			slog.Warn("failed to persist backup status", "component", "scheduler", "error", setErr)
-		}
+		// last_run is deliberately not updated so catch-up retries the backup.
+		s.setStatus(ctx, task, TaskStatusFailed)
 		return
 	}
 
-	retention := s.settingsService.GetInt(ctx, settingBackupRetention, DefaultBackupRetention)
+	retention := s.settingsService.GetInt(ctx, "data_backup_retention_count", DefaultBackupRetention)
 	pruned, err := s.backupService.PruneBackups(retention)
 	if err != nil {
 		// The backup itself succeeded; a prune failure is non-fatal.
 		slog.Warn("failed to prune old backups", "component", "scheduler", "error", err)
 	}
 
-	// Persist completion time and status.
-	now := time.Now()
-	if err := s.settingsService.SetTime(ctx, settingBackupLastRun, now); err != nil {
-		slog.Warn("failed to persist backup_last_run", "component", "scheduler", "error", err)
-	}
-	if err := s.settingsService.Set(ctx, settingBackupLastRunStatus, "success"); err != nil {
-		slog.Warn("failed to persist backup status", "component", "scheduler", "error", err)
-	}
-
+	s.recordRun(ctx, task, TaskStatusSuccess)
 	slog.Info("created data backup", "component", "scheduler", "path", path, "pruned", pruned, "retention", retention)
+}
+
+// task returns the registered task with the given name.
+func (s *Scheduler) task(name string) (ScheduledTask, bool) {
+	for _, t := range s.tasks {
+		if t.Name == name {
+			return t, true
+		}
+	}
+	return ScheduledTask{}, false
+}
+
+// recordRun persists a task's last run time (now) and status.
+func (s *Scheduler) recordRun(ctx context.Context, task ScheduledTask, status string) {
+	if err := s.settingsService.SetTime(ctx, task.LastRunKey(), time.Now()); err != nil {
+		slog.Warn("failed to persist task last run", "component", "scheduler", "key", task.LastRunKey(), "error", err)
+	}
+	s.setStatus(ctx, task, status)
+}
+
+// setStatus persists a task's last run status.
+func (s *Scheduler) setStatus(ctx context.Context, task ScheduledTask, status string) {
+	if err := s.settingsService.Set(ctx, task.LastStatusKey(), status); err != nil {
+		slog.Warn("failed to persist task status", "component", "scheduler", "key", task.LastStatusKey(), "error", err)
+	}
 }

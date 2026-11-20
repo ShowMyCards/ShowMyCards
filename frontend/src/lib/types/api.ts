@@ -740,12 +740,17 @@ export interface ResolveResponse {
  * tygo:export
  */
 export interface ScheduledTaskInfo {
-	name: string;
-	type: string; // "bulk_data_update" | "job_cleanup"
+	name: string; // registry identifier, e.g. "data_backup"
+	display_name: string;
+	description: string;
 	enabled: boolean;
-	schedule: string; // e.g., "03:00 daily"
-	next_run: string;
+	time: string; // time of day, "HH:MM"
+	interval_days: number /* int */;
+	schedule: string; // e.g. "03:00 daily", "02:30 every 14 days"
+	next_run?: string; // omitted when disabled or the time is invalid
 	last_run?: string;
+	last_status?: string; // "in_progress" | "success" | "failed"
+	job_type?: string; // type of Job record the task creates
 	last_job_id?: number /* uint */;
 	last_job_status?: string;
 }
