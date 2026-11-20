@@ -174,7 +174,10 @@
 							card{data.items.aggregate_over_committed === 1 ? ' is' : 's are'}
 							over-committed across your decks:
 						</span>
-						<DeckSharedCards cards={data.items.shared_cards} deckId={data.items.deck_id} />
+						<!-- Keyed by deck so the open reason resets when following a deck link. -->
+						{#key data.items.deck_id}
+							<DeckSharedCards cards={data.items.shared_cards} deckId={data.items.deck_id} />
+						{/key}
 					{/if}
 				</div>
 			{:else if totalItems > 0}
