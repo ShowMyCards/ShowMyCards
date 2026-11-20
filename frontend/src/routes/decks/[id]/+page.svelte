@@ -9,14 +9,18 @@
 		Modal,
 		FormField,
 		DeckView,
+		DeckLegality,
 		DeckAddResultCard,
+		DeckSharedCards,
+		CardListExportModal,
+		deckExportLines,
 		notifications,
 		getActionError,
 		type EnhancedCardResult,
 		type EnrichedDeckItem
 	} from '#lib';
 	import type { DeckGroupMode, DeckSortMode } from '#lib/utils/deck-grouping.ts';
-	import { ArrowLeft, Pencil, Trash2, Search, Info } from '@lucide/svelte';
+	import { ArrowLeft, ClipboardCopy, Pencil, Trash2, Search, Info } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -30,6 +34,7 @@
 	let isSaving = $state(false);
 	let showDeleteModal = $state(false);
 	let isDeleting = $state(false);
+	let showExportModal = $state(false);
 
 	function startEdit() {
 		if (!data.deck) return;
@@ -70,6 +75,11 @@
 	const anyShort = $derived(data.items.aggregate_shortfall > 0 || data.items.token_shortfall > 0);
 	const anyShared = $derived(
 		data.items.aggregate_over_committed > 0 || data.items.token_over_committed > 0
+	);
+	// Maybe-board cards are not part of the deck, so a deck holding only those
+	// has nothing to check.
+	const legalityEmpty = $derived(
+		data.items.command.length + data.items.main.length + data.items.side.length === 0
 	);
 
 	// Roll demand-zone rows up per Oracle so a card split across zones (e.g. 3 main
@@ -140,6 +150,9 @@
 		{ key: 'other' as const, title: 'Other' }
 	];
 
+	const exportAll = $derived(deckExportLines(data.items, 'all'));
+	const exportMissing = $derived(deckExportLines(data.items, 'missing'));
+
 	function zoneCardCount(list: EnrichedDeckItem[]): number {
 		return list.reduce((sum, item) => sum + item.desired_quantity, 0);
 	}
@@ -155,6 +168,15 @@
 			{#snippet actions()}
 				<a href={resolve('/decks')} class="btn bg-base-100 btn-sm"
 					><ArrowLeft class="w-4 h-4" /> Back</a>
+
+				<button
+					onclick={() => (showExportModal = true)}
+					class="btn bg-base-100 btn-sm"
+					title="Export card list"
+					aria-label="Export card list"
+					disabled={totalItems === 0}>
+					<ClipboardCopy class="w-4 h-4" />
+				</button>
 
 				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit deck"
 					><Pencil class="w-4 h-4" /></button>
@@ -186,8 +208,12 @@
 							{#if data.items.aggregate_shortfall === 0}You own every card in this deck, but{/if}
 							<span class="font-semibold">{data.items.aggregate_over_committed}</span>
 							card{data.items.aggregate_over_committed === 1 ? ' is' : 's are'}
-							also wanted by other decks. You don't have enough copies for all of them.
+							over-committed across your decks:
 						</span>
+						<!-- Keyed by deck so the open reason resets when following a deck link. -->
+						{#key data.items.deck_id}
+							<DeckSharedCards cards={data.items.shared_cards} deckId={data.items.deck_id} />
+						{/key}
 					{/if}
 					{#if data.items.token_shortfall > 0}
 						<span>
@@ -219,6 +245,8 @@
 				availability is a later milestone.
 			</span>
 		</div>
+
+		<DeckLegality formats={data.legality} empty={legalityEmpty} />
 
 		<!-- View controls -->
 		{#if totalItems > 0}
@@ -320,6 +348,19 @@
 		</EmptyState>
 	{/if}
 </div>
+
+<CardListExportModal
+	open={showExportModal}
+	onClose={() => (showExportModal = false)}
+	title="Export {data.deck?.name ?? 'deck'}"
+	choices={[
+		{
+			label: 'Only missing',
+			export: exportMissing,
+			empty: 'Nothing missing: you have every card.'
+		},
+		{ label: 'All cards', export: exportAll }
+	]} />
 
 <!-- Edit Deck Modal -->
 

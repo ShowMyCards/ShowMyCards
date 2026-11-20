@@ -1,6 +1,7 @@
 package api
 
 import (
+	"backend/legality"
 	"backend/models"
 	"backend/services"
 	"backend/utils"
@@ -8,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
@@ -60,21 +63,22 @@ type DeckSummary struct {
 
 // deckDemandTotals measures a deck's per-Oracle demand against the owned pool and
 // the cross-deck allocation. shortfall is Σ max(0, demand − owned) over the
-// Oracles; overCommitted counts the Oracles the deck covers alone
+// Oracles; overCommitted lists, sorted, the Oracles the deck covers alone
 // (demand ≤ owned) that the allocation service flags as over-committed across
 // decks. The two are disjoint, mirroring the per-item under_owned/over_committed
 // flags in enrichDeckItems. demandByOracle must contain demand-zone rows only, so
 // maybe-board cards never count.
-func deckDemandTotals(demandByOracle map[string]int, availability services.AvailabilityMap) (shortfall, overCommitted int) {
+func deckDemandTotals(demandByOracle map[string]int, availability services.AvailabilityMap) (shortfall int, overCommitted []string) {
 	for oracleID, demand := range demandByOracle {
 		a := availability.OracleAvailabilityFor(oracleID)
 		switch {
 		case demand > a.Owned:
 			shortfall += demand - a.Owned
 		case a.OverCommitted:
-			overCommitted++
+			overCommitted = append(overCommitted, oracleID)
 		}
 	}
+	slices.Sort(overCommitted)
 	return shortfall, overCommitted
 }
 
@@ -122,7 +126,7 @@ func (h *DeckHandler) List(c fiber.Ctx) error {
 			TotalItems:             len(deck.Items),
 			TotalCardsDemand:       totalDemand,
 			AggregateShortfall:     shortfall,
-			AggregateOverCommitted: overCommitted,
+			AggregateOverCommitted: len(overCommitted),
 		}
 	}
 
@@ -368,14 +372,49 @@ type EnrichedDeckItem struct {
 	OverCommitted bool `json:"over_committed"`
 }
 
+// AllocationConflict explains one reason a card is over-committed: either the
+// decks together want more copies of the card than you own (scryfall_id ""), or
+// decks pin one printing more often than you own it. Decks lists every deck
+// wanting the card (or pinning the printing), which may include this deck.
+//
+// tygo:export
+type AllocationConflict struct {
+	ScryfallID      string         `json:"scryfall_id"` // "" = all printings of the card
+	SetCode         string         `json:"set_code,omitempty"`
+	CollectorNumber string         `json:"collector_number,omitempty"`
+	Lang            string         `json:"lang,omitempty"`
+	Owned           int            `json:"owned"`
+	Wanted          int            `json:"wanted"`
+	Decks           []ConflictDeck `json:"decks"`
+}
+
+// ConflictDeck is one deck's share of an AllocationConflict's wanted copies.
+//
+// tygo:export
+type ConflictDeck struct {
+	DeckID   uint   `json:"deck_id"`
+	DeckName string `json:"deck_name"`
+	Quantity int    `json:"quantity"`
+}
+
+// SharedCard is a card the deck counts as over-committed (see
+// AggregateOverCommitted), with the reasons why.
+//
+// tygo:export
+type SharedCard struct {
+	OracleID  string               `json:"oracle_id"`
+	Name      string               `json:"name"`
+	Conflicts []AllocationConflict `json:"conflicts"`
+}
+
 // DeckItemsResponse represents the items in a deck, grouped by zone, with
 // aggregate availability information.
 //
 // AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
 // owned_O) over card-zone items). AggregateOverCommitted is the number of
-// distinct card-zone cards the deck covers alone but that other decks want too
-// (see DeckSummary). Maybe-board items are returned but never contribute to
-// either.
+// distinct card-zone cards the deck covers alone but that are over-committed
+// across decks (see DeckSummary); SharedCards lists those cards, by name, with
+// the reasons. Maybe-board items are returned but never contribute to either.
 //
 // Other holds tokens and other extras. They never count as cards; their
 // ownership is reported separately: TokenShortfall and TokenOverCommitted are
@@ -391,6 +430,7 @@ type DeckItemsResponse struct {
 	Other                  []EnrichedDeckItem `json:"other"`
 	AggregateShortfall     int                `json:"aggregate_shortfall"`
 	AggregateOverCommitted int                `json:"aggregate_over_committed"`
+	SharedCards            []SharedCard       `json:"shared_cards"`
 	TokenShortfall         int                `json:"token_shortfall"`
 	TokenOverCommitted     int                `json:"token_over_committed"`
 }
@@ -484,9 +524,133 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 	// deck covers alone but other decks want too. Computed per Oracle (not per row)
 	// so a card split across zones is counted once against the owned pool. The
 	// token signals are the same computation over the other zone.
-	resp.AggregateShortfall, resp.AggregateOverCommitted = deckDemandTotals(cardDemandByOracle, availability)
-	resp.TokenShortfall, resp.TokenOverCommitted = deckDemandTotals(tokenDemandByOracle, availability)
+	shortfall, overCommitted := deckDemandTotals(cardDemandByOracle, availability)
+	resp.AggregateShortfall = shortfall
+	resp.AggregateOverCommitted = len(overCommitted)
+	resp.SharedCards = h.sharedCards(ctx, overCommitted, enriched, availability)
+	tokenShortfall, tokenOverCommitted := deckDemandTotals(tokenDemandByOracle, availability)
+	resp.TokenShortfall = tokenShortfall
+	resp.TokenOverCommitted = len(tokenOverCommitted)
 
+	return c.JSON(resp)
+}
+
+// sharedCards explains the deck's over-committed Oracles: each card's name (from
+// its first card-zone item) and the allocation conflicts behind the flag, with
+// set, number and language for pinned printings. Sorted by name; never nil.
+func (h *DeckHandler) sharedCards(ctx context.Context, oracleIDs []string, items []EnrichedDeckItem, availability services.AvailabilityMap) []SharedCard {
+	names := make(map[string]string)
+	for _, item := range items {
+		if _, ok := names[item.OracleID]; !ok && item.Zone.CountsAsCards() {
+			names[item.OracleID] = item.Name
+		}
+	}
+
+	conflictsByOracle := make(map[string][]services.Conflict, len(oracleIDs))
+	var printingIDs []string
+	for _, oracleID := range oracleIDs {
+		conflicts := availability.Conflicts(oracleID)
+		conflictsByOracle[oracleID] = conflicts
+		for _, c := range conflicts {
+			if c.ScryfallID != "" {
+				printingIDs = append(printingIDs, c.ScryfallID)
+			}
+		}
+	}
+
+	printings := map[string]scryfall.Card{}
+	if len(printingIDs) > 0 {
+		var err error
+		if printings, err = models.GetScryfallCardsByIDs(h.db.WithContext(ctx), printingIDs); err != nil {
+			slog.Warn("failed to fetch printings for deck conflicts", "component", "decks", "error", err)
+		}
+	}
+
+	shared := make([]SharedCard, 0, len(oracleIDs))
+	for _, oracleID := range oracleIDs {
+		card := SharedCard{OracleID: oracleID, Name: names[oracleID], Conflicts: []AllocationConflict{}}
+		for _, c := range conflictsByOracle[oracleID] {
+			conflict := AllocationConflict{
+				ScryfallID: c.ScryfallID,
+				Owned:      c.Owned,
+				Wanted:     c.Wanted,
+				Decks:      make([]ConflictDeck, len(c.Decks)),
+			}
+			if p, ok := printings[c.ScryfallID]; ok {
+				conflict.SetCode = p.Set
+				conflict.CollectorNumber = p.CollectorNumber
+				conflict.Lang = string(p.Lang)
+			}
+			for i, d := range c.Decks {
+				conflict.Decks[i] = ConflictDeck{DeckID: d.DeckID, DeckName: d.DeckName, Quantity: d.Quantity}
+			}
+			card.Conflicts = append(card.Conflicts, conflict)
+		}
+		shared = append(shared, card)
+	}
+	slices.SortStableFunc(shared, func(a, b SharedCard) int { return strings.Compare(a.Name, b.Name) })
+	return shared
+}
+
+// FormatLegality is a deck's verdict for one format. Reasons lists why the deck
+// is not legal, one line per kind of violation; it is empty when Legal.
+//
+// tygo:export
+type FormatLegality struct {
+	Format  string   `json:"format"` // Scryfall legalities key
+	Name    string   `json:"name"`
+	Legal   bool     `json:"legal"`
+	Reasons []string `json:"reasons"`
+}
+
+// Legality checks the deck against every supported format and returns one
+// FormatLegality per format, in display order. Maybe-board items are ignored.
+func (h *DeckHandler) Legality(c fiber.Ctx) error {
+	id := fiber.Params[int](c, "id")
+	if id == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid id")
+	}
+
+	db := h.db.WithContext(c.RequestCtx())
+
+	var deck models.Deck
+	if err := db.First(&deck, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ReturnError(c, fiber.StatusNotFound, "deck not found")
+		}
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch deck", "database query failed", err)
+	}
+
+	var items []models.DeckItem
+	if err := db.Where("deck_id = ? AND zone <> ?", deck.ID, models.ZoneMaybe).Find(&items).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch deck items", "database query failed", err)
+	}
+
+	// Legality and rules text are the same for every printing of a card, so any
+	// one printing per Oracle is enough, pinned or not; GetAnyCardsByOracle skips
+	// the costly printing ranking used for display. A missing Oracle in the
+	// result means the card has no local data yet.
+	oracleIDs := make([]string, 0, len(items))
+	seen := make(map[string]bool)
+	for _, item := range items {
+		if !seen[item.OracleID] {
+			seen[item.OracleID] = true
+			oracleIDs = append(oracleIDs, item.OracleID)
+		}
+	}
+	cards, err := models.GetAnyCardsByOracle(db, oracleIDs)
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to check deck legality", "card query failed", err)
+	}
+
+	results := legality.Check(items, cards)
+	resp := make([]FormatLegality, len(results))
+	for i, r := range results {
+		resp[i] = FormatLegality(r)
+	}
 	return c.JSON(resp)
 }
 

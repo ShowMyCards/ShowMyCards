@@ -140,6 +140,31 @@ func seedPrintingVariety(t *testing.T, db *gorm.DB) {
 	}
 }
 
+func TestGetAnyCardsByOracle(t *testing.T) {
+	db := setupResolveTestDB(t)
+	seedResolveCards(t, db)
+
+	got, err := GetAnyCardsByOracle(db, []string{"oracle-aa", "oracle-sr", "oracle-missing"})
+	if err != nil {
+		t.Fatalf("GetAnyCardsByOracle: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected one card for each of the 2 known oracles, got %d", len(got))
+	}
+	// oracle-aa has an English and a German printing; either will do.
+	if card := got["oracle-aa"]; card.OracleID != "oracle-aa" || card.Name == "" {
+		t.Errorf("expected a printing of oracle-aa, got %+v", card)
+	}
+	if card := got["oracle-sr"]; card.Name != "Sol Ring" {
+		t.Errorf("expected Sol Ring for oracle-sr, got %q", card.Name)
+	}
+
+	empty, err := GetAnyCardsByOracle(db, nil)
+	if err != nil || len(empty) != 0 {
+		t.Errorf("expected an empty map for no oracles, got %v, %v", empty, err)
+	}
+}
+
 func TestGetPreferredCardsByOracle_PrefersPlainNewestPrinting(t *testing.T) {
 	db := setupResolveTestDB(t)
 	seedPrintingVariety(t, db)

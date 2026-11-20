@@ -62,10 +62,13 @@ export { default as ScheduledTaskCard } from './components/ScheduledTaskCard.sve
 export { default as ListCard } from './components/ListCard.svelte';
 export { default as DeckCard } from './components/DeckCard.svelte';
 export { default as DeckView } from './components/DeckView.svelte';
+export { default as DeckLegality } from './components/DeckLegality.svelte';
 export { default as DeckCardActions } from './components/DeckCardActions.svelte';
+export { default as DeckSharedCards } from './components/DeckSharedCards.svelte';
 export { default as ManaCost } from './components/ManaCost.svelte';
 export { default as DeckAddResultCard } from './components/DeckAddResultCard.svelte';
 export { default as AddToDeckModal } from './components/AddToDeckModal.svelte';
+export { default as CardListExportModal } from './components/CardListExportModal.svelte';
 export { default as ListStatsBar } from './components/ListStatsBar.svelte';
 export { default as ListCardGrid } from './components/ListCardGrid.svelte';
 export { default as ListCardTable } from './components/ListCardTable.svelte';
@@ -181,7 +184,11 @@ export type {
 	CreateDeckItemRequest,
 	CreateDeckItemsBatchRequest,
 	UpdateDeckItemRequest,
-	DeckCardUsage
+	DeckCardUsage,
+	SharedCard,
+	AllocationConflict,
+	ConflictDeck,
+	FormatLegality
 } from './types/api';
 
 // Re-export local card-resolution API types
@@ -209,3 +216,11 @@ export { getActionError, getActionMessage } from './utils/form-actions';
 export { scryfallImageUrl } from './utils/scryfall-image';
 export { buildDeckItems } from './utils/deck-add';
 export type { AddToDeckCard, BuildDeckItemsOptions } from './utils/deck-add';
+export { deckExportLines, listExportLines, formatExportLines } from './utils/card-list-export';
+export type {
+	CardListExport,
+	CardListExportChoice,
+	CardListExportLine,
+	CardListExportMode,
+	DeckExportItems
+} from './utils/card-list-export';

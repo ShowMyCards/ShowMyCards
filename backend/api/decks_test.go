@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
 	"backend/models"
 
+	scryfall "github.com/BlueMonday/go-scryfall"
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -42,6 +44,7 @@ func setupDeckTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	app.Get("/api/decks", handler.List)
 	app.Get("/api/decks/for-card/:scryfall_id", handler.DecksForCard)
 	app.Get("/api/decks/:id", handler.Get)
+	app.Get("/api/decks/:id/legality", handler.Legality)
 	app.Post("/api/decks", handler.Create)
 	app.Put("/api/decks/:id", handler.Update)
 	app.Delete("/api/decks/:id", handler.Delete)
@@ -682,6 +685,10 @@ func assertDeckTotals(t *testing.T, app *fiber.App, deck models.Deck, wantShortf
 	if items.AggregateShortfall != wantShortfall || items.AggregateOverCommitted != wantOverCommitted {
 		t.Errorf("deck %q items: shortfall=%d over_committed=%d, want shortfall=%d over_committed=%d",
 			deck.Name, items.AggregateShortfall, items.AggregateOverCommitted, wantShortfall, wantOverCommitted)
+	}
+	// shared_cards explains exactly the cards aggregate_over_committed counts.
+	if len(items.SharedCards) != wantOverCommitted {
+		t.Errorf("deck %q items: %d shared_cards, want %d", deck.Name, len(items.SharedCards), wantOverCommitted)
 	}
 }
 
@@ -1347,5 +1354,181 @@ func TestDeckMoveItem_Rejections(t *testing.T) {
 				t.Errorf("expected side x2 unchanged, got %v", zones)
 			}
 		})
+	}
+}
+
+// createDeckTestPrinting inserts a printing with an explicit collector number and
+// language, for tests that tell printings of one card apart.
+func createDeckTestPrinting(t *testing.T, db *gorm.DB, scryfallID, oracleID, name, set, number, lang string) {
+	t.Helper()
+	rawJSON := fmt.Sprintf(`{
+		"id": "%s", "oracle_id": "%s", "name": "%s", "set": "%s", "set_name": "%s Set",
+		"collector_number": "%s", "rarity": "common", "finishes": ["nonfoil"],
+		"lang": "%s", "layout": "normal", "released_at": "2020-01-01"
+	}`, scryfallID, oracleID, name, set, set, number, lang)
+	if err := db.Create(&models.Card{ScryfallID: scryfallID, OracleID: oracleID, RawJSON: rawJSON}).Error; err != nil {
+		t.Fatalf("failed to create test printing: %v", err)
+	}
+}
+
+// The Swamp case: two decks pin the German printing more often than it is owned,
+// although the card's total fits. A third deck that wants any printing is still
+// flagged, and shared_cards tells it which printing and which decks are behind it.
+func TestDeckListItems_SharedCardsExplainPinnedConflict(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	x := createTestDeck(t, db, "Fluch")
+	y := createTestDeck(t, db, "Lorwyn")
+	z := createTestDeck(t, db, "Schatten")
+
+	createDeckTestPrinting(t, db, "scry-de", "oracle-swamp", "Swamp", "ecl", "271", "de")
+	createDeckTestPrinting(t, db, "scry-en", "oracle-swamp", "Swamp", "ecl", "271", "en")
+	addDeckInventory(t, db, "oracle-swamp", "scry-de", 4)
+	addDeckInventory(t, db, "oracle-swamp", "scry-en", 5)
+	seedPinnedDeckItem(t, db, x.ID, "oracle-swamp", "scry-de", models.ZoneMain, 3)
+	seedPinnedDeckItem(t, db, y.ID, "oracle-swamp", "scry-de", models.ZoneMain, 2)
+	seedDeckItem(t, db, z.ID, "oracle-swamp", models.ZoneMain, 1)
+
+	assertDeckTotals(t, app, z, 0, 1)
+
+	want := []SharedCard{{
+		OracleID: "oracle-swamp",
+		Name:     "Swamp",
+		Conflicts: []AllocationConflict{{
+			ScryfallID:      "scry-de",
+			SetCode:         "ecl",
+			CollectorNumber: "271",
+			Lang:            "de",
+			Owned:           4,
+			Wanted:          5,
+			Decks: []ConflictDeck{
+				{DeckID: x.ID, DeckName: "Fluch", Quantity: 3},
+				{DeckID: y.ID, DeckName: "Lorwyn", Quantity: 2},
+			},
+		}},
+	}}
+	if got := fetchDeckItems(t, app, z.ID).SharedCards; !reflect.DeepEqual(got, want) {
+		t.Errorf("shared_cards:\n got  %+v\n want %+v", got, want)
+	}
+}
+
+// A deck without over-committed cards sends an empty array, not null.
+func TestDeckListItems_SharedCardsEmptyArray(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Solo")
+	createDeckTestCard(t, db, "scry-solo", "oracle-solo", "Solo Card", "lea", "common")
+	addDeckInventory(t, db, "oracle-solo", "scry-solo", 1)
+	seedDeckItem(t, db, deck.ID, "oracle-solo", models.ZoneMain, 1)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/decks/%d/items", deck.ID), nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if got := string(raw["shared_cards"]); got != "[]" {
+		t.Errorf("shared_cards = %s, want []", got)
+	}
+}
+
+// Legality endpoint tests. The rules themselves are covered in backend/legality;
+// these check the wiring: card lookup by Oracle, maybe board, missing data.
+
+// createLegalityTestCard stores a printing that is legal in every format.
+func createLegalityTestCard(t *testing.T, db *gorm.DB, scryfallID, oracleID, name, typeLine string) {
+	t.Helper()
+	var legalities scryfall.Legalities
+	v := reflect.ValueOf(&legalities).Elem()
+	for i := range v.NumField() {
+		v.Field(i).SetString(string(scryfall.LegalityLegal))
+	}
+	card, err := models.FromScryfallCard(scryfall.Card{
+		ID: scryfallID, OracleID: oracleID, Name: name, Lang: "en",
+		TypeLine: typeLine, Legalities: legalities,
+	})
+	if err != nil {
+		t.Fatalf("failed to build test card: %v", err)
+	}
+	if err := db.Create(card).Error; err != nil {
+		t.Fatalf("failed to create test card: %v", err)
+	}
+}
+
+func fetchDeckLegality(t *testing.T, app *fiber.App, deckID uint) map[string]FormatLegality {
+	t.Helper()
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/decks/%d/legality", deckID), nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	var got []FormatLegality
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("failed to decode legality: %v", err)
+	}
+	if len(got) != 9 || got[0].Format != "standard" || got[8].Format != "oathbreaker" {
+		t.Fatalf("expected 9 formats from standard to oathbreaker, got %+v", got)
+	}
+	byFormat := make(map[string]FormatLegality, len(got))
+	for _, f := range got {
+		byFormat[f.Format] = f
+	}
+	return byFormat
+}
+
+func TestDeckLegality_ChecksDeckCards(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Mono Blue")
+
+	createLegalityTestCard(t, db, "island-1", "island", "Island", "Basic Land — Island")
+	createLegalityTestCard(t, db, "opt-1", "opt", "Opt", "Instant")
+	seedDeckItem(t, db, deck.ID, "island", models.ZoneMain, 56)
+	// Pinned to a printing that is not stored locally: resolved through its Oracle.
+	pinned := models.DeckItem{DeckID: deck.ID, OracleID: "opt", ScryfallID: "opt-unknown-printing", Zone: models.ZoneMain, DesiredQuantity: 4}
+	if err := db.Create(&pinned).Error; err != nil {
+		t.Fatalf("failed to create pinned item: %v", err)
+	}
+	// Unknown card on the maybe board: ignored, so no "No card data" reason.
+	seedDeckItem(t, db, deck.ID, "unknown", models.ZoneMaybe, 1)
+
+	got := fetchDeckLegality(t, app, deck.ID)
+
+	if modern := got["modern"]; !modern.Legal || modern.Reasons == nil || len(modern.Reasons) != 0 {
+		t.Errorf("expected modern legal with empty reasons, got %+v", modern)
+	}
+	if cmdr := got["commander"]; cmdr.Legal || cmdr.Name != "Commander" {
+		t.Errorf("expected commander not legal, got %+v", cmdr)
+	}
+}
+
+func TestDeckLegality_MissingCardData(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Unknown")
+	seedDeckItem(t, db, deck.ID, "not-imported-yet", models.ZoneMain, 1)
+
+	got := fetchDeckLegality(t, app, deck.ID)
+
+	modern := got["modern"]
+	if modern.Legal || len(modern.Reasons) == 0 || modern.Reasons[0] != "No card data yet: 1 card" {
+		t.Errorf("expected missing-data reason first, got %+v", modern)
+	}
+}
+
+func TestDeckLegality_NotFound(t *testing.T) {
+	app, _ := setupDeckTestApp(t)
+
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/api/decks/999/legality", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }
