@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.4.0...v0.5.0) (2026-11-23)
+
+
+### Features
+
+* determine deck format legality ([#209](https://github.com/ShowMyCards/ShowMyCards/issues/209)) ([b89f45c](https://github.com/ShowMyCards/ShowMyCards/commit/b89f45c966162643e8a81d4389188ee3e94879bb))
+* edit task schedules on the Jobs page ([#217](https://github.com/ShowMyCards/ShowMyCards/issues/217)) ([45ec52a](https://github.com/ShowMyCards/ShowMyCards/commit/45ec52af3f642f15022cacc0f04dd6e2df1cbd5c))
+* export cards from decks and lists ([#206](https://github.com/ShowMyCards/ShowMyCards/issues/206)) ([10fd5a9](https://github.com/ShowMyCards/ShowMyCards/commit/10fd5a968e9731002c15cc2102891d2a0afad098))
+* job detail view and registry-driven job history labels ([#218](https://github.com/ShowMyCards/ShowMyCards/issues/218)) ([20ef7bd](https://github.com/ShowMyCards/ShowMyCards/commit/20ef7bdf8629556cb864ffe0d36818ae3f2e160c))
+* move tokens and other extras into a separate Other deck section ([#213](https://github.com/ShowMyCards/ShowMyCards/issues/213)) ([95ed0d5](https://github.com/ShowMyCards/ShowMyCards/commit/95ed0d5886517e286162294b9e7ee0b257f207e2))
+* preserve search query in the URL ([#132](https://github.com/ShowMyCards/ShowMyCards/issues/132)) ([#212](https://github.com/ShowMyCards/ShowMyCards/issues/212)) ([01f2aa0](https://github.com/ShowMyCards/ShowMyCards/commit/01f2aa068d4f8c266b778815cde8bf90ef0e49e9))
+* record a Job for every scheduled task run ([#215](https://github.com/ShowMyCards/ShowMyCards/issues/215)) ([4762dd7](https://github.com/ShowMyCards/ShowMyCards/commit/4762dd7e2902b8181cc1af6e622f87ed02a86d75))
+* run any scheduled task on demand ([#216](https://github.com/ShowMyCards/ShowMyCards/issues/216)) ([db2b908](https://github.com/ShowMyCards/ShowMyCards/commit/db2b9088c647bcba56133daff1f0d63fcdc23beb))
+* show reason for deck overcommitment ([#208](https://github.com/ShowMyCards/ShowMyCards/issues/208)) ([3d95c52](https://github.com/ShowMyCards/ShowMyCards/commit/3d95c5297791bca8755fbfef8276ac42b871d987))
+* standardize task settings keys and drive scheduler API from the registry ([#214](https://github.com/ShowMyCards/ShowMyCards/issues/214)) ([d58437f](https://github.com/ShowMyCards/ShowMyCards/commit/d58437f98773aa66f38fe9581b6fe3fc2126cefb))
+
 ## [0.4.0](https://github.com/ShowMyCards/ShowMyCards/compare/v0.3.0...v0.4.0) (2026-11-19)
 
 
