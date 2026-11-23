@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isFoilTreatment, type EnrichedDeckItem } from '#lib';
+	import { getDisplayName, isFoilTreatment, SCRYFALL_LANGUAGES, type EnrichedDeckItem } from '#lib';
 	import { Pin, Sparkles } from '@lucide/svelte';
 	import CardImage from './CardImage.svelte';
 	import ManaCost from './ManaCost.svelte';
@@ -49,7 +49,12 @@
 		]
 			.filter(Boolean)
 			.join(' ');
-		return `Pinned to ${where || 'a specific printing'}; other printings don't count for this slot`;
+		const lang =
+			item.language &&
+			(SCRYFALL_LANGUAGES.find((l) => l.code === item.language)?.name ??
+				item.language.toUpperCase());
+		const printing = [where || 'a specific printing', lang].filter(Boolean).join(' · ');
+		return `Pinned to ${printing}; other printings don't count for this slot`;
 	}
 
 	function cardHref(item: EnrichedDeckItem): string | undefined {
@@ -58,16 +63,17 @@
 </script>
 
 {#snippet cardImage(item: EnrichedDeckItem)}
+	{@const displayName = getDisplayName(item)}
 	{#if item.image_uri}
 		<CardImage
 			src={item.image_uri}
-			alt={item.name ?? ''}
+			alt={displayName}
 			isFoil={isFoil(item)}
 			class="aspect-5/7 shadow" />
 	{:else}
 		<div
 			class="bg-base-300 flex aspect-5/7 items-center justify-center rounded-xl p-2 text-center text-xs opacity-60">
-			{item.name || 'Unknown card'}
+			{displayName || 'Unknown card'}
 		</div>
 	{/if}
 {/snippet}
@@ -114,9 +120,10 @@
 							{#if href}
 								<a
 									href={resolve(`cards/${item.printing_id}`)}
-									class="hover:text-primary flex-1 truncate">{item.name || 'Unknown card'}</a>
+									class="hover:text-primary flex-1 truncate"
+									>{getDisplayName(item) || 'Unknown card'}</a>
 							{:else}
-								<span class="flex-1 truncate">{item.name || 'Unknown card'}</span>
+								<span class="flex-1 truncate">{getDisplayName(item) || 'Unknown card'}</span>
 							{/if}
 							{#if isFoil(item)}
 								{@const finish = item.treatment === 'etched' ? 'Etched' : 'Foil'}

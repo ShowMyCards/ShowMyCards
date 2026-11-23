@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { EnhancedCardResult } from '#lib';
-	import { notifications, getActionError } from '#lib';
+	import { getDisplayName, notifications, getActionError } from '#lib';
 	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { Info, Plus } from '@lucide/svelte';
@@ -23,6 +23,7 @@
 	let adding = $state(false);
 
 	const imageUri = $derived(card.image_uri ?? '');
+	const displayName = $derived(getDisplayName(card));
 
 	async function add() {
 		if (adding) return;
@@ -47,7 +48,7 @@
 			if (result.type === 'success') {
 				await refreshAll();
 				const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
-				notifications.success(`Added ${card.name} to ${zoneLabel}`);
+				notifications.success(`Added ${displayName} to ${zoneLabel}`);
 			} else if (result.type === 'failure') {
 				notifications.error(getActionError(result.data, 'Failed to add card'));
 			} else {
@@ -64,16 +65,21 @@
 <div class="card bg-base-200 p-3 shadow flex flex-col gap-3">
 	<div class="flex gap-3">
 		{#if imageUri}
-			<img src={imageUri} alt={card.name} loading="lazy" class="w-16 rounded shrink-0" />
+			<img src={imageUri} alt={displayName} loading="lazy" class="w-16 rounded shrink-0" />
 		{:else}
 			<div class="w-16 aspect-5/7 bg-base-300 rounded flex items-center justify-center shrink-0">
 				<span class="text-[10px] opacity-50 text-center">No image</span>
 			</div>
 		{/if}
 		<div class="min-w-0">
-			<div class="font-medium truncate">{card.name}</div>
+			<div class="font-medium truncate">{displayName}</div>
 			<div class="text-xs opacity-60">{card.set_name} · #{card.collector_number}</div>
-			<div class="text-xs opacity-50 uppercase">{card.set_code}</div>
+			<div class="flex items-center gap-1.5 text-xs">
+				<span class="opacity-50 uppercase">{card.set_code}</span>
+				{#if card.language}
+					<span class="badge badge-outline badge-xs uppercase">{card.language}</span>
+				{/if}
+			</div>
 		</div>
 	</div>
 

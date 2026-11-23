@@ -270,6 +270,8 @@ export interface EnrichedDeckItem {
 	 * Enriched fields (populated from Scryfall card data in 1b).
 	 */
 	name?: string;
+	printed_name?: string;
+	language?: string;
 	set_name?: string;
 	set_code?: string;
 	collector_number?: string;
@@ -329,6 +331,7 @@ export interface ConflictDeck {
 export interface SharedCard {
 	oracle_id: string;
 	name: string;
+	printed_name?: string;
 	conflicts: AllocationConflict[];
 }
 /**

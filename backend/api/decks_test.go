@@ -1542,3 +1542,150 @@ func TestDeckLegality_NotFound(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }
+
+// createLocalizedDeckTestCard inserts a card printing with an optional localized
+// printed_name and explicit legalities.
+func createLocalizedDeckTestCard(t *testing.T, db *gorm.DB, scryfallID, oracleID, name, printedName, set, number, lang, typeLine string, legalities scryfall.Legalities) {
+	t.Helper()
+	var pn *string
+	if printedName != "" {
+		pn = &printedName
+	}
+	card, err := models.FromScryfallCard(scryfall.Card{
+		ID:              scryfallID,
+		OracleID:        oracleID,
+		Name:            name,
+		PrintedName:     pn,
+		Set:             set,
+		SetName:         set + " Set",
+		CollectorNumber: number,
+		Rarity:          "common",
+		Finishes:        []scryfall.Finish{scryfall.FinishNonFoil},
+		Lang:            scryfall.Lang(lang),
+		Layout:          scryfall.LayoutNormal,
+		TypeLine:        typeLine,
+		Legalities:      legalities,
+	})
+	if err != nil {
+		t.Fatalf("failed to build localized test card: %v", err)
+	}
+	if err := db.Create(card).Error; err != nil {
+		t.Fatalf("failed to create localized test card: %v", err)
+	}
+}
+
+func allLegalLegalities() scryfall.Legalities {
+	var l scryfall.Legalities
+	v := reflect.ValueOf(&l).Elem()
+	for i := range v.NumField() {
+		v.Field(i).SetString(string(scryfall.LegalityLegal))
+	}
+	return l
+}
+
+func TestDeckListItems_LocalizedCardNames(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "Localized")
+
+	legal := allLegalLegalities()
+	// Pinned German printing.
+	createLocalizedDeckTestCard(t, db, "bolt-de", "oracle-bolt", "Lightning Bolt", "Blitzschlag", "m10", "146", "de", "Instant", legal)
+	// Any-printing card where the user owns a German printing (English also exists).
+	createLocalizedDeckTestCard(t, db, "swamp-en", "oracle-swamp", "Swamp", "", "m10", "238", "en", "Basic Land — Swamp", legal)
+	createLocalizedDeckTestCard(t, db, "swamp-de", "oracle-swamp", "Swamp", "Sumpf", "m10", "238", "de", "Basic Land — Swamp", legal)
+	addDeckInventory(t, db, "oracle-swamp", "swamp-de", 4)
+	// English printing (no printed_name).
+	createLocalizedDeckTestCard(t, db, "sol-en", "oracle-sol", "Sol Ring", "", "cmm", "703", "en", "Artifact", legal)
+
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-bolt", "bolt-de", 4)
+	seedDeckItem(t, db, deck.ID, "oracle-swamp", models.ZoneMain, 4)
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-sol", "sol-en", 1)
+
+	got := fetchDeckItems(t, app, deck.ID)
+	if len(got.Main) != 3 {
+		t.Fatalf("expected 3 main items, got %d", len(got.Main))
+	}
+
+	byOracle := make(map[string]EnrichedDeckItem, len(got.Main))
+	for _, it := range got.Main {
+		byOracle[it.OracleID] = it
+	}
+
+	bolt := byOracle["oracle-bolt"]
+	if bolt.Name != "Lightning Bolt" || bolt.PrintedName == nil || *bolt.PrintedName != "Blitzschlag" || bolt.Language != "de" {
+		t.Errorf("pinned German item: got name=%q printed_name=%v lang=%q", bolt.Name, bolt.PrintedName, bolt.Language)
+	}
+
+	swamp := byOracle["oracle-swamp"]
+	if swamp.Name != "Swamp" || swamp.PrintedName == nil || *swamp.PrintedName != "Sumpf" || swamp.Language != "de" {
+		t.Errorf("any-printing owned German item: got name=%q printed_name=%v lang=%q", swamp.Name, swamp.PrintedName, swamp.Language)
+	}
+
+	sol := byOracle["oracle-sol"]
+	if sol.Name != "Sol Ring" || sol.PrintedName != nil || sol.Language != "en" {
+		t.Errorf("English item: got name=%q printed_name=%v lang=%q", sol.Name, sol.PrintedName, sol.Language)
+	}
+}
+
+func TestDeckListItems_SharedCardsLocalizedNames(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	d1 := createTestDeck(t, db, "Deck One")
+	d2 := createTestDeck(t, db, "Deck Two")
+
+	legal := allLegalLegalities()
+	// "Lightning Bolt" sorts after "Forest" in English, but German "Blitzschlag" sorts before "Forest".
+	createLocalizedDeckTestCard(t, db, "bolt-de", "oracle-bolt", "Lightning Bolt", "Blitzschlag", "m10", "146", "de", "Instant", legal)
+	createLocalizedDeckTestCard(t, db, "forest-en", "oracle-forest", "Forest", "", "m10", "246", "en", "Basic Land — Forest", legal)
+
+	addDeckInventory(t, db, "oracle-bolt", "bolt-de", 4)
+	addDeckInventory(t, db, "oracle-forest", "forest-en", 4)
+
+	seedPinnedDeckItem(t, db, d1.ID, "oracle-forest", "forest-en", 3)
+	seedPinnedDeckItem(t, db, d1.ID, "oracle-bolt", "bolt-de", 3)
+	seedPinnedDeckItem(t, db, d2.ID, "oracle-forest", "forest-en", 3)
+	seedPinnedDeckItem(t, db, d2.ID, "oracle-bolt", "bolt-de", 3)
+
+	shared := fetchDeckItems(t, app, d1.ID).SharedCards
+	if len(shared) != 2 {
+		t.Fatalf("expected 2 shared cards, got %+v", shared)
+	}
+	if shared[0].OracleID != "oracle-bolt" || shared[0].Name != "Lightning Bolt" || shared[0].PrintedName == nil || *shared[0].PrintedName != "Blitzschlag" {
+		t.Errorf("expected Blitzschlag first in shared_cards, got %+v", shared[0])
+	}
+	if shared[1].OracleID != "oracle-forest" || shared[1].Name != "Forest" || shared[1].PrintedName != nil {
+		t.Errorf("expected Forest second in shared_cards, got %+v", shared[1])
+	}
+}
+
+func TestDeckLegality_LocalizedCardNames(t *testing.T) {
+	app, db := setupDeckTestApp(t)
+	deck := createTestDeck(t, db, "German Modern")
+
+	legal := allLegalLegalities()
+	bannedInModern := allLegalLegalities()
+	bannedInModern.Modern = scryfall.LegalityBanned
+
+	// Basic filler in English.
+	createLocalizedDeckTestCard(t, db, "island-en", "oracle-island", "Island", "", "m10", "234", "en", "Basic Land — Island", legal)
+	// Pinned German card banned in Modern.
+	createLocalizedDeckTestCard(t, db, "lotus-de", "oracle-lotus", "Black Lotus", "Schwarzer Lotus", "lea", "232", "de", "Artifact", bannedInModern)
+	// Any-printing card owned in German, over copy limit.
+	createLocalizedDeckTestCard(t, db, "bolt-en", "oracle-bolt", "Lightning Bolt", "", "m10", "146", "en", "Instant", legal)
+	createLocalizedDeckTestCard(t, db, "bolt-de", "oracle-bolt", "Lightning Bolt", "Blitzschlag", "m10", "146", "de", "Instant", legal)
+	addDeckInventory(t, db, "oracle-bolt", "bolt-de", 5)
+
+	seedDeckItem(t, db, deck.ID, "oracle-island", models.ZoneMain, 54)
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-lotus", "lotus-de", 1)
+	seedDeckItem(t, db, deck.ID, "oracle-bolt", models.ZoneMain, 5)
+
+	got := fetchDeckLegality(t, app, deck.ID)
+	modern := got["modern"]
+	wantReasons := []string{
+		"Banned: Schwarzer Lotus",
+		"More than 4 copies: Blitzschlag (5)",
+	}
+	if modern.Legal || !reflect.DeepEqual(modern.Reasons, wantReasons) {
+		t.Errorf("modern legality: got legal=%v reasons=%q, want legal=false reasons=%q",
+			modern.Legal, modern.Reasons, wantReasons)
+	}
+}

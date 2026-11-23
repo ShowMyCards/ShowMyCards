@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { EnrichedDeckItem } from '#lib';
-	import { notifications, getActionError } from '#lib';
+	import { getDisplayName, notifications, getActionError } from '#lib';
 	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { ChevronDown, Trash2 } from '@lucide/svelte';
@@ -25,6 +25,7 @@
 
 	// Maybe-board items never count as demand, so they carry no availability signal.
 	const isDemand = $derived(item.zone !== 'maybe');
+	const displayName = $derived(getDisplayName(item) || 'card');
 
 	// Writable derived: seeded from the prop, editable, resets on fresh data.
 	let qty = $derived(item.desired_quantity);
@@ -110,7 +111,7 @@
 				quantity: String(moveQty)
 			});
 			if (ok) {
-				notifications.success(`Moved ${moveQty} ${item.name || 'card'} to ${zoneLabel(moveZone)}`);
+				notifications.success(`Moved ${moveQty} ${displayName} to ${zoneLabel(moveZone)}`);
 				close();
 			} else {
 				cancelMove();
@@ -126,7 +127,7 @@
 		try {
 			const ok = await post('deleteItem', { item_id: String(item.id) });
 			if (ok) {
-				notifications.success(`Removed ${item.name || 'card'} from deck`);
+				notifications.success(`Removed ${displayName} from deck`);
 				close();
 			}
 		} finally {
@@ -141,7 +142,7 @@
 	<summary
 		class="btn btn-ghost btn-xs btn-square"
 		title="Card actions"
-		aria-label="Card actions for {item.name || 'card'}">
+		aria-label="Card actions for {displayName}">
 		<ChevronDown class="h-4 w-4" />
 	</summary>
 	<div

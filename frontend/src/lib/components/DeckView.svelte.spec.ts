@@ -69,4 +69,29 @@ describe('DeckView', () => {
 		expect(page.getByLabelText(/^Pinned to/).elements()).toHaveLength(1);
 		expect(page.getByLabelText('Foil', { exact: true }).elements()).toHaveLength(1);
 	});
+
+	it('displays printed_name and includes language in the pin tooltip', async () => {
+		const localized = [
+			makeItem({
+				id: 3,
+				oracle_id: 'oracle-bolt',
+				name: 'Lightning Bolt',
+				printed_name: 'Blitzschlag',
+				language: 'de',
+				scryfall_id: 'bolt-de',
+				printing_id: 'bolt-de',
+				set_code: 'm10',
+				collector_number: '146'
+			})
+		];
+
+		await render(DeckView, { ...props, items: localized, view: 'text' });
+		await expect.element(page.getByRole('link', { name: 'Blitzschlag' })).toBeInTheDocument();
+		await expect
+			.element(page.getByLabelText('Pinned to M10 #146 · German', { exact: false }))
+			.toBeInTheDocument();
+
+		await render(DeckView, { ...props, items: localized, view: 'grid' });
+		await expect.element(page.getByRole('img', { name: 'Blitzschlag' })).toBeInTheDocument();
+	});
 });
