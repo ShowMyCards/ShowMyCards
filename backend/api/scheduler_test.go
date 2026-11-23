@@ -35,7 +35,8 @@ func (f fakeTaskProvider) RunNow(ctx context.Context, name string) (uint, error)
 var testTasks = fakeTaskProvider{
 	{Name: "bulk_data_update", DisplayName: "Card Data Update", Interval: 24 * time.Hour, JobType: models.JobTypeBulkDataImport},
 	{Name: "set_data_update", DisplayName: "Set Data Update", Interval: 14 * 24 * time.Hour, JobType: models.JobTypeSetDataImport},
-	{Name: "data_backup", DisplayName: "Data Backup", Interval: 24 * time.Hour},
+	{Name: "data_backup", DisplayName: "Data Backup", Interval: 24 * time.Hour,
+		Extras: []services.TaskSetting{{Key: "data_backup_retention_count", Label: "Backups to keep", Kind: "int"}}},
 	{Name: "always_running", DisplayName: "Busy", Interval: 24 * time.Hour,
 		Run: func(context.Context) (uint, error) { return 0, services.ErrTaskRunning }},
 	{Name: "broken", DisplayName: "Broken", Interval: 24 * time.Hour,
@@ -135,6 +136,9 @@ func TestScheduler_GetScheduledTasks_DefaultsFromSettings(t *testing.T) {
 			}
 			if got.Time != tt.time {
 				t.Errorf("time = %q, want %q", got.Time, tt.time)
+			}
+			if got.EnabledKey != tt.name+"_enabled" || got.TimeKey != tt.name+"_time" {
+				t.Errorf("keys = %q/%q, want %s_enabled/%s_time", got.EnabledKey, got.TimeKey, tt.name, tt.name)
 			}
 			if got.Schedule != tt.schedule {
 				t.Errorf("schedule = %q, want %q", got.Schedule, tt.schedule)
@@ -252,5 +256,28 @@ func TestScheduler_RunTask(t *testing.T) {
 				t.Errorf("job_id = %d, want %d", result.JobID, tt.wantJobID)
 			}
 		})
+	}
+}
+
+func TestScheduler_GetScheduledTasks_Extras(t *testing.T) {
+	app, settingsService, _ := setupSchedulerTestApp(t)
+	settingsService.Set(context.Background(), "data_backup_retention_count", "5")
+
+	tasks := getTasks(t, app)
+
+	extras := tasks["data_backup"].Extras
+	if len(extras) != 1 {
+		t.Fatalf("expected 1 extra, got %d", len(extras))
+	}
+	got := extras[0]
+	if got.Key != "data_backup_retention_count" || got.Value != "5" || got.Kind != "int" {
+		t.Errorf("extra = %+v, want data_backup_retention_count=5 (int)", got)
+	}
+	if got.Min == nil || *got.Min != 0 {
+		t.Errorf("min = %v, want 0", got.Min)
+	}
+
+	if extras := tasks["bulk_data_update"].Extras; extras == nil || len(extras) != 0 {
+		t.Errorf("expected an empty (non-null) extras list, got %v", extras)
 	}
 }

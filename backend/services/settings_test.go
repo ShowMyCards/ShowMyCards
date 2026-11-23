@@ -3,6 +3,7 @@ package services
 import (
 	"backend/models"
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -416,5 +417,55 @@ func TestSettingsService_SetTime_UpdateExisting(t *testing.T) {
 	retrieved, _ := service.GetTime(context.Background(), "test_time")
 	if !retrieved.Equal(time2) {
 		t.Errorf("expected %v, got %v", time2, retrieved)
+	}
+}
+
+func TestValidateSetting(t *testing.T) {
+	tests := []struct {
+		key, value string
+		wantErr    bool
+	}{
+		{"data_backup_enabled", "true", false},
+		{"data_backup_enabled", "false", false},
+		{"data_backup_enabled", "yes", true},
+		{"scheduler_catchup_enabled", "1", true},
+		{"data_backup_time", "03:30", false},
+		{"data_backup_time", "3:30pm", true},
+		{"data_backup_time", "", true},
+		{"data_backup_retention_count", "0", false},
+		{"data_backup_retention_count", "-1", true},
+		{"job_cleanup_retention_days", "0", true},
+		{"job_cleanup_retention_days", "7", false},
+		{"job_cleanup_retention_days", "seven", true},
+		{"data_backup_last_run", "", false},            // system-managed, not shape-checked
+		{"scryfall_default_search", "anything", false}, // free text
+		{"test_time", "2026-01-01T00:00:00Z", false},   // unknown keys are not validated
+	}
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			err := ValidateSetting(tt.key, tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateSetting() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil && !errors.Is(err, ErrInvalidSettingValue) {
+				t.Errorf("expected ErrInvalidSettingValue, got %v", err)
+			}
+		})
+	}
+}
+
+func TestSettingsService_SetBulk_RejectsInvalidValueAtomically(t *testing.T) {
+	service, _ := setupSettingsServiceTest(t)
+	ctx := context.Background()
+
+	err := service.SetBulk(ctx, map[string]string{
+		"data_backup_time":    "04:00",
+		"data_backup_enabled": "maybe",
+	})
+	if !errors.Is(err, ErrInvalidSettingValue) {
+		t.Fatalf("err = %v, want ErrInvalidSettingValue", err)
+	}
+	if value, _ := service.Get(ctx, "data_backup_time"); value != "03:30" {
+		t.Errorf("data_backup_time = %q, want it unchanged (03:30)", value)
 	}
 }

@@ -41,9 +41,20 @@ type ScheduledTask struct {
 	// JobType is the type of Job record the task creates, if any
 	JobType models.JobType
 
+	// Extras are task-specific settings shown alongside the schedule
+	Extras []TaskSetting
+
 	// Run starts the task: it creates the task's Job record synchronously,
 	// continues the work in the background, and returns the job's ID.
 	Run func(ctx context.Context) (uint, error)
+}
+
+// TaskSetting describes a task-specific setting the UI can edit.
+type TaskSetting struct {
+	Key         string
+	Label       string
+	Description string
+	Kind        string // "int"
 }
 
 // EnabledKey is the settings key holding whether the task is enabled ("true"/"false").
@@ -133,7 +144,13 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			Description: "Deletes job history records older than the retention period.",
 			Interval:    24 * time.Hour,
 			JobType:     models.JobTypeJobCleanup,
-			Run:         s.runJobCleanup,
+			Extras: []TaskSetting{{
+				Key:         "job_cleanup_retention_days",
+				Label:       "Keep history for (days)",
+				Description: "Finished jobs older than this are deleted.",
+				Kind:        "int",
+			}},
+			Run: s.runJobCleanup,
 		},
 		{
 			Name:        "data_backup",
@@ -141,7 +158,13 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			Description: "Exports your collection, lists and decks to a compressed backup file.",
 			Interval:    24 * time.Hour,
 			JobType:     models.JobTypeDataBackup,
-			Run:         s.runBackup,
+			Extras: []TaskSetting{{
+				Key:         "data_backup_retention_count",
+				Label:       "Backups to keep",
+				Description: "Older backups are deleted after each run. 0 keeps every backup.",
+				Kind:        "int",
+			}},
+			Run: s.runBackup,
 		},
 	}
 

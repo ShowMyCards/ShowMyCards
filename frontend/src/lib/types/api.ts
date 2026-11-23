@@ -736,7 +736,9 @@ export interface ScheduledTaskInfo {
 	display_name: string;
 	description: string;
 	enabled: boolean;
+	enabled_key: string; // settings key to write to change Enabled
 	time: string; // time of day, "HH:MM"
+	time_key: string; // settings key to write to change Time
 	interval_days: number /* int */;
 	schedule: string; // e.g. "03:00 daily", "02:30 every 14 days"
 	next_run?: string; // omitted when disabled or the time is invalid
@@ -745,6 +747,19 @@ export interface ScheduledTaskInfo {
 	job_type?: string; // type of Job record the task creates
 	last_job_id?: number /* uint */;
 	last_job_status?: string;
+	extras: TaskSettingInfo[];
+}
+/**
+ * TaskSettingInfo is a task-specific setting and its current value
+ * tygo:export
+ */
+export interface TaskSettingInfo {
+	key: string;
+	label: string;
+	description: string;
+	kind: string; // "int"
+	value: string;
+	min?: number /* int */;
 }
 /**
  * RunTaskResponse is returned when a task is started on demand

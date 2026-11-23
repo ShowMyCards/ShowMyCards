@@ -10,6 +10,18 @@ function task(overrides: Partial<ScheduledTaskInfo> = {}): ScheduledTaskInfo {
 		display_name: 'Data Backup',
 		description: 'Exports your collection to a backup file.',
 		enabled: true,
+		enabled_key: 'data_backup_enabled',
+		time_key: 'data_backup_time',
+		extras: [
+			{
+				key: 'data_backup_retention_count',
+				label: 'Backups to keep',
+				description: '0 keeps every backup.',
+				kind: 'int',
+				value: '14',
+				min: 0
+			}
+		],
 		time: '03:30',
 		interval_days: 1,
 		schedule: '03:30 daily',
@@ -67,12 +79,12 @@ describe('ScheduledTaskCard', () => {
 			.spyOn(globalThis, 'fetch')
 			.mockResolvedValue(new Response(JSON.stringify({ job_id: 7 }), { status: 202 }));
 		const success = vi.spyOn(notifications, 'success');
-		const onStarted = vi.fn();
-		await render(ScheduledTaskCard, { task: task(), onStarted });
+		const onUpdated = vi.fn();
+		await render(ScheduledTaskCard, { task: task(), onUpdated });
 
 		await page.getByRole('button', { name: 'Run now' }).click();
 
-		await vi.waitFor(() => expect(onStarted).toHaveBeenCalled());
+		await vi.waitFor(() => expect(onUpdated).toHaveBeenCalled());
 		expect(fetchSpy).toHaveBeenCalledWith('/api/scheduler/tasks/data_backup/run', {
 			method: 'POST'
 		});
@@ -84,13 +96,13 @@ describe('ScheduledTaskCard', () => {
 			new Response(JSON.stringify({ error: 'task is already running' }), { status: 409 })
 		);
 		const error = vi.spyOn(notifications, 'error');
-		const onStarted = vi.fn();
-		await render(ScheduledTaskCard, { task: task(), onStarted });
+		const onUpdated = vi.fn();
+		await render(ScheduledTaskCard, { task: task(), onUpdated });
 
 		await page.getByRole('button', { name: 'Run now' }).click();
 
 		await vi.waitFor(() => expect(error).toHaveBeenCalledWith('task is already running'));
-		expect(onStarted).toHaveBeenCalled();
+		expect(onUpdated).toHaveBeenCalled();
 	});
 
 	it('disables Run now while the task is running', async () => {
@@ -99,5 +111,62 @@ describe('ScheduledTaskCard', () => {
 		});
 
 		await expect.element(page.getByRole('button', { name: 'Run now' })).toBeDisabled();
+	});
+
+	it('saves the edited schedule and extras through the settings API', async () => {
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(JSON.stringify({ message: 'ok' }), { status: 200 }));
+		const onUpdated = vi.fn();
+		await render(ScheduledTaskCard, { task: task(), onUpdated });
+
+		await page.getByRole('button', { name: 'Edit schedule' }).click();
+		await page.getByRole('checkbox', { name: 'Enabled' }).click();
+		await page.getByLabelText(/^Time of day/).fill('04:15');
+		await page.getByLabelText(/^Backups to keep/).fill('7');
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await vi.waitFor(() => expect(onUpdated).toHaveBeenCalled());
+		const [url, init] = fetchSpy.mock.calls[0];
+		expect(url).toBe('/api/settings');
+		expect(init?.method).toBe('PUT');
+		expect(JSON.parse(String(init?.body))).toEqual({
+			data_backup_enabled: 'false',
+			data_backup_time: '04:15',
+			data_backup_retention_count: '7'
+		});
+		await expect.element(page.getByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+	});
+
+	it('keeps the form open and shows the validation error when saving fails', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response(JSON.stringify({ error: 'invalid setting value: data_backup_time' }), {
+				status: 400
+			})
+		);
+		const error = vi.spyOn(notifications, 'error');
+		const onUpdated = vi.fn();
+		await render(ScheduledTaskCard, { task: task(), onUpdated });
+
+		await page.getByRole('button', { name: 'Edit schedule' }).click();
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await vi.waitFor(() =>
+			expect(error).toHaveBeenCalledWith('invalid setting value: data_backup_time')
+		);
+		expect(onUpdated).not.toHaveBeenCalled();
+		await expect.element(page.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+	});
+
+	it('discards edits on cancel', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch');
+		await render(ScheduledTaskCard, { task: task() });
+
+		await page.getByRole('button', { name: 'Edit schedule' }).click();
+		await page.getByLabelText(/^Time of day/).fill('09:00');
+		await page.getByRole('button', { name: 'Cancel' }).click();
+
+		await expect.element(page.getByLabelText(/^Time of day/)).not.toBeInTheDocument();
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 });

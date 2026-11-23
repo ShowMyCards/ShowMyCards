@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
@@ -422,5 +423,51 @@ func TestSettingsHandler_GetAll_OmitsUnknownKeys(t *testing.T) {
 	}
 	if _, ok := settings["data_backup_enabled"]; !ok {
 		t.Error("expected whitelisted keys to be present")
+	}
+}
+
+func TestSettingsUpdateBulk_InvalidValue(t *testing.T) {
+	app, service := setupSettingsTestApp(t)
+
+	reqBody, _ := json.Marshal(map[string]string{
+		"data_backup_time":            "25:99",
+		"data_backup_retention_count": "3",
+	})
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("failed to make request: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d. Body: %s", fiber.StatusBadRequest, resp.StatusCode, body)
+	}
+
+	var result map[string]string
+	json.Unmarshal(body, &result)
+	if !strings.Contains(result["error"], "data_backup_time") {
+		t.Errorf("expected error to name the invalid key, got %q", result["error"])
+	}
+	if value, _ := service.Get(context.Background(), "data_backup_retention_count"); value != "14" {
+		t.Errorf("expected no settings to be written, retention = %q", value)
+	}
+}
+
+func TestSettingsUpdate_InvalidValue(t *testing.T) {
+	app, _ := setupSettingsTestApp(t)
+
+	reqBody, _ := json.Marshal(map[string]string{"value": "sometimes"})
+	req := httptest.NewRequest("PUT", "/api/settings/data_backup_enabled", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("key", "data_backup_enabled")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("failed to make request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", fiber.StatusBadRequest, resp.StatusCode)
 	}
 }

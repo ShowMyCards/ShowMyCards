@@ -15,19 +15,33 @@ import (
 // ScheduledTaskInfo represents information about a scheduled task
 // tygo:export
 type ScheduledTaskInfo struct {
-	Name          string     `json:"name"` // registry identifier, e.g. "data_backup"
-	DisplayName   string     `json:"display_name"`
-	Description   string     `json:"description"`
-	Enabled       bool       `json:"enabled"`
-	Time          string     `json:"time"` // time of day, "HH:MM"
-	IntervalDays  int        `json:"interval_days"`
-	Schedule      string     `json:"schedule"`           // e.g. "03:00 daily", "02:30 every 14 days"
-	NextRun       *time.Time `json:"next_run,omitempty"` // omitted when disabled or the time is invalid
-	LastRun       *time.Time `json:"last_run,omitempty"`
-	LastStatus    *string    `json:"last_status,omitempty"` // "in_progress" | "success" | "failed"
-	JobType       *string    `json:"job_type,omitempty"`    // type of Job record the task creates
-	LastJobID     *uint      `json:"last_job_id,omitempty"`
-	LastJobStatus *string    `json:"last_job_status,omitempty"`
+	Name          string            `json:"name"` // registry identifier, e.g. "data_backup"
+	DisplayName   string            `json:"display_name"`
+	Description   string            `json:"description"`
+	Enabled       bool              `json:"enabled"`
+	EnabledKey    string            `json:"enabled_key"` // settings key to write to change Enabled
+	Time          string            `json:"time"`        // time of day, "HH:MM"
+	TimeKey       string            `json:"time_key"`    // settings key to write to change Time
+	IntervalDays  int               `json:"interval_days"`
+	Schedule      string            `json:"schedule"`           // e.g. "03:00 daily", "02:30 every 14 days"
+	NextRun       *time.Time        `json:"next_run,omitempty"` // omitted when disabled or the time is invalid
+	LastRun       *time.Time        `json:"last_run,omitempty"`
+	LastStatus    *string           `json:"last_status,omitempty"` // "in_progress" | "success" | "failed"
+	JobType       *string           `json:"job_type,omitempty"`    // type of Job record the task creates
+	LastJobID     *uint             `json:"last_job_id,omitempty"`
+	LastJobStatus *string           `json:"last_job_status,omitempty"`
+	Extras        []TaskSettingInfo `json:"extras"`
+}
+
+// TaskSettingInfo is a task-specific setting and its current value
+// tygo:export
+type TaskSettingInfo struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Kind        string `json:"kind"` // "int"
+	Value       string `json:"value"`
+	Min         *int   `json:"min,omitempty"`
 }
 
 // RunTaskResponse is returned when a task is started on demand
@@ -106,6 +120,8 @@ func (h *SchedulerHandler) GetScheduledTasks(c fiber.Ctx) error {
 			DisplayName:  task.DisplayName,
 			Description:  task.Description,
 			Enabled:      h.settingsService.GetBool(ctx, task.EnabledKey(), false),
+			EnabledKey:   task.EnabledKey(),
+			TimeKey:      task.TimeKey(),
 			IntervalDays: int(task.Interval / (24 * time.Hour)),
 		}
 
@@ -146,6 +162,25 @@ func (h *SchedulerHandler) GetScheduledTasks(c fiber.Ctx) error {
 				status := string(lastJob.Status)
 				info.LastJobStatus = &status
 			}
+		}
+
+		info.Extras = make([]TaskSettingInfo, 0, len(task.Extras))
+		for _, extra := range task.Extras {
+			value, err := h.settingsService.Get(ctx, extra.Key)
+			if err != nil {
+				slog.Warn("failed to read task setting", "component", "scheduler", "key", extra.Key, "error", err)
+			}
+			setting := TaskSettingInfo{
+				Key:         extra.Key,
+				Label:       extra.Label,
+				Description: extra.Description,
+				Kind:        extra.Kind,
+				Value:       value,
+			}
+			if min, ok := services.SettingMinimum(extra.Key); ok {
+				setting.Min = &min
+			}
+			info.Extras = append(info.Extras, setting)
 		}
 
 		tasks = append(tasks, info)

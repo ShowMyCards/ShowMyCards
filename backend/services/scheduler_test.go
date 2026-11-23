@@ -797,3 +797,21 @@ func TestScheduler_InBackground_PanicFailsJob(t *testing.T) {
 		t.Errorf("data_backup_last_status = %q, want failed", status)
 	}
 }
+
+func TestScheduler_TaskExtrasAreValidSettings(t *testing.T) {
+	scheduler, _, _, _, _ := setupSchedulerTest(t)
+	valid := ValidSettingKeys()
+
+	for _, task := range scheduler.Tasks() {
+		for _, extra := range task.Extras {
+			if !valid[extra.Key] {
+				t.Errorf("task %s: extra %s is not a valid setting key", task.Name, extra.Key)
+			}
+			if extra.Kind == "int" {
+				if _, ok := SettingMinimum(extra.Key); !ok {
+					t.Errorf("task %s: int extra %s has no minimum", task.Name, extra.Key)
+				}
+			}
+		}
+	}
+}
