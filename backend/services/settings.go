@@ -26,30 +26,44 @@ func NewSettingsService(db *gorm.DB) *SettingsService {
 	return service
 }
 
-// initializeDefaults creates default settings if they don't exist
-func (s *SettingsService) initializeDefaults(ctx context.Context) {
-	defaults := map[string]string{
-		"bulk_data_auto_update":           "true",
+// defaultSettings returns every known setting key with its default value.
+// It is the single source of truth for both seeding and the key whitelist.
+func defaultSettings() map[string]string {
+	return map[string]string{
+		"bulk_data_update_enabled":        "true",
 		"bulk_data_update_time":           "03:00",
+		"bulk_data_update_last_run":       "",
+		"bulk_data_update_last_status":    "",
 		"bulk_data_url":                   "https://api.scryfall.com/bulk-data",
-		"bulk_data_last_update":           "",
-		"bulk_data_last_update_status":    "",
-		"set_data_auto_update":            "true",
+		"set_data_update_enabled":         "true",
 		"set_data_update_time":            "02:30",
-		"set_data_last_update":            "",
-		"set_data_last_update_status":     "",
+		"set_data_update_last_run":        "",
+		"set_data_update_last_status":     "",
+		"symbol_data_update_enabled":      "true",
+		"symbol_data_update_time":         "02:00",
+		"symbol_data_update_last_run":     "",
+		"symbol_data_update_last_status":  "",
+		"job_cleanup_enabled":             "true",
+		"job_cleanup_time":                "00:00",
+		"job_cleanup_last_run":            "",
+		"job_cleanup_last_status":         "",
+		"job_cleanup_retention_days":      strconv.Itoa(DefaultJobCleanupRetentionDays),
+		"data_backup_enabled":             "true",
+		"data_backup_time":                "03:30",
+		"data_backup_last_run":            "",
+		"data_backup_last_status":         "",
+		"data_backup_retention_count":     strconv.Itoa(DefaultBackupRetention),
 		"scryfall_default_search":         "game:paper",
 		"scryfall_unique_mode":            "cards",
 		"scryfall_default_language":       "en",
-		"job_cleanup_last_run":            "",
 		"scheduler_catchup_enabled":       "true",
 		"scheduler_catchup_delay_seconds": "60",
-		"backup_auto_create":              "true",
-		"backup_create_time":              "03:30",
-		"backup_retention_count":          strconv.Itoa(DefaultBackupRetention),
-		"backup_last_run":                 "",
-		"backup_last_run_status":          "",
 	}
+}
+
+// initializeDefaults creates default settings if they don't exist
+func (s *SettingsService) initializeDefaults(ctx context.Context) {
+	defaults := defaultSettings()
 
 	for key, value := range defaults {
 		var count int64
@@ -166,28 +180,12 @@ func (s *SettingsService) SetTime(ctx context.Context, key string, value time.Ti
 
 // ValidSettingKeys returns the set of valid setting keys
 func ValidSettingKeys() map[string]bool {
-	return map[string]bool{
-		"bulk_data_auto_update":           true,
-		"bulk_data_update_time":           true,
-		"bulk_data_url":                   true,
-		"bulk_data_last_update":           true,
-		"bulk_data_last_update_status":    true,
-		"set_data_auto_update":            true,
-		"set_data_update_time":            true,
-		"set_data_last_update":            true,
-		"set_data_last_update_status":     true,
-		"scryfall_default_search":         true,
-		"scryfall_unique_mode":            true,
-		"scryfall_default_language":       true,
-		"job_cleanup_last_run":            true,
-		"scheduler_catchup_enabled":       true,
-		"scheduler_catchup_delay_seconds": true,
-		"backup_auto_create":              true,
-		"backup_create_time":              true,
-		"backup_retention_count":          true,
-		"backup_last_run":                 true,
-		"backup_last_run_status":          true,
+	defaults := defaultSettings()
+	keys := make(map[string]bool, len(defaults))
+	for key := range defaults {
+		keys[key] = true
 	}
+	return keys
 }
 
 // SetBulk updates multiple settings in a single transaction

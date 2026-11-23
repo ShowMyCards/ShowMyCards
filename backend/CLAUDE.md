@@ -246,9 +246,16 @@ Go types are mapped to TypeScript as follows:
 
 ### Scheduler
 
-- `GET /api/scheduler/tasks` - List all scheduled tasks
-- `POST /api/scheduler/tasks` - Create/update scheduled task
-- `POST /api/scheduler/tasks/:name/run` - Manually trigger a task
+- `GET /api/scheduler/tasks` - List every task registered in `services.Scheduler`
+  (the registry is the single source of truth — registering a task surfaces it)
+- `POST /api/scheduler/tasks/:name/run` - Manually trigger a task (planned, #136)
+
+Each task's settings keys are derived from its `Name`: `<name>_enabled`,
+`<name>_time` (`HH:MM`), `<name>_last_run` (RFC3339), `<name>_last_status`
+(`in_progress` | `success` | `failed`), plus task-specific extras such as
+`data_backup_retention_count`. New keys must be added to `defaultSettings()` in
+`services/settings.go` (which also drives the whitelist). Legacy keys are
+renamed on startup by `renameSettingKeys` in `database/client.go`.
 
 ### Settings
 

@@ -154,7 +154,7 @@
 				</thead>
 				<tbody>
 					{#each data.jobs as job (job.id)}
-						<tr>
+						<tr id="job-{job.id}" class="scroll-mt-20 target:bg-base-300">
 							<td>{job.id}</td>
 							<td>
 								<!-- <span class="badge badge-outline">

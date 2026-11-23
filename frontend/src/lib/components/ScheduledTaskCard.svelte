@@ -8,11 +8,21 @@
 	// Live countdown state
 	let countdown = $state('');
 
+	// Tasks that write Job records report the job's status; others (e.g. backups)
+	// report the status persisted in settings.
+	const lastStatus = $derived(task.last_job_status ?? task.last_status);
+
 	// Update countdown every second
 	$effect(() => {
+		const nextRun = task.next_run;
+		if (!nextRun) {
+			countdown = '';
+			return;
+		}
+
 		function updateCountdown() {
 			const now = Date.now();
-			const next = new Date(task.next_run).getTime();
+			const next = new Date(nextRun!).getTime();
 			const diff = next - now;
 
 			if (diff <= 0) {
@@ -46,7 +56,7 @@
 		if (!status) return null;
 		if (status === 'pending') return 'info';
 		if (status === 'in_progress') return 'warning';
-		if (status === 'completed') return 'success';
+		if (status === 'completed' || status === 'success') return 'success';
 		if (status === 'failed') return 'error';
 		return null;
 	}
@@ -56,6 +66,7 @@
 		if (status === 'pending') return 'Pending';
 		if (status === 'in_progress') return 'In Progress';
 		if (status === 'completed') return 'Completed';
+		if (status === 'success') return 'Succeeded';
 		if (status === 'failed') return 'Failed';
 		if (status === 'cancelled') return 'Cancelled';
 		return status;
@@ -66,7 +77,10 @@
 	<div class="card-body p-5">
 		<div class="flex items-start justify-between mb-3">
 			<div>
-				<h3 class="card-title text-lg">{task.name}</h3>
+				<h3 class="card-title text-lg">{task.display_name}</h3>
+				{#if task.description}
+					<p class="text-sm opacity-70">{task.description}</p>
+				{/if}
 				<p class="text-sm opacity-70">Schedule: {task.schedule}</p>
 			</div>
 			<div class="flex gap-2">
@@ -83,13 +97,15 @@
 		<div class="grid grid-cols-2 gap-4 text-sm">
 			<div>
 				<div class="opacity-70 mb-1">Next Run</div>
-				{#if task.enabled}
+				{#if !task.enabled}
+					<div class="opacity-50">Task disabled</div>
+				{:else if task.next_run}
 					<div class="font-semibold">
 						{new Date(task.next_run).toLocaleString()}
 					</div>
 					<div class="text-xs opacity-70 mt-1">{countdown}</div>
 				{:else}
-					<div class="opacity-50">Task disabled</div>
+					<div class="opacity-50">Not scheduled</div>
 				{/if}
 			</div>
 
@@ -99,10 +115,10 @@
 					<div class="font-semibold">
 						{new Date(task.last_run).toLocaleString()}
 					</div>
-					{#if task.last_job_status}
+					{#if lastStatus}
 						<div class="mt-1">
-							<Lozenge color={getStatusColor(task.last_job_status)} size="small">
-								{getStatusText(task.last_job_status)}
+							<Lozenge color={getStatusColor(lastStatus)} size="small">
+								{getStatusText(lastStatus)}
 							</Lozenge>
 						</div>
 					{/if}
@@ -114,7 +130,9 @@
 
 		{#if task.last_job_id}
 			<div class="mt-3">
-				<a href={resolve(`/jobs#${task.last_job_id}` as '/jobs')} class="link link-primary text-sm">
+				<a
+					href={resolve(`/jobs#job-${task.last_job_id}` as '/jobs')}
+					class="link link-primary text-sm">
 					View last job →
 				</a>
 			</div>

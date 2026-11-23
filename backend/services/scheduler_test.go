@@ -176,9 +176,8 @@ func TestScheduler_ShouldRunTask_PersistedLastRun(t *testing.T) {
 	scheduler, _, _, settingsService, _ := setupSchedulerTest(t)
 
 	task := ScheduledTask{
-		Name:              "test_task",
-		Interval:          24 * time.Hour,
-		LastRunSettingKey: "test_task_last_run",
+		Name:     "test_task",
+		Interval: 24 * time.Hour,
 	}
 
 	// Set persisted last run to recent time
@@ -192,50 +191,23 @@ func TestScheduler_ShouldRunTask_PersistedLastRun(t *testing.T) {
 
 // isInTimeWindow tests
 
-func TestScheduler_IsInTimeWindow_EmptyTime(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
-	// Empty time means always in window
-	if !scheduler.isInTimeWindow(context.Background(), "", time.Now()) {
-		t.Error("expected empty time to always be in window")
-	}
-}
-
 func TestScheduler_IsInTimeWindow_LiteralTime_InWindow(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	now := time.Now()
 	timeStr := now.Format("15:04")
 
-	if !scheduler.isInTimeWindow(context.Background(), timeStr, now) {
+	if !isInTimeWindow(timeStr, now) {
 		t.Error("expected current time to be in window")
 	}
 }
 
 func TestScheduler_IsInTimeWindow_LiteralTime_OutOfWindow(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	now := time.Now()
 	// Set target to 2 hours ago
 	targetTime := now.Add(-2 * time.Hour)
 	timeStr := targetTime.Format("15:04")
 
-	if scheduler.isInTimeWindow(context.Background(), timeStr, now) {
+	if isInTimeWindow(timeStr, now) {
 		t.Error("expected past time to be out of window")
-	}
-}
-
-func TestScheduler_IsInTimeWindow_SettingsKey(t *testing.T) {
-	scheduler, _, _, settingsService, _ := setupSchedulerTest(t)
-
-	now := time.Now()
-	timeStr := now.Format("15:04")
-
-	// Set time via settings
-	settingsService.Set(context.Background(), "test_time_setting", timeStr)
-
-	if !scheduler.isInTimeWindow(context.Background(), "test_time_setting", now) {
-		t.Error("expected settings-based time to be in window")
 	}
 }
 
@@ -304,9 +276,8 @@ func TestScheduler_ShouldRunTask_PersistedOverdue(t *testing.T) {
 	scheduler, _, _, settingsService, _ := setupSchedulerTest(t)
 
 	task := ScheduledTask{
-		Name:              "test_task",
-		Interval:          24 * time.Hour,
-		LastRunSettingKey: "test_task_last_run",
+		Name:     "test_task",
+		Interval: 24 * time.Hour,
 	}
 
 	// Set persisted last run to 48 hours ago (well past interval)
@@ -321,9 +292,8 @@ func TestScheduler_ShouldRunTask_InMemoryOverridesPersistedRecent(t *testing.T) 
 	scheduler, _, _, settingsService, _ := setupSchedulerTest(t)
 
 	task := ScheduledTask{
-		Name:              "test_task",
-		Interval:          1 * time.Hour,
-		LastRunSettingKey: "test_task_last_run",
+		Name:     "test_task",
+		Interval: 1 * time.Hour,
 	}
 
 	// Persisted says it ran 2 hours ago (overdue)
@@ -343,71 +313,47 @@ func TestScheduler_ShouldRunTask_InMemoryOverridesPersistedRecent(t *testing.T) 
 // isInTimeWindow edge case tests
 
 func TestScheduler_IsInTimeWindow_JustInsideWindow(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	// Create a time at exactly 14:00
 	now := time.Date(2024, 6, 15, 14, 3, 0, 0, time.Local)
 
 	// Window is 14:00 to 14:05, so 14:03 is inside
-	if !scheduler.isInTimeWindow(context.Background(), "14:00", now) {
+	if !isInTimeWindow("14:00", now) {
 		t.Error("expected time 14:03 to be within 5-minute window of 14:00")
 	}
 }
 
 func TestScheduler_IsInTimeWindow_AtWindowStart(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	// Time exactly at the window start
 	now := time.Date(2024, 6, 15, 14, 0, 0, 0, time.Local)
 
-	if !scheduler.isInTimeWindow(context.Background(), "14:00", now) {
+	if !isInTimeWindow("14:00", now) {
 		t.Error("expected time exactly at window start to be in window")
 	}
 }
 
 func TestScheduler_IsInTimeWindow_JustOutsideWindow(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	// Time at 14:05, window is 14:00 to 14:05 (exclusive end)
 	now := time.Date(2024, 6, 15, 14, 5, 0, 0, time.Local)
 
-	if scheduler.isInTimeWindow(context.Background(), "14:00", now) {
+	if isInTimeWindow("14:00", now) {
 		t.Error("expected time at 14:05 to be outside the 5-minute window ending at 14:05")
 	}
 }
 
 func TestScheduler_IsInTimeWindow_WellOutsideWindow(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	// Morning time, target is afternoon
 	now := time.Date(2024, 6, 15, 8, 0, 0, 0, time.Local)
 
-	if scheduler.isInTimeWindow(context.Background(), "14:00", now) {
+	if isInTimeWindow("14:00", now) {
 		t.Error("expected morning time to be outside afternoon window")
 	}
 }
 
 func TestScheduler_IsInTimeWindow_InvalidFormat(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
-
 	now := time.Now()
 
-	// "invalid" is not 5 chars with ':' at position 2, so it's treated as a settings key
-	// Since the settings key doesn't exist, it should return false
-	if scheduler.isInTimeWindow(context.Background(), "bad_setting_key", now) {
-		t.Error("expected non-existent settings key to be out of window")
-	}
-}
-
-func TestScheduler_IsInTimeWindow_SettingsKeyOutOfWindow(t *testing.T) {
-	scheduler, _, _, settingsService, _ := setupSchedulerTest(t)
-
-	// Set time via settings to a time well in the past relative to now
-	now := time.Date(2024, 6, 15, 20, 0, 0, 0, time.Local)
-	settingsService.Set(context.Background(), "test_time_setting", "08:00")
-
-	if scheduler.isInTimeWindow(context.Background(), "test_time_setting", now) {
-		t.Error("expected settings-based time 08:00 to be out of window when current time is 20:00")
+	if isInTimeWindow("bad", now) {
+		t.Error("expected an unparseable time to be out of window")
 	}
 }
 
@@ -418,16 +364,15 @@ func TestScheduler_CheckTask_DisabledBySettings(t *testing.T) {
 
 	ran := false
 	task := ScheduledTask{
-		Name:              "test_disabled",
-		Interval:          1 * time.Millisecond,
-		EnabledSettingKey: "test_disabled_setting",
+		Name:     "test_disabled",
+		Interval: 1 * time.Millisecond,
 		Run: func(ctx context.Context) {
 			ran = true
 		},
 	}
 
 	// Disable the task via settings
-	settingsService.Set(context.Background(), "test_disabled_setting", "false")
+	settingsService.Set(context.Background(), "test_disabled_enabled", "false")
 
 	scheduler.checkTask(context.Background(), task, false)
 
@@ -441,17 +386,16 @@ func TestScheduler_CheckTask_EnabledBySettings(t *testing.T) {
 
 	ran := false
 	task := ScheduledTask{
-		Name:              "test_enabled",
-		Interval:          1 * time.Millisecond,
-		TimeOfDay:         "",
-		EnabledSettingKey: "test_enabled_setting",
+		Name:     "test_enabled",
+		Interval: 1 * time.Millisecond,
 		Run: func(ctx context.Context) {
 			ran = true
 		},
 	}
 
 	// Enable the task via settings
-	settingsService.Set(context.Background(), "test_enabled_setting", "true")
+	settingsService.Set(context.Background(), "test_enabled_enabled", "true")
+	settingsService.Set(context.Background(), "test_enabled_time", time.Now().Format("15:04"))
 
 	scheduler.checkTask(context.Background(), task, false)
 
@@ -465,16 +409,15 @@ func TestScheduler_CheckTask_CatchupSkipsTimeWindow(t *testing.T) {
 
 	ran := false
 	task := ScheduledTask{
-		Name:              "test_catchup",
-		Interval:          1 * time.Millisecond,
-		TimeOfDay:         "03:00", // Specific time that is not now
-		EnabledSettingKey: "test_catchup_enabled",
+		Name:     "test_catchup",
+		Interval: 1 * time.Millisecond,
 		Run: func(ctx context.Context) {
 			ran = true
 		},
 	}
 
 	settingsService.Set(context.Background(), "test_catchup_enabled", "true")
+	settingsService.Set(context.Background(), "test_catchup_time", time.Now().Add(-2*time.Hour).Format("15:04")) // not now
 
 	// Running as catchup should skip the time window check
 	scheduler.checkTask(context.Background(), task, true)
@@ -485,7 +428,8 @@ func TestScheduler_CheckTask_CatchupSkipsTimeWindow(t *testing.T) {
 }
 
 func TestScheduler_CheckTask_PreventsDuplicateExecution(t *testing.T) {
-	scheduler, _, _, _, _ := setupSchedulerTest(t)
+	scheduler, _, _, settingsService, _ := setupSchedulerTest(t)
+	settingsService.Set(context.Background(), "test_dedup_enabled", "true")
 
 	var runCount atomic.Int32
 	blocker := make(chan struct{})
@@ -520,8 +464,9 @@ func TestScheduler_Integration_DisabledTasks(t *testing.T) {
 	scheduler, _, jobService, settingsService, _ := setupSchedulerTest(t)
 
 	// Disable all auto-updates
-	settingsService.Set(context.Background(), "bulk_data_auto_update", "false")
-	settingsService.Set(context.Background(), "set_data_auto_update", "false")
+	settingsService.Set(context.Background(), "bulk_data_update_enabled", "false")
+	settingsService.Set(context.Background(), "set_data_update_enabled", "false")
+	settingsService.Set(context.Background(), "symbol_data_update_enabled", "false")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
@@ -537,5 +482,76 @@ func TestScheduler_Integration_DisabledTasks(t *testing.T) {
 	_, total, _ := jobService.List(context.Background(), 1, 10, nil, nil)
 	if total != 0 {
 		t.Errorf("expected 0 jobs with disabled tasks, got %d", total)
+	}
+}
+
+func TestScheduledTask_DerivedKeys(t *testing.T) {
+	task := ScheduledTask{Name: "data_backup"}
+	tests := []struct{ got, want string }{
+		{task.EnabledKey(), "data_backup_enabled"},
+		{task.TimeKey(), "data_backup_time"},
+		{task.LastRunKey(), "data_backup_last_run"},
+		{task.LastStatusKey(), "data_backup_last_status"},
+	}
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("got %q, want %q", tt.got, tt.want)
+		}
+	}
+}
+
+// Every registered task's derived keys must be seeded and whitelisted, or the
+// task can never run (enabled defaults to false) and can't be configured.
+func TestScheduler_TaskKeysAreSeededAndWhitelisted(t *testing.T) {
+	scheduler, _, _, _, _ := setupSchedulerTest(t)
+	valid := ValidSettingKeys()
+
+	for _, task := range scheduler.Tasks() {
+		for _, key := range []string{task.EnabledKey(), task.TimeKey(), task.LastRunKey(), task.LastStatusKey()} {
+			if !valid[key] {
+				t.Errorf("task %s: key %s is not a valid setting key", task.Name, key)
+			}
+		}
+		if task.DisplayName == "" {
+			t.Errorf("task %s: missing DisplayName", task.Name)
+		}
+	}
+}
+
+func TestNextRun(t *testing.T) {
+	loc := time.Local
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, loc)
+	at := func(day, hour, min int) time.Time { return time.Date(2026, 6, day, hour, min, 0, 0, loc) }
+	ptr := func(t time.Time) *time.Time { return &t }
+
+	tests := []struct {
+		name     string
+		timeStr  string
+		interval time.Duration
+		lastRun  *time.Time
+		want     time.Time
+	}{
+		{"never run, later today", "15:00", 24 * time.Hour, nil, at(15, 15, 0)},
+		{"never run, already passed today", "03:00", 24 * time.Hour, nil, at(16, 3, 0)},
+		{"daily, ran this morning", "03:00", 24 * time.Hour, ptr(at(15, 3, 0)), at(16, 3, 0)},
+		{"daily, finished late is pushed a day", "03:00", 24 * time.Hour, ptr(at(15, 3, 20)), at(17, 3, 0)},
+		{"14 days", "02:30", 14 * 24 * time.Hour, ptr(at(10, 2, 30)), at(24, 2, 30)},
+		{"30 days", "02:00", 30 * 24 * time.Hour, ptr(at(1, 2, 0)), time.Date(2026, 7, 1, 2, 0, 0, 0, loc)},
+		{"overdue runs at next window", "15:00", 14 * 24 * time.Hour, ptr(at(1, 15, 0)), at(15, 15, 0)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NextRun(tt.timeStr, tt.interval, tt.lastRun, now)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !got.Equal(tt.want) {
+				t.Errorf("NextRun() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	if _, err := NextRun("bad", 24*time.Hour, nil, now); err == nil {
+		t.Error("expected error for invalid time")
 	}
 }

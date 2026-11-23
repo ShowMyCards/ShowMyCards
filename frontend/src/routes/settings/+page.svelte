@@ -206,14 +206,14 @@
 				<div class="card-body">
 					<div class="mb-4">
 						<h2 class="card-title">Bulk Data Configuration</h2>
-						{#if settings.bulk_data_last_update}
+						{#if settings.bulk_data_update_last_run}
 							<p class="text-sm opacity-70 mt-1">
-								Last updated {new Date(settings.bulk_data_last_update).toLocaleString()}
-								{#if settings.bulk_data_last_update_status === 'success'}
+								Last updated {new Date(settings.bulk_data_update_last_run).toLocaleString()}
+								{#if settings.bulk_data_update_last_status === 'success'}
 									<Lozenge color="success" size="xsmall">Success</Lozenge>
-								{:else if settings.bulk_data_last_update_status === 'failed'}
+								{:else if settings.bulk_data_update_last_status === 'failed'}
 									<Lozenge color="error" size="xsmall">Failed</Lozenge>
-								{:else if settings.bulk_data_last_update_status === 'in_progress'}
+								{:else if settings.bulk_data_update_last_status === 'in_progress'}
 									<Lozenge color="warning" size="xsmall">In Progress</Lozenge>
 								{/if}
 
@@ -231,10 +231,10 @@
 							<input
 								type="checkbox"
 								class="toggle toggle-primary"
-								checked={settings.bulk_data_auto_update === 'true'}
+								checked={settings.bulk_data_update_enabled === 'true'}
 								onchange={() => {
-									settings.bulk_data_auto_update =
-										settings.bulk_data_auto_update === 'true' ? 'false' : 'true';
+									settings.bulk_data_update_enabled =
+										settings.bulk_data_update_enabled === 'true' ? 'false' : 'true';
 								}} />
 						</SettingRow>
 

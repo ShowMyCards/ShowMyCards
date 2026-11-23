@@ -33,7 +33,7 @@ func (h *SettingsHandler) GetAll(c fiber.Ctx) error {
 			filtered[key] = value
 		}
 	}
-	return c.JSON(settings)
+	return c.JSON(filtered)
 }
 
 // Get retrieves a single setting by key

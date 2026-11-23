@@ -28,12 +28,13 @@ type Server struct {
 	bulkDataService   *services.BulkDataService
 	setDataService    *services.SetDataService
 	symbolDataService *services.SymbolDataService
+	scheduler         *services.Scheduler
 	dataDir           string
 	appCtx            context.Context
 }
 
 // NewServer creates a new server instance
-func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient *scryfall.Client, settingsService *services.SettingsService, jobService *services.JobService, bulkDataService *services.BulkDataService, setDataService *services.SetDataService, symbolDataService *services.SymbolDataService, dataDir string) *Server {
+func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient *scryfall.Client, settingsService *services.SettingsService, jobService *services.JobService, bulkDataService *services.BulkDataService, setDataService *services.SetDataService, symbolDataService *services.SymbolDataService, scheduler *services.Scheduler, dataDir string) *Server {
 	app := fiber.New(fiber.Config{
 		BodyLimit:    50 * 1024 * 1024, // 50MB — raised from 4MB for /data/import (fasthttp enforces globally)
 		ReadTimeout:  10 * time.Second,
@@ -80,6 +81,7 @@ func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient
 		bulkDataService:   bulkDataService,
 		setDataService:    setDataService,
 		symbolDataService: symbolDataService,
+		scheduler:         scheduler,
 		dataDir:           dataDir,
 		appCtx:            appCtx,
 	}
