@@ -2,8 +2,6 @@ package api
 
 import (
 	"backend/models"
-	"backend/scryfall"
-	"backend/services"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -40,14 +38,7 @@ func setupSetTestApp(t *testing.T) (*fiber.App, *gorm.DB, string) {
 		t.Fatalf("failed to write test icon: %v", err)
 	}
 
-	jobService := services.NewJobService(db)
-	settingsService := services.NewSettingsService(db)
-	scryfallClient, err := scryfall.NewClient()
-	if err != nil {
-		t.Fatalf("failed to create scryfall client: %v", err)
-	}
-	setDataService := services.NewSetDataService(db, jobService, settingsService, scryfallClient, dataDir)
-	handler := NewSetHandler(db, setDataService, dataDir)
+	handler := NewSetHandler(db, dataDir)
 
 	app := fiber.New()
 	sets := app.Group("/api/sets")

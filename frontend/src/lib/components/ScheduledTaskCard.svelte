@@ -1,9 +1,17 @@
 <script lang="ts">
-	import { Lozenge } from '#lib';
+	import { Lozenge, notifications } from '#lib';
 	import { resolve } from '$app/paths';
 	import type { ScheduledTaskInfo } from '#lib';
+	import { Play } from '@lucide/svelte';
 
-	let { task }: { task: ScheduledTaskInfo } = $props();
+	let {
+		task,
+		onStarted
+	}: {
+		task: ScheduledTaskInfo;
+		/** Called after a run has been requested (successfully or not), e.g. to reload data. */
+		onStarted?: () => void;
+	} = $props();
 
 	// Live countdown state
 	let countdown = $state('');
@@ -11,6 +19,30 @@
 	// Tasks that write Job records report the job's status; others (e.g. backups)
 	// report the status persisted in settings.
 	const lastStatus = $derived(task.last_job_status ?? task.last_status);
+	const running = $derived(lastStatus === 'pending' || lastStatus === 'in_progress');
+
+	let starting = $state(false);
+
+	async function runNow() {
+		starting = true;
+		try {
+			// Relative URL: proxied to the backend by the /api/[...path] server route.
+			const response = await fetch(`/api/scheduler/tasks/${encodeURIComponent(task.name)}/run`, {
+				method: 'POST'
+			});
+			if (response.ok) {
+				notifications.success(`${task.display_name} started`);
+			} else {
+				const body: { error?: string } = await response.json().catch(() => ({}));
+				notifications.error(body.error ?? `Failed to start ${task.display_name}`);
+			}
+		} catch {
+			notifications.error(`Failed to start ${task.display_name}`);
+		} finally {
+			starting = false;
+		}
+		onStarted?.();
+	}
 
 	// Update countdown every second
 	$effect(() => {
@@ -128,14 +160,29 @@
 			</div>
 		</div>
 
-		{#if task.last_job_id}
-			<div class="mt-3">
+		<div class="mt-3 flex items-center justify-between gap-2">
+			{#if task.last_job_id}
 				<a
 					href={resolve(`/jobs#job-${task.last_job_id}` as '/jobs')}
 					class="link link-primary text-sm">
 					View last job →
 				</a>
-			</div>
-		{/if}
+			{:else}
+				<span></span>
+			{/if}
+			<button
+				type="button"
+				class="btn btn-sm btn-outline"
+				disabled={starting || running}
+				title={running ? `${task.display_name} is already running` : undefined}
+				onclick={runNow}>
+				{#if starting}
+					<span class="loading loading-spinner loading-xs"></span>
+				{:else}
+					<Play class="w-4 h-4" />
+				{/if}
+				Run now
+			</button>
+		</div>
 	</div>
 </div>

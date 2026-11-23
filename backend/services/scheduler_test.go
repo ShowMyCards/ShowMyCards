@@ -23,6 +23,14 @@ func setupSchedulerTest(t *testing.T) (*Scheduler, *BulkDataService, *JobService
 		t.Fatalf("failed to setup test db: %v", err)
 	}
 
+	// Tasks finish in background goroutines. Each pooled connection to
+	// ":memory:" is a separate database, so pin the pool to one connection.
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get database instance: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+
 	if err := db.AutoMigrate(&models.Job{}, &models.Setting{}, &models.Card{}, &models.Set{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
@@ -369,8 +377,9 @@ func TestScheduler_CheckTask_DisabledBySettings(t *testing.T) {
 	task := ScheduledTask{
 		Name:     "test_disabled",
 		Interval: 1 * time.Millisecond,
-		Run: func(ctx context.Context) {
+		Run: func(ctx context.Context) (uint, error) {
 			ran = true
+			return 0, nil
 		},
 	}
 
@@ -391,8 +400,9 @@ func TestScheduler_CheckTask_EnabledBySettings(t *testing.T) {
 	task := ScheduledTask{
 		Name:     "test_enabled",
 		Interval: 1 * time.Millisecond,
-		Run: func(ctx context.Context) {
+		Run: func(ctx context.Context) (uint, error) {
 			ran = true
+			return 0, nil
 		},
 	}
 
@@ -414,8 +424,9 @@ func TestScheduler_CheckTask_CatchupSkipsTimeWindow(t *testing.T) {
 	task := ScheduledTask{
 		Name:     "test_catchup",
 		Interval: 1 * time.Millisecond,
-		Run: func(ctx context.Context) {
+		Run: func(ctx context.Context) (uint, error) {
 			ran = true
+			return 0, nil
 		},
 	}
 
@@ -439,9 +450,10 @@ func TestScheduler_CheckTask_PreventsDuplicateExecution(t *testing.T) {
 	task := ScheduledTask{
 		Name:     "test_dedup",
 		Interval: 1 * time.Millisecond,
-		Run: func(ctx context.Context) {
+		Run: func(ctx context.Context) (uint, error) {
 			runCount.Add(1)
 			<-blocker // Block until released
+			return 0, nil
 		},
 	}
 
@@ -561,25 +573,46 @@ func TestNextRun(t *testing.T) {
 
 // Scheduled-task job records
 
-func lastJob(t *testing.T, jobService *JobService, jobType models.JobType) *models.Job {
+// waitForJob polls until the job reaches a terminal status, since task work
+// runs in the background after Run returns.
+func waitForJob(t *testing.T, jobService *JobService, id uint) *models.Job {
 	t.Helper()
-	job, err := jobService.GetLastJobByType(context.Background(), jobType)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		job, err := jobService.Get(context.Background(), id)
+		if err != nil {
+			t.Fatalf("failed to get job %d: %v", id, err)
+		}
+		if job.Status != models.JobStatusPending && job.Status != models.JobStatusInProgress {
+			return job
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("job %d did not finish, status %q", id, job.Status)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func mustStart(t *testing.T, id uint, err error) uint {
+	t.Helper()
 	if err != nil {
-		t.Fatalf("GetLastJobByType(%s) failed: %v", jobType, err)
+		t.Fatalf("failed to start task: %v", err)
 	}
-	if job == nil {
-		t.Fatalf("expected a %s job to be recorded", jobType)
+	if id == 0 {
+		t.Fatal("expected a job ID")
 	}
-	return job
+	return id
 }
 
 func TestScheduler_RunBackup_RecordsCompletedJob(t *testing.T) {
 	scheduler, _, jobService, settingsService, _ := setupSchedulerTest(t)
 	ctx := context.Background()
 
-	scheduler.runBackup(ctx)
-
-	job := lastJob(t, jobService, models.JobTypeDataBackup)
+	id, err := scheduler.runBackup(ctx)
+	job := waitForJob(t, jobService, mustStart(t, id, err))
+	if job.Type != models.JobTypeDataBackup {
+		t.Errorf("type = %q, want %q", job.Type, models.JobTypeDataBackup)
+	}
 	if job.Status != models.JobStatusCompleted {
 		t.Fatalf("status = %q, want completed (error: %q)", job.Status, job.Error)
 	}
@@ -614,9 +647,8 @@ func TestScheduler_RunBackup_FailureRecordsFailedJob(t *testing.T) {
 	ctx := context.Background()
 	scheduler.backupService = NewBackupService(stubExporter{err: errors.New("export exploded")}, settingsService, t.TempDir())
 
-	scheduler.runBackup(ctx)
-
-	job := lastJob(t, jobService, models.JobTypeDataBackup)
+	id, err := scheduler.runBackup(ctx)
+	job := waitForJob(t, jobService, mustStart(t, id, err))
 	if job.Status != models.JobStatusFailed {
 		t.Fatalf("status = %q, want failed", job.Status)
 	}
@@ -643,9 +675,8 @@ func TestScheduler_RunJobCleanup_RecordsJobAndSparesActiveJobs(t *testing.T) {
 	db.Create(running)
 	db.Model(&models.Job{}).Where("id IN ?", []uint{finished.ID, running.ID}).Update("created_at", old)
 
-	scheduler.runJobCleanup(ctx)
-
-	job := lastJob(t, jobService, models.JobTypeJobCleanup)
+	id, err := scheduler.runJobCleanup(ctx)
+	job := waitForJob(t, jobService, mustStart(t, id, err))
 	if job.Status != models.JobStatusCompleted {
 		t.Fatalf("status = %q, want completed (error: %q)", job.Status, job.Error)
 	}
@@ -672,5 +703,97 @@ func TestScheduler_EveryTaskRecordsJobs(t *testing.T) {
 		if !task.JobType.Valid() {
 			t.Errorf("task %s: JobType %q is not a valid job type", task.Name, task.JobType)
 		}
+	}
+}
+
+// RunNow tests
+
+func TestScheduler_RunNow_UnknownTask(t *testing.T) {
+	scheduler, _, _, _, _ := setupSchedulerTest(t)
+
+	if _, err := scheduler.RunNow(context.Background(), "does_not_exist"); !errors.Is(err, ErrTaskNotFound) {
+		t.Errorf("err = %v, want ErrTaskNotFound", err)
+	}
+}
+
+func TestScheduler_RunNow_RunsDisabledTaskOutsideWindow(t *testing.T) {
+	scheduler, _, jobService, settingsService, _ := setupSchedulerTest(t)
+	ctx := context.Background()
+	settingsService.Set(ctx, "data_backup_enabled", "false")
+	settingsService.Set(ctx, "data_backup_time", time.Now().Add(-2*time.Hour).Format("15:04"))
+
+	id, err := scheduler.RunNow(ctx, "data_backup")
+	job := waitForJob(t, jobService, mustStart(t, id, err))
+	if job.Status != models.JobStatusCompleted {
+		t.Errorf("status = %q, want completed (error: %q)", job.Status, job.Error)
+	}
+}
+
+func TestScheduler_RunNow_RejectsWhileJobActive(t *testing.T) {
+	scheduler, _, jobService, _, _ := setupSchedulerTest(t)
+	ctx := context.Background()
+
+	// An in-progress import (e.g. started on startup or by an earlier run).
+	active, _ := jobService.Create(ctx, models.JobTypeSetDataImport, "{}")
+	jobService.Start(ctx, active.ID)
+
+	if _, err := scheduler.RunNow(ctx, "set_data_update"); !errors.Is(err, ErrTaskRunning) {
+		t.Errorf("err = %v, want ErrTaskRunning", err)
+	}
+
+	var count int64
+	jobService.db.Model(&models.Job{}).Where("type = ?", models.JobTypeSetDataImport).Count(&count)
+	if count != 1 {
+		t.Errorf("expected no new job to be created, found %d set import jobs", count)
+	}
+}
+
+func TestScheduler_RunNow_RejectsConcurrentStart(t *testing.T) {
+	scheduler, _, _, _, _ := setupSchedulerTest(t)
+	ctx := context.Background()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	scheduler.tasks = append(scheduler.tasks, ScheduledTask{
+		Name: "slow_start",
+		Run: func(ctx context.Context) (uint, error) {
+			close(entered)
+			<-release
+			return 1, nil
+		},
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := scheduler.RunNow(ctx, "slow_start")
+		done <- err
+	}()
+	<-entered
+
+	if _, err := scheduler.RunNow(ctx, "slow_start"); !errors.Is(err, ErrTaskRunning) {
+		t.Errorf("err = %v, want ErrTaskRunning", err)
+	}
+
+	close(release)
+	if err := <-done; err != nil {
+		t.Errorf("first run failed: %v", err)
+	}
+}
+
+func TestScheduler_InBackground_PanicFailsJob(t *testing.T) {
+	scheduler, _, jobService, settingsService, _ := setupSchedulerTest(t)
+	ctx := context.Background()
+	task, _ := scheduler.task("data_backup")
+
+	job, _ := jobService.Create(ctx, models.JobTypeDataBackup, "{}")
+	jobService.Start(ctx, job.ID)
+	scheduler.inBackground(ctx, task, job.ID, func(context.Context) error { panic("boom") })
+
+	got := waitForJob(t, jobService, job.ID)
+	if got.Status != models.JobStatusFailed || !strings.Contains(got.Error, "boom") {
+		t.Errorf("job = %q / %q, want failed with the panic message", got.Status, got.Error)
+	}
+	if status, _ := settingsService.Get(ctx, "data_backup_last_status"); status != TaskStatusFailed {
+		t.Errorf("data_backup_last_status = %q, want failed", status)
 	}
 }

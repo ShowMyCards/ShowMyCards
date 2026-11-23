@@ -177,6 +177,18 @@ func (s *JobService) CancelStaleJobs(ctx context.Context) (int64, error) {
 	return result.RowsAffected, nil
 }
 
+// HasActive reports whether a pending or in-progress job of the given type exists.
+func (s *JobService) HasActive(ctx context.Context, jobType models.JobType) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&models.Job{}).
+		Where("type = ?", jobType).
+		Where("status IN ?", []models.JobStatus{models.JobStatusPending, models.JobStatusInProgress}).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("checking for active %s jobs: %w", jobType, err)
+	}
+	return count > 0, nil
+}
+
 // GetLastJobByType retrieves the most recent job of a specific type
 func (s *JobService) GetLastJobByType(ctx context.Context, jobType models.JobType) (*models.Job, error) {
 	var job models.Job

@@ -116,7 +116,7 @@ func main() {
 	scheduler := services.NewScheduler(bulkDataService, setDataService, symbolDataService, jobService, settingsService, backupService)
 
 	// Initialize server with database, scryfall clients, and services
-	srv := server.NewServer(ctx, dbClient, scryfallClient, settingsService, jobService, bulkDataService, setDataService, symbolDataService, scheduler, dataDir)
+	srv := server.NewServer(ctx, dbClient, scryfallClient, settingsService, jobService, scheduler, dataDir)
 
 	scheduler.Start(ctx)
 	defer scheduler.Stop()

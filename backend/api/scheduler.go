@@ -2,6 +2,9 @@ package api
 
 import (
 	"backend/services"
+	"backend/utils"
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -27,25 +30,67 @@ type ScheduledTaskInfo struct {
 	LastJobStatus *string    `json:"last_job_status,omitempty"`
 }
 
-// taskProvider exposes the scheduler's registered tasks.
-type taskProvider interface {
+// RunTaskResponse is returned when a task is started on demand
+// tygo:export
+type RunTaskResponse struct {
+	Message string `json:"message"`
+	JobID   uint   `json:"job_id"`
+}
+
+// taskRunner exposes the scheduler's registered tasks and lets them be run on demand.
+type taskRunner interface {
 	Tasks() []services.ScheduledTask
+	RunNow(ctx context.Context, name string) (uint, error)
 }
 
 // SchedulerHandler handles scheduler-related API requests
 type SchedulerHandler struct {
-	tasks           taskProvider
+	appCtx          context.Context
+	tasks           taskRunner
 	settingsService *services.SettingsService
 	jobService      *services.JobService
 }
 
-// NewSchedulerHandler creates a new scheduler handler
-func NewSchedulerHandler(tasks taskProvider, settingsService *services.SettingsService, jobService *services.JobService) *SchedulerHandler {
+// NewSchedulerHandler creates a new scheduler handler. appCtx is used for task
+// runs, which outlive the request that started them.
+func NewSchedulerHandler(appCtx context.Context, tasks taskRunner, settingsService *services.SettingsService, jobService *services.JobService) *SchedulerHandler {
 	return &SchedulerHandler{
+		appCtx:          appCtx,
 		tasks:           tasks,
 		settingsService: settingsService,
 		jobService:      jobService,
 	}
+}
+
+// RunTask starts the task named by the :name path parameter.
+func (h *SchedulerHandler) RunTask(c fiber.Ctx) error {
+	return h.runTask(c, c.Params("name"))
+}
+
+// RunNamedTask returns a handler that starts the given task. It backs the
+// legacy per-type import endpoints (e.g. POST /api/bulk-data/import).
+func (h *SchedulerHandler) RunNamedTask(name string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		return h.runTask(c, name)
+	}
+}
+
+func (h *SchedulerHandler) runTask(c fiber.Ctx, name string) error {
+	jobID, err := h.tasks.RunNow(h.appCtx, name)
+	switch {
+	case errors.Is(err, services.ErrTaskNotFound):
+		return utils.ReturnError(c, fiber.StatusNotFound, fmt.Sprintf("unknown task %q", name))
+	case errors.Is(err, services.ErrTaskRunning):
+		return utils.ReturnError(c, fiber.StatusConflict, "task is already running")
+	case err != nil:
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to start task", "task run failed", err)
+	}
+
+	return c.Status(fiber.StatusAccepted).JSON(RunTaskResponse{
+		Message: "Task started",
+		JobID:   jobID,
+	})
 }
 
 // GetScheduledTasks returns information about every registered scheduled task
