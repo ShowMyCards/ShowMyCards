@@ -377,9 +377,10 @@ Defines automated rules for sorting cards into storage locations.
 
 Background job tracking for long-running operations.
 
-- `Type` (string) - Job type (e.g., "bulk_import", "card_update")
-- `Status` (string) - Current status (pending, in_progress, completed, failed)
-- `Progress` (int) - Completion percentage (0-100)
+- `Type` (string) - Job type: `bulk_data_import`, `set_data_import`,
+  `symbol_data_import`, `data_backup`, `job_cleanup`. Every scheduled task
+  writes a Job record (its `JobType` in the scheduler registry).
+- `Status` (string) - Current status (pending, in_progress, completed, failed, cancelled)
 - `Error` (string) - Error message if failed
 - `StartedAt` (\*time.Time) - When job started
 - `CompletedAt` (\*time.Time) - When job finished

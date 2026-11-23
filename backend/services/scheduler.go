@@ -3,8 +3,11 @@ package services
 import (
 	"backend/models"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -121,6 +124,7 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			DisplayName: "Job History Cleanup",
 			Description: "Deletes job history records older than the retention period.",
 			Interval:    24 * time.Hour,
+			JobType:     models.JobTypeJobCleanup,
 			Run:         s.runJobCleanup,
 		},
 		{
@@ -128,6 +132,7 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			DisplayName: "Data Backup",
 			Description: "Exports your collection, lists and decks to a compressed backup file.",
 			Interval:    24 * time.Hour,
+			JobType:     models.JobTypeDataBackup,
 			Run:         s.runBackup,
 		},
 	}
@@ -391,18 +396,32 @@ func (s *Scheduler) runSymbolDataUpdate(ctx context.Context) {
 	}()
 }
 
+// jobCleanupMetadata is the Job metadata recorded by the job_cleanup task.
+type jobCleanupMetadata struct {
+	Deleted       int64 `json:"deleted"`
+	RetentionDays int   `json:"retention_days"`
+}
+
 func (s *Scheduler) runJobCleanup(ctx context.Context) {
 	task, _ := s.task("job_cleanup")
-	retentionDays := s.settingsService.GetInt(ctx, "job_cleanup_retention_days", DefaultJobCleanupRetentionDays)
-	deletedCount, err := s.jobService.CleanupOldJobs(ctx, retentionDays)
-	if err != nil {
-		slog.Error("error cleaning up jobs", "component", "scheduler", "error", err)
-		s.setStatus(ctx, task, TaskStatusFailed)
-		return
-	}
+	s.runAsJob(ctx, task, func(ctx context.Context) (any, error) {
+		retentionDays := s.settingsService.GetInt(ctx, "job_cleanup_retention_days", DefaultJobCleanupRetentionDays)
+		deleted, err := s.jobService.CleanupOldJobs(ctx, retentionDays)
+		if err != nil {
+			return nil, err
+		}
+		slog.Info("cleaned up old jobs", "component", "scheduler", "deleted_count", deleted)
+		return jobCleanupMetadata{Deleted: deleted, RetentionDays: retentionDays}, nil
+	})
+}
 
-	s.recordRun(ctx, task, TaskStatusSuccess)
-	slog.Info("cleaned up old jobs", "component", "scheduler", "deleted_count", deletedCount)
+// backupMetadata is the Job metadata recorded by the data_backup task.
+type backupMetadata struct {
+	FileName   string `json:"file_name"`
+	SizeBytes  int64  `json:"size_bytes"`
+	Retention  int    `json:"retention"`
+	Pruned     int    `json:"pruned"`
+	PruneError string `json:"prune_error,omitempty"`
 }
 
 func (s *Scheduler) runBackup(ctx context.Context) {
@@ -410,24 +429,70 @@ func (s *Scheduler) runBackup(ctx context.Context) {
 		return
 	}
 	task, _ := s.task("data_backup")
+	s.runAsJob(ctx, task, func(ctx context.Context) (any, error) {
+		path, err := s.backupService.CreateBackup(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-	path, err := s.backupService.CreateBackup(ctx)
+		md := backupMetadata{FileName: filepath.Base(path)}
+		if info, err := os.Stat(path); err == nil {
+			md.SizeBytes = info.Size()
+		} else {
+			slog.Warn("failed to stat backup file", "component", "scheduler", "path", path, "error", err)
+		}
+
+		md.Retention = s.settingsService.GetInt(ctx, "data_backup_retention_count", DefaultBackupRetention)
+		md.Pruned, err = s.backupService.PruneBackups(md.Retention)
+		if err != nil {
+			// The backup itself succeeded; a prune failure is non-fatal.
+			slog.Warn("failed to prune old backups", "component", "scheduler", "error", err)
+			md.PruneError = err.Error()
+		}
+
+		slog.Info("created data backup", "component", "scheduler", "path", path, "pruned", md.Pruned, "retention", md.Retention)
+		return md, nil
+	})
+}
+
+// runAsJob runs fn synchronously inside a Job record of task.JobType, storing
+// fn's metadata on the job and mirroring the outcome into the task's settings.
+// On failure last_run is deliberately left unchanged so catch-up retries.
+func (s *Scheduler) runAsJob(ctx context.Context, task ScheduledTask, fn func(ctx context.Context) (any, error)) {
+	job, err := s.jobService.Create(ctx, task.JobType, "{}")
 	if err != nil {
-		slog.Error("error creating data backup", "component", "scheduler", "error", err)
-		// last_run is deliberately not updated so catch-up retries the backup.
+		slog.Error("error creating job", "component", "scheduler", "task", task.Name, "error", err)
+		s.setStatus(ctx, task, TaskStatusFailed)
+		return
+	}
+	if err := s.jobService.Start(ctx, job.ID); err != nil {
+		slog.Warn("failed to mark job started", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", err)
+	}
+	s.setStatus(ctx, task, TaskStatusInProgress)
+
+	metadata, runErr := fn(ctx)
+
+	if metadata != nil {
+		if b, err := json.Marshal(metadata); err != nil {
+			slog.Warn("failed to marshal job metadata", "component", "scheduler", "task", task.Name, "error", err)
+		} else if err := s.jobService.UpdateMetadata(ctx, job.ID, string(b)); err != nil {
+			slog.Warn("failed to store job metadata", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", err)
+		}
+	}
+
+	if runErr != nil {
+		slog.Error("scheduled task failed", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", runErr)
+		if err := s.jobService.Fail(ctx, job.ID, runErr.Error()); err != nil {
+			slog.Warn("failed to mark job failed", "component", "scheduler", "job_id", job.ID, "error", err)
+		}
 		s.setStatus(ctx, task, TaskStatusFailed)
 		return
 	}
 
-	retention := s.settingsService.GetInt(ctx, "data_backup_retention_count", DefaultBackupRetention)
-	pruned, err := s.backupService.PruneBackups(retention)
-	if err != nil {
-		// The backup itself succeeded; a prune failure is non-fatal.
-		slog.Warn("failed to prune old backups", "component", "scheduler", "error", err)
+	if err := s.jobService.Complete(ctx, job.ID); err != nil {
+		slog.Warn("failed to mark job completed", "component", "scheduler", "job_id", job.ID, "error", err)
 	}
-
 	s.recordRun(ctx, task, TaskStatusSuccess)
-	slog.Info("created data backup", "component", "scheduler", "path", path, "pruned", pruned, "retention", retention)
 }
 
 // task returns the registered task with the given name.

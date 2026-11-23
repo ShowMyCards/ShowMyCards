@@ -17,12 +17,15 @@ const (
 	JobTypeBulkDataImport   JobType = "bulk_data_import"
 	JobTypeSetDataImport    JobType = "set_data_import"
 	JobTypeSymbolDataImport JobType = "symbol_data_import"
+	JobTypeDataBackup       JobType = "data_backup"
+	JobTypeJobCleanup       JobType = "job_cleanup"
 )
 
 // Valid checks if the job type is valid
 func (jt JobType) Valid() bool {
 	switch jt {
-	case JobTypeBulkDataImport, JobTypeSetDataImport, JobTypeSymbolDataImport:
+	case JobTypeBulkDataImport, JobTypeSetDataImport, JobTypeSymbolDataImport,
+		JobTypeDataBackup, JobTypeJobCleanup:
 		return true
 	default:
 		return false
@@ -114,12 +117,12 @@ func (j *Job) BeforeCreate(tx *gorm.DB) error {
 	if !j.Type.Valid() {
 		return fmt.Errorf("invalid job type: %s", j.Type)
 	}
-	if !j.Status.Valid() {
-		return fmt.Errorf("invalid job status: %s", j.Status)
-	}
-	// Ensure status is pending for new jobs
+	// Default an unset status to pending before validating it
 	if j.Status == "" {
 		j.Status = JobStatusPending
+	}
+	if !j.Status.Valid() {
+		return fmt.Errorf("invalid job status: %s", j.Status)
 	}
 	return nil
 }
