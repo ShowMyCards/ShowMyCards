@@ -2,8 +2,6 @@ package api
 
 import (
 	"backend/models"
-	"backend/scryfall"
-	"backend/services"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,14 +24,7 @@ func setupSymbolTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		t.Fatalf("failed to migrate test database: %v", err)
 	}
 
-	jobService := services.NewJobService(db)
-	settingsService := services.NewSettingsService(db)
-	scryfallClient, err := scryfall.NewClient()
-	if err != nil {
-		t.Fatalf("failed to create scryfall client: %v", err)
-	}
-	symbolDataService := services.NewSymbolDataService(db, jobService, settingsService, scryfallClient)
-	handler := NewSymbolHandler(db, symbolDataService)
+	handler := NewSymbolHandler(db)
 
 	app := fiber.New()
 	symbols := app.Group("/api/symbols")

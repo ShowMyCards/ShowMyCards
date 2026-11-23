@@ -20,21 +20,18 @@ import (
 
 // Server holds the main application components
 type Server struct {
-	app               *fiber.App
-	db                *database.Client
-	scryfall          *scryfall.Client
-	settingsService   *services.SettingsService
-	jobService        *services.JobService
-	bulkDataService   *services.BulkDataService
-	setDataService    *services.SetDataService
-	symbolDataService *services.SymbolDataService
-	scheduler         *services.Scheduler
-	dataDir           string
-	appCtx            context.Context
+	app             *fiber.App
+	db              *database.Client
+	scryfall        *scryfall.Client
+	settingsService *services.SettingsService
+	jobService      *services.JobService
+	scheduler       *services.Scheduler
+	dataDir         string
+	appCtx          context.Context
 }
 
 // NewServer creates a new server instance
-func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient *scryfall.Client, settingsService *services.SettingsService, jobService *services.JobService, bulkDataService *services.BulkDataService, setDataService *services.SetDataService, symbolDataService *services.SymbolDataService, scheduler *services.Scheduler, dataDir string) *Server {
+func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient *scryfall.Client, settingsService *services.SettingsService, jobService *services.JobService, scheduler *services.Scheduler, dataDir string) *Server {
 	app := fiber.New(fiber.Config{
 		BodyLimit:    50 * 1024 * 1024, // 50MB — raised from 4MB for /data/import (fasthttp enforces globally)
 		ReadTimeout:  10 * time.Second,
@@ -73,17 +70,14 @@ func NewServer(appCtx context.Context, dbClient *database.Client, scryfallClient
 	}))
 
 	return &Server{
-		app:               app,
-		db:                dbClient,
-		scryfall:          scryfallClient,
-		settingsService:   settingsService,
-		jobService:        jobService,
-		bulkDataService:   bulkDataService,
-		setDataService:    setDataService,
-		symbolDataService: symbolDataService,
-		scheduler:         scheduler,
-		dataDir:           dataDir,
-		appCtx:            appCtx,
+		app:             app,
+		db:              dbClient,
+		scryfall:        scryfallClient,
+		settingsService: settingsService,
+		jobService:      jobService,
+		scheduler:       scheduler,
+		dataDir:         dataDir,
+		appCtx:          appCtx,
 	}
 }
 
@@ -123,8 +117,7 @@ func (s *Server) setupRoutes() {
 	JobsRoutes(s.app, s.jobService)
 	BannerRoutes(s.app, s.jobService)
 	DataRoutes(s.app, s.db.DB)
-	BulkDataRoutes(s.app, s.bulkDataService, s.appCtx)
-	SetRoutes(s.app, s.db.DB, s.setDataService, s.dataDir, s.appCtx)
-	SymbolRoutes(s.app, s.db.DB, s.symbolDataService, s.appCtx)
+	SetRoutes(s.app, s.db.DB, s.dataDir)
+	SymbolRoutes(s.app, s.db.DB)
 	s.RegisterSchedulerRoutes(s.app)
 }

@@ -14,13 +14,28 @@
 		Pagination,
 		ScheduledTaskCard,
 		Modal,
+		TIMEOUTS,
 		type Job
 	} from '#lib';
 	import type { PageData } from './$types';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
 	let { data }: { data: PageData } = $props();
+
+	// While any task is running, poll so its card and the history table update.
+	const anyTaskRunning = $derived(
+		(data.scheduledTasks ?? []).some((task) => {
+			const status = task.last_job_status ?? task.last_status;
+			return status === JobStatusPending || status === JobStatusInProgress;
+		})
+	);
+
+	$effect(() => {
+		if (!anyTaskRunning) return;
+		const interval = setInterval(() => invalidateAll(), TIMEOUTS.POLLING_INTERVAL);
+		return () => clearInterval(interval);
+	});
 
 	let errorModalOpen = $state(false);
 	let errorModalMessage = $state('');
@@ -124,7 +139,7 @@
 			<h2 class="text-2xl font-bold mb-4">Scheduled Tasks</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 				{#each data.scheduledTasks as task (task.name)}
-					<ScheduledTaskCard {task} />
+					<ScheduledTaskCard {task} onStarted={() => invalidateAll()} />
 				{/each}
 			</div>
 		</div>

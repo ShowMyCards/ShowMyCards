@@ -248,7 +248,9 @@ Go types are mapped to TypeScript as follows:
 
 - `GET /api/scheduler/tasks` - List every task registered in `services.Scheduler`
   (the registry is the single source of truth — registering a task surfaces it)
-- `POST /api/scheduler/tasks/:name/run` - Manually trigger a task (planned, #136)
+- `POST /api/scheduler/tasks/:name/run` - Start a task now, bypassing its
+  enabled flag and time window. `202 {message, job_id}`; `404` for an unknown
+  task; `409` if the task is already running (an in-progress Job of its type).
 
 Each task's settings keys are derived from its `Name`: `<name>_enabled`,
 `<name>_time` (`HH:MM`), `<name>_last_run` (RFC3339), `<name>_last_status`
@@ -264,7 +266,9 @@ renamed on startup by `renameSettingKeys` in `database/client.go`.
 
 ### Bulk Data
 
-- `POST /api/bulk-data/import` - Trigger bulk data import from Scryfall
+- `POST /api/bulk-data/import` - Alias of `POST /api/scheduler/tasks/bulk_data_update/run`
+  (`/api/sets/import` and `/api/symbols/import` alias `set_data_update` and
+  `symbol_data_update` the same way)
 
 ### Card Search
 

@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -40,8 +41,9 @@ type ScheduledTask struct {
 	// JobType is the type of Job record the task creates, if any
 	JobType models.JobType
 
-	// Run is the function to execute when the task should run
-	Run func(ctx context.Context)
+	// Run starts the task: it creates the task's Job record synchronously,
+	// continues the work in the background, and returns the job's ID.
+	Run func(ctx context.Context) (uint, error)
 }
 
 // EnabledKey is the settings key holding whether the task is enabled ("true"/"false").
@@ -55,6 +57,12 @@ func (t ScheduledTask) LastRunKey() string { return t.Name + "_last_run" }
 
 // LastStatusKey is the settings key holding the outcome of the last run.
 func (t ScheduledTask) LastStatusKey() string { return t.Name + "_last_status" }
+
+// Errors returned by Scheduler.RunNow.
+var (
+	ErrTaskNotFound = errors.New("scheduled task not found")
+	ErrTaskRunning  = errors.New("scheduled task is already running")
+)
 
 // Values written to a task's LastStatusKey.
 const (
@@ -194,14 +202,45 @@ func (s *Scheduler) checkAndRunTasks(ctx context.Context) {
 	}
 }
 
-// checkTask checks if a specific task should run
-func (s *Scheduler) checkTask(ctx context.Context, task ScheduledTask, isCatchup bool) {
-	// Prevent duplicate execution of the same task
+// RunNow starts the named task immediately, regardless of whether it is
+// enabled or inside its time window, and returns the ID of the Job it created.
+// It returns ErrTaskNotFound for an unknown name and ErrTaskRunning if the
+// task is already running. ctx must outlive the request (use the app context),
+// since the task keeps running in the background.
+func (s *Scheduler) RunNow(ctx context.Context, name string) (uint, error) {
+	task, ok := s.task(name)
+	if !ok {
+		return 0, ErrTaskNotFound
+	}
+	slog.Info("running task on demand", "component", "scheduler", "task", task.Name)
+	return s.start(ctx, task)
+}
+
+// start runs task unless it is already running. The runningTasks guard makes
+// the active-job check and job creation atomic; the active-job check covers
+// the background phase after Run has returned (and imports started outside the
+// scheduler, such as the initial import on startup).
+func (s *Scheduler) start(ctx context.Context, task ScheduledTask) (uint, error) {
 	if _, loaded := s.runningTasks.LoadOrStore(task.Name, true); loaded {
-		return
+		return 0, ErrTaskRunning
 	}
 	defer s.runningTasks.Delete(task.Name)
 
+	if task.JobType != "" {
+		active, err := s.jobService.HasActive(ctx, task.JobType)
+		if err != nil {
+			return 0, fmt.Errorf("checking for running %s job: %w", task.JobType, err)
+		}
+		if active {
+			return 0, ErrTaskRunning
+		}
+	}
+
+	return task.Run(ctx)
+}
+
+// checkTask checks if a specific task should run
+func (s *Scheduler) checkTask(ctx context.Context, task ScheduledTask, isCatchup bool) {
 	// Check if task is enabled
 	if !s.settingsService.GetBool(ctx, task.EnabledKey(), false) {
 		return
@@ -240,7 +279,13 @@ func (s *Scheduler) checkTask(ctx context.Context, task ScheduledTask, isCatchup
 		slog.Info("running scheduled task", "component", "scheduler", "task", task.Name, "interval", task.Interval)
 	}
 
-	task.Run(ctx)
+	if _, err := s.start(ctx, task); err != nil {
+		if errors.Is(err, ErrTaskRunning) {
+			slog.Info("skipping task, already running", "component", "scheduler", "task", task.Name)
+			return
+		}
+		slog.Error("error starting task", "component", "scheduler", "task", task.Name, "error", err)
+	}
 }
 
 // isInTimeWindow reports whether now falls within the 5-minute window that
@@ -339,59 +384,58 @@ func (s *Scheduler) runCatchupTasks(ctx context.Context) {
 
 // Task execution functions
 
-func (s *Scheduler) runBulkDataUpdate(ctx context.Context) {
+func (s *Scheduler) runBulkDataUpdate(ctx context.Context) (uint, error) {
+	task, _ := s.task("bulk_data_update")
 	job, err := s.bulkDataService.CreateImportJob(ctx)
 	if err != nil {
-		slog.Error("error creating bulk data import job", "component", "scheduler", "error", err)
-		return
+		return 0, fmt.Errorf("creating bulk data import job: %w", err)
 	}
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("panic in bulk data import", "component", "scheduler", "panic", r)
-			}
-		}()
-		if err := s.bulkDataService.DownloadAndImport(ctx, job.ID); err != nil {
-			slog.Error("error in bulk data import", "component", "scheduler", "error", err)
-		}
-	}()
+	s.inBackground(ctx, task, job.ID, func(ctx context.Context) error {
+		return s.bulkDataService.DownloadAndImport(ctx, job.ID)
+	})
+	return job.ID, nil
 }
 
-func (s *Scheduler) runSetDataUpdate(ctx context.Context) {
+func (s *Scheduler) runSetDataUpdate(ctx context.Context) (uint, error) {
+	task, _ := s.task("set_data_update")
 	job, err := s.setDataService.CreateImportJob(ctx)
 	if err != nil {
-		slog.Error("error creating set data import job", "component", "scheduler", "error", err)
-		return
+		return 0, fmt.Errorf("creating set data import job: %w", err)
 	}
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("panic in set data import", "component", "scheduler", "panic", r)
-			}
-		}()
-		if err := s.setDataService.DownloadAndImport(ctx, job.ID); err != nil {
-			slog.Error("error in set data import", "component", "scheduler", "error", err)
-		}
-	}()
+	s.inBackground(ctx, task, job.ID, func(ctx context.Context) error {
+		return s.setDataService.DownloadAndImport(ctx, job.ID)
+	})
+	return job.ID, nil
 }
 
-func (s *Scheduler) runSymbolDataUpdate(ctx context.Context) {
+func (s *Scheduler) runSymbolDataUpdate(ctx context.Context) (uint, error) {
+	task, _ := s.task("symbol_data_update")
 	job, err := s.symbolDataService.CreateImportJob(ctx)
 	if err != nil {
-		slog.Error("error creating symbol data import job", "component", "scheduler", "error", err)
-		return
+		return 0, fmt.Errorf("creating symbol data import job: %w", err)
 	}
+	s.inBackground(ctx, task, job.ID, func(ctx context.Context) error {
+		return s.symbolDataService.DownloadAndImport(ctx, job.ID)
+	})
+	return job.ID, nil
+}
 
+// inBackground runs fn in a goroutine. fn is responsible for recording its own
+// outcome on the job; a panic is recovered and recorded as a failure so the job
+// never stays in progress (which would block the task until restart).
+func (s *Scheduler) inBackground(ctx context.Context, task ScheduledTask, jobID uint, fn func(ctx context.Context) error) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("panic in symbol data import", "component", "scheduler", "panic", r)
+				slog.Error("panic in scheduled task", "component", "scheduler", "task", task.Name, "job_id", jobID, "panic", r)
+				s.setStatus(ctx, task, TaskStatusFailed)
+				if err := s.jobService.Fail(ctx, jobID, fmt.Sprintf("panic: %v", r)); err != nil {
+					slog.Warn("failed to mark job failed", "component", "scheduler", "job_id", jobID, "error", err)
+				}
 			}
 		}()
-		if err := s.symbolDataService.DownloadAndImport(ctx, job.ID); err != nil {
-			slog.Error("error in symbol data import", "component", "scheduler", "error", err)
+		if err := fn(ctx); err != nil {
+			slog.Error("scheduled task failed", "component", "scheduler", "task", task.Name, "job_id", jobID, "error", err)
 		}
 	}()
 }
@@ -402,9 +446,9 @@ type jobCleanupMetadata struct {
 	RetentionDays int   `json:"retention_days"`
 }
 
-func (s *Scheduler) runJobCleanup(ctx context.Context) {
+func (s *Scheduler) runJobCleanup(ctx context.Context) (uint, error) {
 	task, _ := s.task("job_cleanup")
-	s.runAsJob(ctx, task, func(ctx context.Context) (any, error) {
+	return s.runAsJob(ctx, task, func(ctx context.Context) (any, error) {
 		retentionDays := s.settingsService.GetInt(ctx, "job_cleanup_retention_days", DefaultJobCleanupRetentionDays)
 		deleted, err := s.jobService.CleanupOldJobs(ctx, retentionDays)
 		if err != nil {
@@ -424,12 +468,12 @@ type backupMetadata struct {
 	PruneError string `json:"prune_error,omitempty"`
 }
 
-func (s *Scheduler) runBackup(ctx context.Context) {
+func (s *Scheduler) runBackup(ctx context.Context) (uint, error) {
 	if s.backupService == nil {
-		return
+		return 0, errors.New("backups are not configured")
 	}
 	task, _ := s.task("data_backup")
-	s.runAsJob(ctx, task, func(ctx context.Context) (any, error) {
+	return s.runAsJob(ctx, task, func(ctx context.Context) (any, error) {
 		path, err := s.backupService.CreateBackup(ctx)
 		if err != nil {
 			return nil, err
@@ -455,44 +499,50 @@ func (s *Scheduler) runBackup(ctx context.Context) {
 	})
 }
 
-// runAsJob runs fn synchronously inside a Job record of task.JobType, storing
-// fn's metadata on the job and mirroring the outcome into the task's settings.
-// On failure last_run is deliberately left unchanged so catch-up retries.
-func (s *Scheduler) runAsJob(ctx context.Context, task ScheduledTask, fn func(ctx context.Context) (any, error)) {
+// runAsJob creates a Job record of task.JobType and runs fn in the background,
+// storing fn's metadata on the job and mirroring the outcome into the task's
+// settings. On failure last_run is deliberately left unchanged so catch-up
+// retries.
+func (s *Scheduler) runAsJob(ctx context.Context, task ScheduledTask, fn func(ctx context.Context) (any, error)) (uint, error) {
 	job, err := s.jobService.Create(ctx, task.JobType, "{}")
 	if err != nil {
-		slog.Error("error creating job", "component", "scheduler", "task", task.Name, "error", err)
 		s.setStatus(ctx, task, TaskStatusFailed)
-		return
+		return 0, fmt.Errorf("creating %s job: %w", task.JobType, err)
 	}
 	if err := s.jobService.Start(ctx, job.ID); err != nil {
 		slog.Warn("failed to mark job started", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", err)
 	}
 	s.setStatus(ctx, task, TaskStatusInProgress)
 
-	metadata, runErr := fn(ctx)
+	s.inBackground(ctx, task, job.ID, func(ctx context.Context) error {
+		metadata, runErr := fn(ctx)
 
-	if metadata != nil {
-		if b, err := json.Marshal(metadata); err != nil {
-			slog.Warn("failed to marshal job metadata", "component", "scheduler", "task", task.Name, "error", err)
-		} else if err := s.jobService.UpdateMetadata(ctx, job.ID, string(b)); err != nil {
-			slog.Warn("failed to store job metadata", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", err)
+		if metadata != nil {
+			if b, err := json.Marshal(metadata); err != nil {
+				slog.Warn("failed to marshal job metadata", "component", "scheduler", "task", task.Name, "error", err)
+			} else if err := s.jobService.UpdateMetadata(ctx, job.ID, string(b)); err != nil {
+				slog.Warn("failed to store job metadata", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", err)
+			}
 		}
-	}
 
-	if runErr != nil {
-		slog.Error("scheduled task failed", "component", "scheduler", "task", task.Name, "job_id", job.ID, "error", runErr)
-		if err := s.jobService.Fail(ctx, job.ID, runErr.Error()); err != nil {
-			slog.Warn("failed to mark job failed", "component", "scheduler", "job_id", job.ID, "error", err)
+		// Task settings are written before the job is finalised, so anyone who
+		// observes a finished job also sees the task's updated status.
+		if runErr != nil {
+			s.setStatus(ctx, task, TaskStatusFailed)
+			if err := s.jobService.Fail(ctx, job.ID, runErr.Error()); err != nil {
+				slog.Warn("failed to mark job failed", "component", "scheduler", "job_id", job.ID, "error", err)
+			}
+			return runErr
 		}
-		s.setStatus(ctx, task, TaskStatusFailed)
-		return
-	}
 
-	if err := s.jobService.Complete(ctx, job.ID); err != nil {
-		slog.Warn("failed to mark job completed", "component", "scheduler", "job_id", job.ID, "error", err)
-	}
-	s.recordRun(ctx, task, TaskStatusSuccess)
+		s.recordRun(ctx, task, TaskStatusSuccess)
+		if err := s.jobService.Complete(ctx, job.ID); err != nil {
+			slog.Warn("failed to mark job completed", "component", "scheduler", "job_id", job.ID, "error", err)
+		}
+		return nil
+	})
+
+	return job.ID, nil
 }
 
 // task returns the registered task with the given name.

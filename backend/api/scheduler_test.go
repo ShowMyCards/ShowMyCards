@@ -5,6 +5,7 @@ import (
 	"backend/services"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http/httptest"
 	"testing"
@@ -19,12 +20,28 @@ type fakeTaskProvider []services.ScheduledTask
 
 func (f fakeTaskProvider) Tasks() []services.ScheduledTask { return f }
 
+// RunNow mimics services.Scheduler.RunNow for the registered fake tasks.
+func (f fakeTaskProvider) RunNow(ctx context.Context, name string) (uint, error) {
+	for _, task := range f {
+		if task.Name == name {
+			return task.Run(ctx)
+		}
+	}
+	return 0, services.ErrTaskNotFound
+}
+
 // testTasks mirrors the shape of the real registry without needing the
 // services the real scheduler depends on.
 var testTasks = fakeTaskProvider{
 	{Name: "bulk_data_update", DisplayName: "Card Data Update", Interval: 24 * time.Hour, JobType: models.JobTypeBulkDataImport},
 	{Name: "set_data_update", DisplayName: "Set Data Update", Interval: 14 * 24 * time.Hour, JobType: models.JobTypeSetDataImport},
 	{Name: "data_backup", DisplayName: "Data Backup", Interval: 24 * time.Hour},
+	{Name: "always_running", DisplayName: "Busy", Interval: 24 * time.Hour,
+		Run: func(context.Context) (uint, error) { return 0, services.ErrTaskRunning }},
+	{Name: "broken", DisplayName: "Broken", Interval: 24 * time.Hour,
+		Run: func(context.Context) (uint, error) { return 0, errors.New("disk full") }},
+	{Name: "quick", DisplayName: "Quick", Interval: 24 * time.Hour,
+		Run: func(context.Context) (uint, error) { return 42, nil }},
 }
 
 func setupSchedulerTestApp(t *testing.T) (*fiber.App, *services.SettingsService, *services.JobService) {
@@ -42,10 +59,12 @@ func setupSchedulerTestApp(t *testing.T) (*fiber.App, *services.SettingsService,
 	settingsService := services.NewSettingsService(db)
 	jobService := services.NewJobService(db)
 
-	handler := NewSchedulerHandler(testTasks, settingsService, jobService)
+	handler := NewSchedulerHandler(context.Background(), testTasks, settingsService, jobService)
 
 	app := fiber.New()
 	app.Get("/api/scheduler/tasks", handler.GetScheduledTasks)
+	app.Post("/api/scheduler/tasks/:name/run", handler.RunTask)
+	app.Post("/api/legacy/import", handler.RunNamedTask("quick"))
 
 	return app, settingsService, jobService
 }
@@ -192,5 +211,46 @@ func TestScheduler_GetScheduledTasks_WithLastJob(t *testing.T) {
 	}
 	if got.LastJobStatus == nil || *got.LastJobStatus != string(models.JobStatusCompleted) {
 		t.Errorf("last_job_status = %v, want completed", got.LastJobStatus)
+	}
+}
+
+// RunTask tests
+
+func TestScheduler_RunTask(t *testing.T) {
+	app, _, _ := setupSchedulerTestApp(t)
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+		wantJobID  uint
+	}{
+		{"starts the task", "/api/scheduler/tasks/quick/run", fiber.StatusAccepted, 42},
+		{"legacy alias starts its task", "/api/legacy/import", fiber.StatusAccepted, 42},
+		{"unknown task", "/api/scheduler/tasks/nope/run", fiber.StatusNotFound, 0},
+		{"already running", "/api/scheduler/tasks/always_running/run", fiber.StatusConflict, 0},
+		{"run failure", "/api/scheduler/tasks/broken/run", fiber.StatusInternalServerError, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := app.Test(httptest.NewRequest("POST", tt.path, nil))
+			if err != nil {
+				t.Fatalf("failed to make request: %v", err)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode != tt.wantStatus {
+				t.Fatalf("status = %d, want %d (body: %s)", resp.StatusCode, tt.wantStatus, body)
+			}
+			if tt.wantStatus != fiber.StatusAccepted {
+				return
+			}
+			var result RunTaskResponse
+			if err := json.Unmarshal(body, &result); err != nil {
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
+			if result.JobID != tt.wantJobID {
+				t.Errorf("job_id = %d, want %d", result.JobID, tt.wantJobID)
+			}
+		})
 	}
 }

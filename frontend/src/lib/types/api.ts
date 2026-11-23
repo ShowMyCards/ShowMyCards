@@ -19,14 +19,6 @@
 export interface BannerHandler {}
 
 //////////
-// source: bulk_data.go
-
-/**
- * BulkDataHandler handles bulk data-related HTTP requests
- */
-export interface BulkDataHandler {}
-
-//////////
 // source: constants.go
 
 /**
@@ -755,6 +747,14 @@ export interface ScheduledTaskInfo {
 	last_job_status?: string;
 }
 /**
+ * RunTaskResponse is returned when a task is started on demand
+ * tygo:export
+ */
+export interface RunTaskResponse {
+	message: string;
+	job_id: number /* uint */;
+}
+/**
  * SchedulerHandler handles scheduler-related API requests
  */
 export interface SchedulerHandler {}
@@ -841,14 +841,6 @@ export interface AutocompleteResponse {
  * SetHandler handles set endpoints
  */
 export interface SetHandler {}
-/**
- * TriggerImportResponse represents the response from triggering an import
- * tygo:export
- */
-export interface TriggerImportResponse {
-	message: string;
-	job_id: number /* uint */;
-}
 
 //////////
 // source: settings.go

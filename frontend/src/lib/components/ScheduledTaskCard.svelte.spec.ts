@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { ScheduledTaskInfo } from '#lib';
+import { notifications, type ScheduledTaskInfo } from '#lib';
 import ScheduledTaskCard from './ScheduledTaskCard.svelte';
 
 function task(overrides: Partial<ScheduledTaskInfo> = {}): ScheduledTaskInfo {
@@ -19,6 +19,8 @@ function task(overrides: Partial<ScheduledTaskInfo> = {}): ScheduledTaskInfo {
 }
 
 describe('ScheduledTaskCard', () => {
+	afterEach(() => vi.restoreAllMocks());
+
 	it('renders the registry display name, description and schedule', async () => {
 		await render(ScheduledTaskCard, { task: task() });
 
@@ -58,5 +60,44 @@ describe('ScheduledTaskCard', () => {
 		await expect
 			.element(page.getByRole('link', { name: 'View last job →' }))
 			.toHaveAttribute('href', expect.stringContaining('/jobs#job-42'));
+	});
+
+	it('starts the task through the proxy and reports success', async () => {
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(JSON.stringify({ job_id: 7 }), { status: 202 }));
+		const success = vi.spyOn(notifications, 'success');
+		const onStarted = vi.fn();
+		await render(ScheduledTaskCard, { task: task(), onStarted });
+
+		await page.getByRole('button', { name: 'Run now' }).click();
+
+		await vi.waitFor(() => expect(onStarted).toHaveBeenCalled());
+		expect(fetchSpy).toHaveBeenCalledWith('/api/scheduler/tasks/data_backup/run', {
+			method: 'POST'
+		});
+		expect(success).toHaveBeenCalledWith('Data Backup started');
+	});
+
+	it('shows the backend error when the task is already running', async () => {
+		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+			new Response(JSON.stringify({ error: 'task is already running' }), { status: 409 })
+		);
+		const error = vi.spyOn(notifications, 'error');
+		const onStarted = vi.fn();
+		await render(ScheduledTaskCard, { task: task(), onStarted });
+
+		await page.getByRole('button', { name: 'Run now' }).click();
+
+		await vi.waitFor(() => expect(error).toHaveBeenCalledWith('task is already running'));
+		expect(onStarted).toHaveBeenCalled();
+	});
+
+	it('disables Run now while the task is running', async () => {
+		await render(ScheduledTaskCard, {
+			task: task({ last_job_id: 3, last_job_status: 'in_progress' })
+		});
+
+		await expect.element(page.getByRole('button', { name: 'Run now' })).toBeDisabled();
 	});
 });
