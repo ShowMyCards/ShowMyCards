@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { JobRecord, ScheduledTaskInfo } from '#lib';
+import type { JobRecord, JobType, ScheduledTaskInfo } from '#lib';
 import Page from './+page.svelte';
 import type { PageData } from './$types';
 
@@ -33,7 +33,8 @@ function job(id: number, type: string, overrides: Partial<JobRecord> = {}): JobR
 		id,
 		created_at: '2026-11-20T03:00:00Z',
 		updated_at: '2026-11-20T03:00:00Z',
-		type,
+		// string, not JobType: tests also cover job types the registry doesn't know.
+		type: type as JobType,
 		status: 'completed',
 		started_at: '2026-11-20T03:00:00Z',
 		completed_at: '2026-11-20T03:01:00Z',

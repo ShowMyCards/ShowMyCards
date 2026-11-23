@@ -98,6 +98,29 @@ describe('DeckCardActions', () => {
 		expect(posted('moveItem')).toBeUndefined();
 	});
 
+	it('offers no zone picker for tokens and other extras', async () => {
+		await render(DeckCardActions, {
+			item: makeItem({ zone: 'other', name: 'Rabbit', desired_quantity: 2 }),
+			deckWants: 2
+		});
+
+		await page.getByLabelText('Card actions for Rabbit').click();
+
+		await expect.element(page.getByLabelText('Desired quantity')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Zone')).not.toBeInTheDocument();
+	});
+
+	it('does not offer Other as a zone for real cards', async () => {
+		await render(DeckCardActions, { item: makeItem(), deckWants: 1 });
+
+		await page.getByLabelText('Card actions for Ocelot Pride').click();
+
+		const options = Array.from(
+			(page.getByLabelText('Zone').element() as HTMLSelectElement).options
+		).map((o) => o.value);
+		expect(options).not.toContain('other');
+	});
+
 	it('keeps only one row menu open at a time', async () => {
 		await render(DeckCardActions, { item: makeItem(), deckWants: 1 });
 		await render(DeckCardActions, { item: makeItem({ id: 2, name: 'Sol Ring' }), deckWants: 1 });

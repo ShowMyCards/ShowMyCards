@@ -10,6 +10,7 @@
 		getCardTreatmentName,
 		getActionError,
 		SCRYFALL_LANGUAGES,
+		ZONE_LABELS,
 		type EnhancedCardResult,
 		type CardResult,
 		type ResolveResult,
@@ -20,8 +21,7 @@
 		resolveTreatment,
 		getTreatmentDisplayName,
 		getTreatmentMarker,
-		type ParsedCard,
-		type ImportZone
+		type ParsedCard
 	} from '#lib/utils/card-list-parser.ts';
 	import { deserialize } from '$app/forms';
 	import { refreshAll } from '$app/navigation';
@@ -56,13 +56,6 @@
 
 	const textareaPlaceholder =
 		"1 Ashnod's Altar (BRR) 67 *F*\n4 Lightning Bolt\n\nSideboard\n2 Damn";
-
-	const ZONE_LABELS: Record<ImportZone, string> = {
-		command: 'Command',
-		main: 'Main',
-		side: 'Side',
-		maybe: 'Maybe'
-	};
 
 	// Preview state - combines parsing and searching
 	interface PreviewCard {
@@ -749,15 +742,18 @@
 				<h3 class="font-semibold mb-2">Decklist exports</h3>
 				<p class="text-sm text-base-content/70 mb-3">
 					Paste exports from Moxfield, MTGGoldfish, MTGA or MTGO. Each line is
-					<code class="bg-base-300 px-1 rounded">[qty] Name [(SET) COLLECTOR] [*F*/*E*]</code>. A
+					<code class="bg-base-300 px-1 rounded">[qty] Name [(SET) [COLLECTOR]] [*F*/*E*]</code>. A
 					<code class="bg-base-300 px-1 rounded">(SET) COLLECTOR</code>
-					suffix pins that exact printing; <code class="bg-base-300 px-1 rounded">*F*</code> is
-					foil,
+					suffix pins that exact printing; a set alone, in
+					<code class="bg-base-300 px-1 rounded">(SET)</code> or
+					<code class="bg-base-300 px-1 rounded">[SET]</code>, pins a printing from that set.
+					<code class="bg-base-300 px-1 rounded">*F*</code> is foil,
 					<code class="bg-base-300 px-1 rounded">*E*</code> is etched.
 				</p>
 				<pre class="text-sm bg-base-300 p-3 rounded font-mono whitespace-pre-wrap">1 Ashnod's Altar
 1 Ashnod's Altar (BRR) 67 *F*
-1 Gravecrawler (2X2) 438 *E*</pre>
+1 Gravecrawler (2X2) 438 *E*
+1 Cat [tmh3]</pre>
 			</div>
 
 			<div>

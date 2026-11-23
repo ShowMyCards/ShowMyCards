@@ -103,10 +103,12 @@ func (h *DeckHandler) List(c fiber.Ctx) error {
 		// Roll demand-zone rows up per Oracle before measuring shortfall so a
 		// card split across zones (e.g. 3 main + 1 side) is counted once against
 		// the owned pool, matching the deck-detail items endpoint. See ListItems.
+		// Tokens and other extras (zone other) are items, not cards: they are
+		// left out of the card total and the card signals.
 		totalDemand := 0
 		demandByOracle := make(map[string]int)
 		for _, item := range deck.Items {
-			if !item.Zone.CountsAsDemand() {
+			if !item.Zone.CountsAsCards() {
 				continue
 			}
 			totalDemand += item.DesiredQuantity
@@ -409,10 +411,14 @@ type SharedCard struct {
 // aggregate availability information.
 //
 // AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
-// owned_O) over demand-zone items). AggregateOverCommitted is the number of
-// distinct demand-zone cards the deck covers alone but that are over-committed
+// owned_O) over card-zone items). AggregateOverCommitted is the number of
+// distinct card-zone cards the deck covers alone but that are over-committed
 // across decks (see DeckSummary); SharedCards lists those cards, by name, with
 // the reasons. Maybe-board items are returned but never contribute to either.
+//
+// Other holds tokens and other extras. They never count as cards; their
+// ownership is reported separately: TokenShortfall and TokenOverCommitted are
+// the same two signals computed over the other zone only.
 //
 // tygo:export
 type DeckItemsResponse struct {
@@ -421,9 +427,12 @@ type DeckItemsResponse struct {
 	Main                   []EnrichedDeckItem `json:"main"`
 	Side                   []EnrichedDeckItem `json:"side"`
 	Maybe                  []EnrichedDeckItem `json:"maybe"`
+	Other                  []EnrichedDeckItem `json:"other"`
 	AggregateShortfall     int                `json:"aggregate_shortfall"`
 	AggregateOverCommitted int                `json:"aggregate_over_committed"`
 	SharedCards            []SharedCard       `json:"shared_cards"`
+	TokenShortfall         int                `json:"token_shortfall"`
+	TokenOverCommitted     int                `json:"token_over_committed"`
 }
 
 // ListItems returns the items in a deck, grouped by zone, enriched with card
@@ -466,10 +475,21 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 	// aggregate shortfall must measure the deck's combined demand for an Oracle
 	// against what is owned, not each row independently. (The zone is part of
 	// the deck_items unique index precisely to allow a card in several zones.)
+	//
+	// Card and token Oracles never overlap, so the combined map drives the
+	// per-row flags while the split maps drive the card and token aggregates.
 	deckDemandByOracle := make(map[string]int)
+	cardDemandByOracle := make(map[string]int)
+	tokenDemandByOracle := make(map[string]int)
 	for _, item := range items {
 		if item.Zone.CountsAsDemand() {
 			deckDemandByOracle[item.OracleID] += item.DesiredQuantity
+		}
+		switch {
+		case item.Zone.CountsAsCards():
+			cardDemandByOracle[item.OracleID] += item.DesiredQuantity
+		case item.Zone == models.ZoneOther:
+			tokenDemandByOracle[item.OracleID] += item.DesiredQuantity
 		}
 	}
 
@@ -481,6 +501,7 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 		Main:    []EnrichedDeckItem{},
 		Side:    []EnrichedDeckItem{},
 		Maybe:   []EnrichedDeckItem{},
+		Other:   []EnrichedDeckItem{},
 	}
 
 	for _, item := range enriched {
@@ -493,28 +514,34 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 			resp.Side = append(resp.Side, item)
 		case models.ZoneMaybe:
 			resp.Maybe = append(resp.Maybe, item)
+		case models.ZoneOther:
+			resp.Other = append(resp.Other, item)
 		}
 	}
 
-	// Aggregate shortfall = Σ over distinct demand-zone Oracles of
+	// Aggregate shortfall = Σ over distinct card-zone Oracles of
 	// max(0, deckDemand − owned); aggregate over-committed counts the Oracles the
 	// deck covers alone but other decks want too. Computed per Oracle (not per row)
-	// so a card split across zones is counted once against the owned pool.
-	shortfall, overCommitted := deckDemandTotals(deckDemandByOracle, availability)
+	// so a card split across zones is counted once against the owned pool. The
+	// token signals are the same computation over the other zone.
+	shortfall, overCommitted := deckDemandTotals(cardDemandByOracle, availability)
 	resp.AggregateShortfall = shortfall
 	resp.AggregateOverCommitted = len(overCommitted)
 	resp.SharedCards = h.sharedCards(ctx, overCommitted, enriched, availability)
+	tokenShortfall, tokenOverCommitted := deckDemandTotals(tokenDemandByOracle, availability)
+	resp.TokenShortfall = tokenShortfall
+	resp.TokenOverCommitted = len(tokenOverCommitted)
 
 	return c.JSON(resp)
 }
 
 // sharedCards explains the deck's over-committed Oracles: each card's name (from
-// its first demand-zone item) and the allocation conflicts behind the flag, with
+// its first card-zone item) and the allocation conflicts behind the flag, with
 // set, number and language for pinned printings. Sorted by name; never nil.
 func (h *DeckHandler) sharedCards(ctx context.Context, oracleIDs []string, items []EnrichedDeckItem, availability services.AvailabilityMap) []SharedCard {
 	names := make(map[string]string)
 	for _, item := range items {
-		if _, ok := names[item.OracleID]; !ok && item.Zone.CountsAsDemand() {
+		if _, ok := names[item.OracleID]; !ok && item.Zone.CountsAsCards() {
 			names[item.OracleID] = item.Name
 		}
 	}
@@ -820,8 +847,44 @@ func (h *DeckHandler) CreateItemsBatch(c fiber.Ctx) error {
 		}
 	}
 
-	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
-		return tx.Create(&items).Error
+	items, err := placeDeckExtras(h.db.WithContext(c.RequestCtx()), items)
+	if err != nil {
+		if isExtraZoneRule(err) {
+			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+		}
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to classify deck items", "card lookup failed", err)
+	}
+
+	err = h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		toCreate := make([]*models.DeckItem, 0, len(items))
+		for i := range items {
+			// Extras land in the other zone whatever zone the client asked for,
+			// so the client can't spot an existing row to update. Merge into it
+			// here instead of conflicting on re-add.
+			if items[i].Zone == models.ZoneOther {
+				var existing models.DeckItem
+				err := tx.Where("deck_id = ? AND oracle_id = ? AND scryfall_id = ? AND treatment = ? AND zone = ?",
+					items[i].DeckID, items[i].OracleID, items[i].ScryfallID, items[i].Treatment, models.ZoneOther).
+					First(&existing).Error
+				if err == nil {
+					existing.DesiredQuantity += items[i].DesiredQuantity
+					if err := tx.Save(&existing).Error; err != nil {
+						return err
+					}
+					items[i] = existing
+					continue
+				}
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+			}
+			toCreate = append(toCreate, &items[i])
+		}
+		if len(toCreate) == 0 {
+			return nil
+		}
+		return tx.Create(toCreate).Error
 	})
 	if err != nil {
 		if utils.IsDuplicateKey(err) {
@@ -877,6 +940,7 @@ func (h *DeckHandler) UpdateItem(c fiber.Ctx) error {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "at least one field must be provided for update")
 	}
 
+	originalZone := item.Zone
 	if req.DesiredQuantity != nil {
 		item.DesiredQuantity = *req.DesiredQuantity
 	}
@@ -894,6 +958,16 @@ func (h *DeckHandler) UpdateItem(c fiber.Ctx) error {
 	// BeforeUpdate hook surfacing as a generic update failure.
 	if err := item.ValidateDeckItem(nil); err != nil {
 		return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	if item.Zone != originalZone {
+		if err := checkExtraZone(h.db.WithContext(c.RequestCtx()), item, item.Zone); err != nil {
+			if isExtraZoneRule(err) {
+				return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+			}
+			return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+				"Failed to classify deck item", "card lookup failed", err)
+		}
 	}
 
 	if err := h.db.WithContext(c.RequestCtx()).Save(&item).Error; err != nil {
@@ -944,7 +1018,7 @@ func (h *DeckHandler) MoveItem(c fiber.Ctx) error {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
 	}
 	if !req.Zone.IsValid() {
-		return utils.ReturnError(c, fiber.StatusBadRequest, "zone must be one of main, side, command, maybe")
+		return utils.ReturnError(c, fiber.StatusBadRequest, "zone must be one of main, side, command, maybe, other")
 	}
 	if req.Quantity < 1 {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity must be at least 1")
@@ -966,51 +1040,19 @@ func (h *DeckHandler) MoveItem(c fiber.Ctx) error {
 		if req.Quantity > source.DesiredQuantity {
 			return errMoveQuantityTooHigh
 		}
-
-		err := tx.Where("deck_id = ? AND oracle_id = ? AND scryfall_id = ? AND treatment = ? AND zone = ?",
-			deckID, source.OracleID, source.ScryfallID, source.Treatment, req.Zone).First(&target).Error
-		switch {
-		case err == nil:
-			// Same card already in the target zone: merge into it.
-			target.DesiredQuantity += req.Quantity
-			if err := tx.Save(&target).Error; err != nil {
-				return err
-			}
-		case !errors.Is(err, gorm.ErrRecordNotFound):
+		if err := checkExtraZone(tx, source, req.Zone); err != nil {
 			return err
-		case req.Quantity == source.DesiredQuantity:
-			// Moving every copy and nothing to merge with: move the row itself.
-			source.Zone = req.Zone
-			if err := tx.Save(&source).Error; err != nil {
-				return err
-			}
-			target = source
-			return nil
-		default:
-			target = models.DeckItem{
-				DeckID:          source.DeckID,
-				OracleID:        source.OracleID,
-				ScryfallID:      source.ScryfallID,
-				Treatment:       source.Treatment,
-				Zone:            req.Zone,
-				DesiredQuantity: req.Quantity,
-			}
-			if err := tx.Create(&target).Error; err != nil {
-				return err
-			}
 		}
 
-		source.DesiredQuantity -= req.Quantity
-		if source.DesiredQuantity == 0 {
-			return tx.Delete(&source).Error
-		}
-		return tx.Save(&source).Error
+		moved, err := models.MoveDeckItemTx(tx, source, req.Zone, req.Quantity)
+		target = moved
+		return err
 	})
 
 	switch {
 	case errors.Is(err, errMoveItemNotFound):
 		return utils.ReturnError(c, fiber.StatusNotFound, err.Error())
-	case errors.Is(err, errMoveQuantityTooHigh):
+	case errors.Is(err, errMoveQuantityTooHigh), isExtraZoneRule(err):
 		return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
 	case err != nil:
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
@@ -1043,4 +1085,60 @@ func (h *DeckHandler) DeleteItem(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// placeDeckExtras applies the extras rule to a batch of new deck items: tokens
+// and other extras are moved into the other zone (the add UIs don't know a
+// card's classification), merging rows the move makes identical, and a real card
+// asked into the other zone is rejected. Items without local card data keep
+// their requested zone.
+func placeDeckExtras(db *gorm.DB, items []models.DeckItem) ([]models.DeckItem, error) {
+	extras, err := models.ClassifyDeckItems(db, items)
+	if err != nil {
+		return nil, err
+	}
+
+	placed := make([]models.DeckItem, 0, len(items))
+	extraRow := make(map[string]int) // oracle|printing|treatment → index in placed
+	for i, item := range items {
+		isExtra, known := extras[i]
+		switch {
+		case !known:
+			placed = append(placed, item)
+		case !isExtra:
+			if err := models.CheckExtraZone(false, item.Zone); err != nil {
+				return nil, fmt.Errorf("item %d: %w", i, err)
+			}
+			placed = append(placed, item)
+		default:
+			item.Zone = models.ZoneOther
+			key := item.OracleID + "|" + item.ScryfallID + "|" + item.Treatment
+			if j, ok := extraRow[key]; ok {
+				placed[j].DesiredQuantity += item.DesiredQuantity
+				continue
+			}
+			extraRow[key] = len(placed)
+			placed = append(placed, item)
+		}
+	}
+	return placed, nil
+}
+
+// checkExtraZone checks that item's card may sit in zone: extras only in the
+// other zone, real cards never. Items without local card data pass unchecked.
+func checkExtraZone(db *gorm.DB, item models.DeckItem, zone models.DeckZone) error {
+	extras, err := models.ClassifyDeckItems(db, []models.DeckItem{item})
+	if err != nil {
+		return err
+	}
+	if isExtra, ok := extras[0]; ok {
+		return models.CheckExtraZone(isExtra, zone)
+	}
+	return nil
+}
+
+// isExtraZoneRule reports whether err is a violation of the extras rule (a
+// client error) rather than a lookup failure.
+func isExtraZoneRule(err error) bool {
+	return errors.Is(err, models.ErrExtraOutsideOther) || errors.Is(err, models.ErrCardInOther)
 }

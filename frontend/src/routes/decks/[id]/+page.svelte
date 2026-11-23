@@ -66,7 +66,15 @@
 		data.items.command.length +
 			data.items.main.length +
 			data.items.side.length +
-			data.items.maybe.length
+			data.items.maybe.length +
+			data.items.other.length
+	);
+
+	// Cards and tokens (the Other section) are reported separately: tokens are
+	// never counted as cards. The alert is a warning if either is short.
+	const anyShort = $derived(data.items.aggregate_shortfall > 0 || data.items.token_shortfall > 0);
+	const anyShared = $derived(
+		data.items.aggregate_over_committed > 0 || data.items.token_over_committed > 0
 	);
 	// Maybe-board cards are not part of the deck, so a deck holding only those
 	// has nothing to check.
@@ -80,7 +88,12 @@
 	// Oracle-level facts stamped on every row; we render them on the first
 	// demand-zone row for each Oracle only.
 	const rollup = $derived.by(() => {
-		const demandOrdered = [...data.items.command, ...data.items.main, ...data.items.side];
+		const demandOrdered = [
+			...data.items.command,
+			...data.items.main,
+			...data.items.side,
+			...data.items.other
+		];
 		const wants: Record<string, number> = {};
 		const zones: Record<string, Record<string, true>> = {};
 		const seen: Record<string, true> = {};
@@ -131,7 +144,10 @@
 		{ key: 'command' as const, title: 'Command' },
 		{ key: 'main' as const, title: 'Main' },
 		{ key: 'side' as const, title: 'Side' },
-		{ key: 'maybe' as const, title: 'Maybe' }
+		{ key: 'maybe' as const, title: 'Maybe' },
+		// Tokens and other extras. The server keeps them here; they count as items,
+		// never as cards, so the deck's card totals leave them out.
+		{ key: 'other' as const, title: 'Other' }
 	];
 
 	const exportAll = $derived(deckExportLines(data.items, 'all'));
@@ -177,10 +193,9 @@
 		<!-- Aggregate shortfall / shared-cards summary -->
 		<div
 			class="alert mb-4"
-			class:alert-warning={data.items.aggregate_shortfall > 0}
-			class:alert-info={data.items.aggregate_shortfall === 0 &&
-				data.items.aggregate_over_committed > 0}>
-			{#if data.items.aggregate_shortfall > 0 || data.items.aggregate_over_committed > 0}
+			class:alert-warning={anyShort}
+			class:alert-info={!anyShort && anyShared}>
+			{#if anyShort || anyShared}
 				<div class="flex flex-col gap-1">
 					{#if data.items.aggregate_shortfall > 0}
 						<span>
@@ -199,6 +214,19 @@
 						{#key data.items.deck_id}
 							<DeckSharedCards cards={data.items.shared_cards} deckId={data.items.deck_id} />
 						{/key}
+					{/if}
+					{#if data.items.token_shortfall > 0}
+						<span>
+							You're missing <span class="font-semibold">{data.items.token_shortfall}</span>
+							token{data.items.token_shortfall === 1 ? '' : 's'}.
+						</span>
+					{/if}
+					{#if data.items.token_over_committed > 0}
+						<span>
+							<span class="font-semibold">{data.items.token_over_committed}</span>
+							token{data.items.token_over_committed === 1 ? ' is' : 's are'}
+							also used by other decks. You don't have enough copies for all of them.
+						</span>
 					{/if}
 				</div>
 			{:else if totalItems > 0}

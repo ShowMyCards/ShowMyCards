@@ -1371,16 +1371,6 @@ func createDeckTestPrinting(t *testing.T, db *gorm.DB, scryfallID, oracleID, nam
 	}
 }
 
-func seedPinnedDeckItem(t *testing.T, db *gorm.DB, deckID uint, oracleID, scryfallID string, qty int) {
-	t.Helper()
-	item := models.DeckItem{
-		DeckID: deckID, OracleID: oracleID, ScryfallID: scryfallID, Zone: models.ZoneMain, DesiredQuantity: qty,
-	}
-	if err := db.Create(&item).Error; err != nil {
-		t.Fatalf("failed to create pinned deck item for %s: %v", scryfallID, err)
-	}
-}
-
 // The Swamp case: two decks pin the German printing more often than it is owned,
 // although the card's total fits. A third deck that wants any printing is still
 // flagged, and shared_cards tells it which printing and which decks are behind it.
@@ -1394,8 +1384,8 @@ func TestDeckListItems_SharedCardsExplainPinnedConflict(t *testing.T) {
 	createDeckTestPrinting(t, db, "scry-en", "oracle-swamp", "Swamp", "ecl", "271", "en")
 	addDeckInventory(t, db, "oracle-swamp", "scry-de", 4)
 	addDeckInventory(t, db, "oracle-swamp", "scry-en", 5)
-	seedPinnedDeckItem(t, db, x.ID, "oracle-swamp", "scry-de", 3)
-	seedPinnedDeckItem(t, db, y.ID, "oracle-swamp", "scry-de", 2)
+	seedPinnedDeckItem(t, db, x.ID, "oracle-swamp", "scry-de", models.ZoneMain, 3)
+	seedPinnedDeckItem(t, db, y.ID, "oracle-swamp", "scry-de", models.ZoneMain, 2)
 	seedDeckItem(t, db, z.ID, "oracle-swamp", models.ZoneMain, 1)
 
 	assertDeckTotals(t, app, z, 0, 1)

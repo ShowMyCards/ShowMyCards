@@ -139,10 +139,12 @@ describe('parseCardList — decklist identity', () => {
 
 	it('does not read Scryfall clauses or a lone symbol as a collector number', () => {
 		const { cards } = parseCardList('1 Foo (ABC) e:dom\n1 Foo (ABC) -\n1 Foo (ABC) *F*');
-		for (const card of cards) {
-			expect(card.pinned).toBe(false);
-		}
+		expect(cards[0].pinned).toBe(false);
 		expect(cards[0].query).toBe('Foo (ABC) e:dom');
+		expect(cards[1].pinned).toBe(false);
+		// The finish marker isn't a collector number: this is a set-only line, foil.
+		expect(cards[2]).toMatchObject({ set: 'ABC', treatment: 'foil', query: '!"Foo" e:ABC' });
+		expect(cards[2].collectorNumber).toBeUndefined();
 	});
 
 	it('pins The List (PLST) printings with hyphenated collector numbers', () => {
@@ -193,6 +195,64 @@ describe('parseCardList — decklist identity', () => {
 	it('does not double-append a language clause', () => {
 		const { cards } = parseCardList('sol ring l:en', { language: 'en' });
 		expect(cards[0].query).toBe('sol ring l:en');
+	});
+});
+
+describe('parseCardList — set without a collector number', () => {
+	it('pins a Moxfield wishlist token line to its set with an exact-name query', () => {
+		const { cards } = parseCardList('Cat [tmh3]');
+		expect(cards[0]).toMatchObject({
+			quantity: 1,
+			name: 'Cat',
+			set: 'tmh3',
+			pinned: true,
+			treatment: 'nonfoil',
+			query: '!"Cat" e:tmh3'
+		});
+		expect(cards[0].collectorNumber).toBeUndefined();
+	});
+
+	it('treats round and square brackets the same', () => {
+		const { cards } = parseCardList('Cat (tmh3)\nCat [tmh3]');
+		expect(cards[0]).toMatchObject({ name: 'Cat', set: 'tmh3', query: '!"Cat" e:tmh3' });
+		expect(cards[1]).toMatchObject({ name: 'Cat', set: 'tmh3', query: '!"Cat" e:tmh3' });
+	});
+
+	it('keeps commas and spaces in the name, and reads a finish marker', () => {
+		const { cards } = parseCardList(
+			'Sephiroth, One-Winged Angel Emblem (tfin)\n2 Treasure [sld] *F*',
+			{ language: 'en' }
+		);
+		expect(cards[0]).toMatchObject({
+			name: 'Sephiroth, One-Winged Angel Emblem',
+			query: '!"Sephiroth, One-Winged Angel Emblem" e:tfin l:en'
+		});
+		expect(cards[1]).toMatchObject({ quantity: 2, treatment: 'foil', set: 'sld' });
+	});
+
+	it('binds the set to the last bracket group when the name has parentheses', () => {
+		const { cards } = parseCardList('Erase (Not the One) [wth]');
+		expect(cards[0]).toMatchObject({ name: 'Erase (Not the One)', set: 'wth' });
+	});
+
+	it('leaves raw queries and mismatched brackets alone', () => {
+		const { cards } = parseCardList('t:goblin (red)\nCat (tmh3]');
+		expect(cards[0]).toMatchObject({ pinned: false, query: 't:goblin (red)' });
+		expect(cards[1]).toMatchObject({ pinned: false, query: 'Cat (tmh3]' });
+	});
+});
+
+describe('parseCardList — pinned printing with square brackets', () => {
+	it('reads [SET] COLLECTOR like (SET) COLLECTOR', () => {
+		const { cards } = parseCardList('1 Teysa Karlov [MUL] 191 *F*');
+		expect(cards[0]).toMatchObject({
+			name: 'Teysa Karlov',
+			set: 'MUL',
+			collectorNumber: '191',
+			treatment: 'foil',
+			pinned: true,
+			query: 'e:MUL cn:191'
+		});
 	});
 });
 

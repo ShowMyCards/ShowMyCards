@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { decksApi, notifications, type DeckSummary, type DeckZone } from '#lib';
+	import {
+		decksApi,
+		notifications,
+		PICKABLE_ZONES,
+		ZONE_LABELS,
+		zonesLabel,
+		type DeckSummary,
+		type DeckZone
+	} from '#lib';
 	import { buildDeckItems, type AddToDeckCard } from '#lib/utils/deck-add.ts';
 	import { LayersPlus, Plus } from '@lucide/svelte';
 	import Modal from './Modal.svelte';
@@ -18,13 +26,6 @@
 	let { open, cards, bulk = false, onClose, onAdded }: Props = $props();
 
 	const uid = $props.id();
-
-	const ZONES: { value: DeckZone; label: string }[] = [
-		{ value: 'command', label: 'Command' },
-		{ value: 'main', label: 'Main' },
-		{ value: 'side', label: 'Side' },
-		{ value: 'maybe', label: 'Maybe' }
-	];
 
 	// Remember the last deck used so repeat adds are a single click. Per-viewer
 	// convenience only, so storage failures (private mode etc.) are ignored.
@@ -147,13 +148,16 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ items })
 			});
+			const data = await response.json().catch(() => ({}));
 			if (!response.ok) {
-				const data = await response.json().catch(() => ({}));
 				throw new Error(data.error || 'Failed to add to deck');
 			}
 
 			rememberDeck(String(deck.id));
-			const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
+			// Tokens and other extras are stored in Other whatever zone was picked, so
+			// name the zones the server reports, not the picked one.
+			const stored = data.zones;
+			const zoneLabel = zonesLabel(Array.isArray(stored) && stored.length > 0 ? stored : [zone]);
 			notifications.success(
 				single
 					? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
@@ -263,13 +267,13 @@
 		<fieldset class="flex flex-col gap-2">
 			<legend class="mb-2 font-semibold">Zone</legend>
 			<div class="join">
-				{#each ZONES as z (z.value)}
+				{#each PICKABLE_ZONES as z (z)}
 					<input
 						type="radio"
 						name="{uid}-zone"
 						class="join-item btn btn-sm"
-						aria-label={z.label}
-						value={z.value}
+						aria-label={ZONE_LABELS[z]}
+						value={z}
 						bind:group={zone} />
 				{/each}
 			</div>

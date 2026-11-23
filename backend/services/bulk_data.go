@@ -273,6 +273,12 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 		slog.Warn("bulk import completed with warnings", "failed", totalFailed, "total", totalCards, "failure_rate_pct", fmt.Sprintf("%.2f", failureRate*100))
 	}
 
+	// Step 4: With fresh card data, put deck tokens and other extras in their
+	// zone. A failure is logged, not returned: the card data itself was imported fine.
+	if _, err := models.ReclassifyDeckExtras(ctx, s.db); err != nil {
+		slog.Error("failed to reclassify deck extras after bulk import", "error", err)
+	}
+
 	return nil
 }
 

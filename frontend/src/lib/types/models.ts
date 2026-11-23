@@ -17,10 +17,11 @@
  * BannerSeverity controls how a Banner is styled in the UI.
  * tygo:export
  */
-export type BannerSeverity = string;
-export const BannerSeverityInfo: BannerSeverity = 'info';
-export const BannerSeverityWarning: BannerSeverity = 'warning';
-export const BannerSeverityError: BannerSeverity = 'error';
+export const BannerSeverityInfo = 'info';
+export const BannerSeverityWarning = 'warning';
+export const BannerSeverityError = 'error';
+export type BannerSeverity =
+	typeof BannerSeverityInfo | typeof BannerSeverityWarning | typeof BannerSeverityError;
 /**
  * Banner is a transient, server-derived message surfaced in the UI.
  * Banners are computed on demand (see services.BannerService) and never
@@ -127,6 +128,17 @@ export interface Deck {
 }
 
 //////////
+// source: deck_extra.go
+
+/**
+ * ReclassifyResult reports what ReclassifyDeckExtras did.
+ */
+export interface ReclassifyResult {
+	Checked: number /* int */; // deck item rows examined
+	Moved: number /* int */; // rows moved (or merged) into their correct zone
+}
+
+//////////
 // source: deck_item.go
 
 /**
@@ -138,6 +150,12 @@ export const ZoneMain: DeckZone = 'main';
 export const ZoneSide: DeckZone = 'side';
 export const ZoneCommand: DeckZone = 'command';
 export const ZoneMaybe: DeckZone = 'maybe';
+/**
+ * ZoneOther holds tokens and other non-playable extras (emblems, helper
+ * cards, art cards, planes, ...). It is reserved for them: extras always live
+ * here and real cards never do (see IsDeckExtra and CheckExtraZone).
+ */
+export const ZoneOther: DeckZone = 'other';
 /**
  * DeckItem represents a single card entry in a deck.
  * ScryfallID is empty when the user does not pin a specific printing (any
@@ -190,22 +208,32 @@ export interface Inventory {
  * JobType represents the type of job
  * tygo:export
  */
-export type JobType = string;
-export const JobTypeBulkDataImport: JobType = 'bulk_data_import';
-export const JobTypeSetDataImport: JobType = 'set_data_import';
-export const JobTypeSymbolDataImport: JobType = 'symbol_data_import';
-export const JobTypeDataBackup: JobType = 'data_backup';
-export const JobTypeJobCleanup: JobType = 'job_cleanup';
+export const JobTypeBulkDataImport = 'bulk_data_import';
+export const JobTypeSetDataImport = 'set_data_import';
+export const JobTypeSymbolDataImport = 'symbol_data_import';
+export const JobTypeDataBackup = 'data_backup';
+export const JobTypeJobCleanup = 'job_cleanup';
+export type JobType =
+	| typeof JobTypeBulkDataImport
+	| typeof JobTypeSetDataImport
+	| typeof JobTypeSymbolDataImport
+	| typeof JobTypeDataBackup
+	| typeof JobTypeJobCleanup;
 /**
  * JobStatus represents the status of a job
  * tygo:export
  */
-export type JobStatus = string;
-export const JobStatusPending: JobStatus = 'pending';
-export const JobStatusInProgress: JobStatus = 'in_progress';
-export const JobStatusCompleted: JobStatus = 'completed';
-export const JobStatusFailed: JobStatus = 'failed';
-export const JobStatusCancelled: JobStatus = 'cancelled';
+export const JobStatusPending = 'pending';
+export const JobStatusInProgress = 'in_progress';
+export const JobStatusCompleted = 'completed';
+export const JobStatusFailed = 'failed';
+export const JobStatusCancelled = 'cancelled';
+export type JobStatus =
+	| typeof JobStatusPending
+	| typeof JobStatusInProgress
+	| typeof JobStatusCompleted
+	| typeof JobStatusFailed
+	| typeof JobStatusCancelled;
 /**
  * Job represents a long-running background job
  * tygo:export

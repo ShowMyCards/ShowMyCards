@@ -162,6 +162,20 @@ func TestAllocation_DemandZonesAllCount(t *testing.T) {
 	assertAvail(t, computeOracle(t, db, "oracle-1"), 10, 6, 4, false)
 }
 
+// Tokens in the other zone lock the token copies you own, so two decks sharing
+// one owned token over-commit it like any card.
+func TestAllocation_OtherZoneCountsAcrossDecks(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	deckA := newDeck(t, db, "Rabbits A")
+	deckB := newDeck(t, db, "Rabbits B")
+
+	addInventory(t, db, "oracle-token", "scry-token", 1)
+	addDeckItem(t, db, deckA.ID, "oracle-token", "", models.ZoneOther, 1)
+	addDeckItem(t, db, deckB.ID, "oracle-token", "", models.ZoneOther, 1)
+
+	assertAvail(t, computeOracle(t, db, "oracle-token"), 1, 2, 0, true)
+}
+
 func TestAllocation_PinnedPrintingConflictWhenOracleFits(t *testing.T) {
 	db := setupAllocationTestDB(t)
 	deck := newDeck(t, db, "Pinned")

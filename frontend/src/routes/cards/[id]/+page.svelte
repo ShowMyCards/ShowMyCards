@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { PageHeader, getCardTreatmentName, getDisplayName, type DeckCardUsage } from '#lib';
+	import {
+		PageHeader,
+		ZONE_LABELS,
+		getCardTreatmentName,
+		getDisplayName,
+		type DeckCardUsage
+	} from '#lib';
 	import { resolve } from '$app/paths';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -13,13 +19,6 @@
 	const card = $derived(data.card);
 	const otherPrintings = $derived(data.otherPrintings);
 	const deckUsage = $derived<DeckCardUsage[]>(data.deckUsage ?? []);
-
-	const ZONE_LABELS: Record<string, string> = {
-		command: 'Command',
-		main: 'Main',
-		side: 'Side',
-		maybe: 'Maybe'
-	};
 
 	// Group the deck usage rows by deck so each deck is listed once with its zones.
 	const decksUsing = $derived.by(() => {
@@ -274,7 +273,7 @@
 												title={entry.scryfall_id
 													? 'Pinned to this printing'
 													: 'Any printing of this card'}>
-												{ZONE_LABELS[entry.zone] ?? entry.zone} ×{entry.desired_quantity}
+												{ZONE_LABELS[entry.zone]} ×{entry.desired_quantity}
 												{#if entry.scryfall_id}· this printing{/if}
 											</span>
 										{/each}

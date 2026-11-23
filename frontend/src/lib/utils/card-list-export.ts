@@ -38,7 +38,10 @@ export interface CardListExport {
 	skipped: number;
 }
 
-export type DeckExportItems = Pick<DeckItemsResponse, 'command' | 'main' | 'side' | 'maybe'>;
+export type DeckExportItems = Pick<
+	DeckItemsResponse,
+	'command' | 'main' | 'side' | 'maybe' | 'other'
+>;
 
 function hasName<T extends { name?: string }>(row: T): row is T & { name: string } {
 	return !!row.name;
@@ -77,7 +80,8 @@ function deckExpansion(row: EnrichedDeckItem): string | undefined {
 }
 
 /**
- * Export a deck across all four zones (Command, Main, Side, Maybe).
+ * Export a deck across all five zones (Command, Main, Side, Maybe, and Other
+ * for tokens and other extras).
  *
  * 'missing' spends each card's owned copies (an Oracle-level, finish-agnostic
  * count) on its rows and exports what is left. Owned copies don't record their
@@ -88,7 +92,7 @@ function deckExpansion(row: EnrichedDeckItem): string | undefined {
  * export, excludes the maybe-board).
  */
 export function deckExportLines(items: DeckExportItems, mode: CardListExportMode): CardListExport {
-	const rows = [...items.command, ...items.main, ...items.side, ...items.maybe];
+	const rows = [...items.command, ...items.main, ...items.side, ...items.maybe, ...items.other];
 	const named = rows.filter(hasName);
 	const lines = createLines();
 

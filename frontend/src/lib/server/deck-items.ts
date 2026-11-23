@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '#lib';
+import { BACKEND_URL, type DeckZone } from '#lib';
 
 /** A single deck item to add, matching the backend CreateDeckItemRequest shape. */
 export interface DeckItemInput {
@@ -6,12 +6,18 @@ export interface DeckItemInput {
 	scryfall_id: string;
 	treatment: string;
 	desired_quantity: number;
-	zone: string;
+	zone: DeckZone;
 }
 
 type FetchFn = typeof fetch;
 
-export type UpsertResult = { ok: true } | { ok: false; status: number; error: string };
+/**
+ * On success, zones lists the zones the items ended up in. The backend decides
+ * this for tokens and other extras: they always land in the "other" zone, whatever
+ * zone was asked for, so callers report these zones rather than the requested one.
+ */
+export type UpsertResult =
+	{ ok: true; zones: DeckZone[] } | { ok: false; status: number; error: string };
 
 /**
  * Add items to a deck with upsert semantics.
@@ -29,13 +35,15 @@ export async function upsertDeckItems(
 	items: DeckItemInput[]
 ): Promise<UpsertResult> {
 	if (items.length === 0) {
-		return { ok: true };
+		return { ok: true, zones: [] };
 	}
 
 	const existingRes = await fetch(`${BACKEND_URL}/api/decks/${deckId}/items`);
 	const existing = existingRes.ok
 		? await existingRes.json()
 		: { command: [], main: [], side: [], maybe: [] };
+	// The other zone is left out: tokens and other extras are never asked for in
+	// it, and the backend merges a re-added extra into its other-zone row itself.
 	const allExisting: Array<DeckItemInput & { id: number }> = [
 		...(existing.command ?? []),
 		...(existing.main ?? []),
@@ -43,6 +51,7 @@ export async function upsertDeckItems(
 		...(existing.maybe ?? [])
 	];
 
+	const zones = new Set<DeckZone>();
 	const toCreate: DeckItemInput[] = [];
 	for (const item of items) {
 		const match = allExisting.find(
@@ -63,6 +72,7 @@ export async function upsertDeckItems(
 				const errorData = await putRes.json().catch(() => ({}));
 				return { ok: false, status: putRes.status, error: errorData.error || 'Failed to add card' };
 			}
+			zones.add(match.zone);
 		} else {
 			toCreate.push(item);
 		}
@@ -82,7 +92,9 @@ export async function upsertDeckItems(
 					: errorData.error || 'Failed to add cards';
 			return { ok: false, status: res.status, error };
 		}
+		const created: Array<{ zone: DeckZone }> = await res.json().catch(() => toCreate);
+		for (const row of created) zones.add(row.zone);
 	}
 
-	return { ok: true };
+	return { ok: true, zones: [...zones] };
 }

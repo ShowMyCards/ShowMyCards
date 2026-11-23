@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { EnrichedDeckItem } from '#lib';
-	import { notifications, getActionError } from '#lib';
+	import type { DeckZone, EnrichedDeckItem } from '#lib';
+	import { notifications, getActionError, PICKABLE_ZONES, ZONE_LABELS } from '#lib';
 	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { ChevronDown, Trash2 } from '@lucide/svelte';
@@ -16,15 +16,11 @@
 		spansZones?: boolean;
 	} = $props();
 
-	const ZONES = [
-		{ value: 'command', label: 'Command' },
-		{ value: 'main', label: 'Main' },
-		{ value: 'side', label: 'Side' },
-		{ value: 'maybe', label: 'Maybe' }
-	];
-
 	// Maybe-board items never count as demand, so they carry no availability signal.
 	const isDemand = $derived(item.zone !== 'maybe');
+	// Tokens and other extras always stay in the Other section: no zone picker.
+	// Real cards can't be moved into Other either, so it isn't in PICKABLE_ZONES.
+	const canMove = $derived(item.zone !== 'other');
 
 	// Writable derived: seeded from the prop, editable, resets on fresh data.
 	let qty = $derived(item.desired_quantity);
@@ -35,13 +31,12 @@
 
 	// Moving to another zone. With more than one copy we ask how many to move
 	// (defaulting to all of them); a single copy moves as soon as a zone is picked.
-	let moveZone = $derived<string>(item.zone);
+	let moveZone = $derived<DeckZone>(item.zone);
 	let moveQty = $derived(item.desired_quantity);
 	const movePending = $derived(moveZone !== item.zone);
 	const moveQtyValid = $derived(
 		Number.isInteger(moveQty) && moveQty >= 1 && moveQty <= item.desired_quantity
 	);
-	const zoneLabel = (value: string) => ZONES.find((z) => z.value === value)?.label ?? value;
 
 	// The <details> menu stays open until something closes it: all row menus
 	// share a name so only one is open at a time, and outside clicks or Escape
@@ -110,7 +105,9 @@
 				quantity: String(moveQty)
 			});
 			if (ok) {
-				notifications.success(`Moved ${moveQty} ${item.name || 'card'} to ${zoneLabel(moveZone)}`);
+				notifications.success(
+					`Moved ${moveQty} ${item.name || 'card'} to ${ZONE_LABELS[moveZone]}`
+				);
 				close();
 			} else {
 				cancelMove();
@@ -180,19 +177,21 @@
 		</div>
 
 		<!-- Zone -->
-		<div class="mb-2 flex items-center gap-2">
-			<span class="w-12 text-xs opacity-70">Zone</span>
-			<select
-				bind:value={moveZone}
-				onchange={onZoneChange}
-				disabled={saving}
-				class="select select-bordered select-xs"
-				aria-label="Zone">
-				{#each ZONES as zone (zone.value)}
-					<option value={zone.value}>{zone.label}</option>
-				{/each}
-			</select>
-		</div>
+		{#if canMove}
+			<div class="mb-2 flex items-center gap-2">
+				<span class="w-12 text-xs opacity-70">Zone</span>
+				<select
+					bind:value={moveZone}
+					onchange={onZoneChange}
+					disabled={saving}
+					class="select select-bordered select-xs"
+					aria-label="Zone">
+					{#each PICKABLE_ZONES as zone (zone)}
+						<option value={zone}>{ZONE_LABELS[zone]}</option>
+					{/each}
+				</select>
+			</div>
+		{/if}
 
 		{#if movePending && item.desired_quantity > 1}
 			<div class="bg-base-200 rounded-box mb-2 p-2">
@@ -205,7 +204,7 @@
 						bind:value={moveQty}
 						class="input input-bordered input-xs w-14"
 						aria-label="Quantity to move" />
-					<span>of {item.desired_quantity} to {zoneLabel(moveZone)}</span>
+					<span>of {item.desired_quantity} to {ZONE_LABELS[moveZone]}</span>
 				</div>
 				<div class="flex gap-2">
 					<button onclick={move} disabled={saving || !moveQtyValid} class="btn btn-primary btn-xs"
