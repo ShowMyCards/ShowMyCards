@@ -9,10 +9,13 @@
  *      - e.g. "4 e:who cn:1056", "2! !\"Lightning Bolt\"", "sol ring"
  *
  * 2. Decklist-export lines (Moxfield / MTGGoldfish / MTGA / MTGO / ManaBox):
- *      [quantity] Name [(SET) COLLECTOR] [*F*|*E*]
+ *      [quantity] Name [(SET) [COLLECTOR]] [*F*|*E*]
  *      - treatment marker is TRAILING: *F* = foil, *E* = etched
+ *      - the set may be in (round) or [square] brackets; they mean the same
  *      - "1 Ashnod's Altar"              -> any printing (name search)
  *      - "1 Ashnod's Altar (BRR) 67 *F*" -> pinned printing (e:BRR cn:67), foil
+ *      - "Cat [tmh3]"                    -> pinned to the set (!"Cat" e:tmh3); Moxfield
+ *                                           wishlists list tokens this way
  *
  * Collector numbers that aren't purely digits are quoted in the resolved query
  * (cn:"2XM-169", cn:"112p", cn:"65†"): Scryfall does not match them in an unquoted
@@ -47,13 +50,14 @@ export interface ParsedCard {
 	zone: ImportZone;
 	/** Parsed card name, when the line is a decklist entry (not a raw Scryfall query) */
 	name?: string;
-	/** Set code, when the line pins a specific printing */
+	/** Set code, when the line pins a printing */
 	set?: string;
-	/** Collector number, when the line pins a specific printing */
+	/** Collector number, when the line pins a printing and gives one */
 	collectorNumber?: string;
 	/**
-	 * True when the line names a specific printing (set + collector). Such lines
-	 * resolve to a pinned Scryfall ID; non-pinned lines keep only the Oracle ID.
+	 * True when the line names a printing (a set, with or without a collector
+	 * number). Such lines resolve to a pinned Scryfall ID; non-pinned lines keep
+	 * only the Oracle ID.
 	 */
 	pinned: boolean;
 	/** Parse error if line couldn't be parsed */
@@ -78,6 +82,11 @@ export interface ParseOptions {
 // then the remainder. Examples: "4!! e:who", "3! bolt", "2 counterspell", "sol ring".
 const LEADING_PATTERN = /^(\d+)?\s*(!!?)?\s*(.+)$/;
 
+// A set code in matching round or square brackets: "(MUL)" or "[tmh3]". Moxfield
+// uses both (decklists round, wishlists square). Two capture groups: one per
+// bracket style, exactly one of which is set.
+const SET_GROUP = String.raw`(?:\(([0-9A-Za-z]+)\)|\[([0-9A-Za-z]+)\])`;
+
 // A decklist line pinning a specific printing: "Name (SET) COLLECTOR [*F*|*E*]".
 // The set code is alphanumeric only and the line is anchored end-to-end (bar the
 // finish marker), so raw Scryfall queries that contain parentheses — e.g.
@@ -90,8 +99,20 @@ const LEADING_PATTERN = /^(\d+)?\s*(!!?)?\s*(.+)$/;
 // a number), '"' (keeps quoting intact), "(" ")" (Scryfall grouping) and "*" (the
 // *F* / *E* marker). This admits real numbers such as "65†", "2XM-169" and "118★".
 // The lookahead requires at least one letter or digit, so a lone "-" isn't a number.
-const PINNED_PATTERN =
-	/^(.+)\s+\(([0-9A-Za-z]+)\)\s+((?=[^\s:"()*]*[\p{L}\p{N}])[^\s:"()*]+)(?:\s+\*([FE])\*)?$/u;
+const PINNED_PATTERN = new RegExp(
+	String.raw`^(.+)\s+${SET_GROUP}\s+((?=[^\s:"()*]*[\p{L}\p{N}])[^\s:"()*]+)(?:\s+\*([FE])\*)?$`,
+	'u'
+);
+
+// A decklist line naming a set but no collector number: "Name (SET)" or "Name [SET]"
+// (e.g. Moxfield wishlist tokens, "Cat [tmh3]"). Same anchoring and greedy name as
+// PINNED_PATTERN. The name must not contain ':' or '"', so a raw query ending in a
+// bracketed word (e.g. "t:goblin (red)") is still treated as a query.
+const SET_ONLY_PATTERN = new RegExp(String.raw`^([^:"]+)\s+${SET_GROUP}(?:\s+\*([FE])\*)?$`, 'u');
+
+function finishTreatment(marker: string | undefined): TreatmentPreference {
+	return marker === 'F' ? 'foil' : marker === 'E' ? 'etched' : 'nonfoil';
+}
 
 // An unquoted cn:/number: clause in a Scryfall query (":" or "=" only; range
 // comparisons like cn>=100 are numeric and left alone). The value stops at
@@ -221,20 +242,41 @@ function parseCardLine(
 	// A pinned decklist printing: "Name (SET) COLLECTOR [*F*|*E*]".
 	const pinnedMatch = rest.match(PINNED_PATTERN);
 	if (pinnedMatch) {
-		const [, name, set, collector, finishMarker] = pinnedMatch;
-		const treatment: TreatmentPreference =
-			finishMarker === 'F' ? 'foil' : finishMarker === 'E' ? 'etched' : 'nonfoil';
+		const [, name, parenSet, bracketSet, collector, finishMarker] = pinnedMatch;
+		const set = parenSet ?? bracketSet;
 
 		return {
 			line,
 			lineNumber,
 			quantity,
-			treatment,
+			treatment: finishTreatment(finishMarker),
 			query: withLanguage(`e:${set} ${cnClause(collector)}`, options.language),
 			zone,
 			name: name.trim(),
 			set,
 			collectorNumber: collector,
+			pinned: true
+		};
+	}
+
+	// A set but no collector number: "Name (SET)" / "Name [SET]". Pinned to whichever
+	// printing Scryfall returns for that exact name in that set. With no collector
+	// number the local resolver can't pin it, so it always goes to Scryfall.
+	const setOnlyMatch = rest.match(SET_ONLY_PATTERN);
+	if (setOnlyMatch) {
+		const [, rawName, parenSet, bracketSet, finishMarker] = setOnlyMatch;
+		const name = rawName.trim();
+		const set = parenSet ?? bracketSet;
+
+		return {
+			line,
+			lineNumber,
+			quantity,
+			treatment: finishTreatment(finishMarker),
+			query: withLanguage(`!"${name}" e:${set}`, options.language),
+			zone,
+			name,
+			set,
 			pinned: true
 		};
 	}
