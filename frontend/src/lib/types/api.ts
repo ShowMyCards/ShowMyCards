@@ -19,14 +19,6 @@
 export interface BannerHandler {}
 
 //////////
-// source: bulk_data.go
-
-/**
- * BulkDataHandler handles bulk data-related HTTP requests
- */
-export interface BulkDataHandler {}
-
-//////////
 // source: constants.go
 
 /**
@@ -746,14 +738,42 @@ export interface ResolveResponse {
  * tygo:export
  */
 export interface ScheduledTaskInfo {
-	name: string;
-	type: string; // "bulk_data_update" | "job_cleanup"
+	name: string; // registry identifier, e.g. "data_backup"
+	display_name: string;
+	description: string;
 	enabled: boolean;
-	schedule: string; // e.g., "03:00 daily"
-	next_run: string;
+	enabled_key: string; // settings key to write to change Enabled
+	time: string; // time of day, "HH:MM"
+	time_key: string; // settings key to write to change Time
+	interval_days: number /* int */;
+	schedule: string; // e.g. "03:00 daily", "02:30 every 14 days"
+	next_run?: string; // omitted when disabled or the time is invalid
 	last_run?: string;
+	last_status?: string; // "in_progress" | "success" | "failed"
+	job_type?: string; // type of Job record the task creates
 	last_job_id?: number /* uint */;
 	last_job_status?: string;
+	extras: TaskSettingInfo[];
+}
+/**
+ * TaskSettingInfo is a task-specific setting and its current value
+ * tygo:export
+ */
+export interface TaskSettingInfo {
+	key: string;
+	label: string;
+	description: string;
+	kind: string; // "int" or "url"
+	value: string;
+	min?: number /* int */;
+}
+/**
+ * RunTaskResponse is returned when a task is started on demand
+ * tygo:export
+ */
+export interface RunTaskResponse {
+	message: string;
+	job_id: number /* uint */;
 }
 /**
  * SchedulerHandler handles scheduler-related API requests
@@ -842,14 +862,6 @@ export interface AutocompleteResponse {
  * SetHandler handles set endpoints
  */
 export interface SetHandler {}
-/**
- * TriggerImportResponse represents the response from triggering an import
- * tygo:export
- */
-export interface TriggerImportResponse {
-	message: string;
-	job_id: number /* uint */;
-}
 
 //////////
 // source: settings.go

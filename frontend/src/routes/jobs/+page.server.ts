@@ -1,21 +1,8 @@
-import { BACKEND_URL, type JobType, type JobStatus, type ScheduledTaskInfo } from '#lib';
+import { BACKEND_URL, type JobRecord, type ScheduledTaskInfo } from '#lib';
 import type { PageServerLoad } from './$types';
 
-// API response has flattened BaseModel fields
-interface JobResponse {
-	id: number;
-	created_at: string;
-	updated_at: string;
-	type: JobType;
-	status: JobStatus;
-	started_at?: string;
-	completed_at?: string;
-	error?: string;
-	metadata?: string;
-}
-
 interface PaginatedResponse {
-	data: JobResponse[];
+	data: JobRecord[];
 	page: number;
 	page_size: number;
 	total_items: number;
@@ -34,7 +21,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 
 		if (!jobsResponse.ok) {
 			return {
-				jobs: [] as JobResponse[],
+				jobs: [] as JobRecord[],
 				scheduledTasks: [] as ScheduledTaskInfo[],
 				page: 1,
 				totalPages: 0,
@@ -54,7 +41,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 		};
 	} catch {
 		return {
-			jobs: [] as JobResponse[],
+			jobs: [] as JobRecord[],
 			scheduledTasks: [] as ScheduledTaskInfo[],
 			page: 1,
 			totalPages: 0,

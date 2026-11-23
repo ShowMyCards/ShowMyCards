@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
@@ -62,11 +63,11 @@ func TestSettingsGet_Success(t *testing.T) {
 
 	// Verify default settings exist
 	expectedDefaults := []string{
-		"bulk_data_auto_update",
+		"bulk_data_update_enabled",
 		"bulk_data_update_time",
 		"bulk_data_url",
-		"bulk_data_last_update",
-		"bulk_data_last_update_status",
+		"bulk_data_update_last_run",
+		"bulk_data_update_last_status",
 		"scryfall_default_search",
 		"scryfall_unique_mode",
 	}
@@ -78,8 +79,8 @@ func TestSettingsGet_Success(t *testing.T) {
 	}
 
 	// Verify specific default values
-	if settings["bulk_data_auto_update"] != "true" {
-		t.Errorf("expected bulk_data_auto_update='true', got '%s'", settings["bulk_data_auto_update"])
+	if settings["bulk_data_update_enabled"] != "true" {
+		t.Errorf("expected bulk_data_update_enabled='true', got '%s'", settings["bulk_data_update_enabled"])
 	}
 
 	if settings["bulk_data_update_time"] != "03:00" {
@@ -92,8 +93,8 @@ func TestSettingsGet_Success(t *testing.T) {
 func TestSettingsGetSingle_Success(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("GET", "/api/settings/bulk_data_auto_update", nil)
-	req.SetPathValue("key", "bulk_data_auto_update")
+	req := httptest.NewRequest("GET", "/api/settings/bulk_data_update_enabled", nil)
+	req.SetPathValue("key", "bulk_data_update_enabled")
 
 	resp, err := app.Test(req)
 	if err != nil {
@@ -110,8 +111,8 @@ func TestSettingsGetSingle_Success(t *testing.T) {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	if result["key"] != "bulk_data_auto_update" {
-		t.Errorf("expected key 'bulk_data_auto_update', got '%s'", result["key"])
+	if result["key"] != "bulk_data_update_enabled" {
+		t.Errorf("expected key 'bulk_data_update_enabled', got '%s'", result["key"])
 	}
 
 	if result["value"] != "true" {
@@ -145,9 +146,9 @@ func TestSettingsUpdate_Success(t *testing.T) {
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
-	req := httptest.NewRequest("PUT", "/api/settings/bulk_data_auto_update", bytes.NewReader(reqBody))
+	req := httptest.NewRequest("PUT", "/api/settings/bulk_data_update_enabled", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("key", "bulk_data_auto_update")
+	req.SetPathValue("key", "bulk_data_update_enabled")
 
 	resp, err := app.Test(req)
 	if err != nil {
@@ -160,7 +161,7 @@ func TestSettingsUpdate_Success(t *testing.T) {
 	}
 
 	// Verify update persisted
-	value, err := service.Get(context.Background(),"bulk_data_auto_update")
+	value, err := service.Get(context.Background(), "bulk_data_update_enabled")
 	if err != nil {
 		t.Fatalf("failed to get setting: %v", err)
 	}
@@ -173,9 +174,9 @@ func TestSettingsUpdate_Success(t *testing.T) {
 func TestSettingsUpdate_InvalidJSON(t *testing.T) {
 	app, _ := setupSettingsTestApp(t)
 
-	req := httptest.NewRequest("PUT", "/api/settings/bulk_data_auto_update", bytes.NewReader([]byte("invalid json")))
+	req := httptest.NewRequest("PUT", "/api/settings/bulk_data_update_enabled", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("key", "bulk_data_auto_update")
+	req.SetPathValue("key", "bulk_data_update_enabled")
 
 	resp, err := app.Test(req)
 	if err != nil {
@@ -215,9 +216,9 @@ func TestSettingsUpdateBulk_Success(t *testing.T) {
 	app, service := setupSettingsTestApp(t)
 
 	updateReq := map[string]string{
-		"bulk_data_auto_update": "false",
-		"bulk_data_update_time": "04:00",
-		"scryfall_unique_mode":  "prints",
+		"bulk_data_update_enabled": "false",
+		"bulk_data_update_time":    "04:00",
+		"scryfall_unique_mode":     "prints",
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
@@ -235,17 +236,17 @@ func TestSettingsUpdateBulk_Success(t *testing.T) {
 	}
 
 	// Verify all updates persisted
-	value1, _ := service.Get(context.Background(),"bulk_data_auto_update")
+	value1, _ := service.Get(context.Background(), "bulk_data_update_enabled")
 	if value1 != "false" {
-		t.Errorf("expected bulk_data_auto_update='false', got '%s'", value1)
+		t.Errorf("expected bulk_data_update_enabled='false', got '%s'", value1)
 	}
 
-	value2, _ := service.Get(context.Background(),"bulk_data_update_time")
+	value2, _ := service.Get(context.Background(), "bulk_data_update_time")
 	if value2 != "04:00" {
 		t.Errorf("expected bulk_data_update_time='04:00', got '%s'", value2)
 	}
 
-	value3, _ := service.Get(context.Background(),"scryfall_unique_mode")
+	value3, _ := service.Get(context.Background(), "scryfall_unique_mode")
 	if value3 != "prints" {
 		t.Errorf("expected scryfall_unique_mode='prints', got '%s'", value3)
 	}
@@ -255,8 +256,8 @@ func TestSettingsUpdateBulk_UnknownKeyIsDropped(t *testing.T) {
 	app, service := setupSettingsTestApp(t)
 
 	updateReq := map[string]string{
-		"bulk_data_auto_update": "false",
-		"invalid_key":           "some_value",
+		"bulk_data_update_enabled": "false",
+		"invalid_key":              "some_value",
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
@@ -274,9 +275,9 @@ func TestSettingsUpdateBulk_UnknownKeyIsDropped(t *testing.T) {
 	}
 
 	// Valid key was updated
-	value, _ := service.Get(context.Background(), "bulk_data_auto_update")
+	value, _ := service.Get(context.Background(), "bulk_data_update_enabled")
 	if value != "false" {
-		t.Errorf("expected bulk_data_auto_update='false', got '%s'", value)
+		t.Errorf("expected bulk_data_update_enabled='false', got '%s'", value)
 	}
 
 	// Unknown key was not stored
@@ -296,8 +297,8 @@ func TestSettingsUpdateBulk_AppVersionIsDropped(t *testing.T) {
 
 	// Simulate the frontend round-tripping all settings including app_version
 	updateReq := map[string]string{
-		"bulk_data_auto_update": "false",
-		"app_version":           "0.0.0", // should be ignored
+		"bulk_data_update_enabled": "false",
+		"app_version":              "0.0.0", // should be ignored
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
@@ -364,8 +365,8 @@ func TestSettingsUpdateBulk_PartialUpdate(t *testing.T) {
 
 	// Update only some settings
 	updateReq := map[string]string{
-		"bulk_data_auto_update": "false",
-		"scryfall_unique_mode":  "prints",
+		"bulk_data_update_enabled": "false",
+		"scryfall_unique_mode":     "prints",
 	}
 	reqBody, _ := json.Marshal(updateReq)
 
@@ -382,19 +383,91 @@ func TestSettingsUpdateBulk_PartialUpdate(t *testing.T) {
 	}
 
 	// Verify updated settings
-	value1, _ := service.Get(context.Background(),"bulk_data_auto_update")
+	value1, _ := service.Get(context.Background(), "bulk_data_update_enabled")
 	if value1 != "false" {
-		t.Errorf("expected bulk_data_auto_update='false', got '%s'", value1)
+		t.Errorf("expected bulk_data_update_enabled='false', got '%s'", value1)
 	}
 
-	value2, _ := service.Get(context.Background(),"scryfall_unique_mode")
+	value2, _ := service.Get(context.Background(), "scryfall_unique_mode")
 	if value2 != "prints" {
 		t.Errorf("expected scryfall_unique_mode='prints', got '%s'", value2)
 	}
 
 	// Verify untouched settings remain unchanged
-	value3, _ := service.Get(context.Background(),"bulk_data_update_time")
+	value3, _ := service.Get(context.Background(), "bulk_data_update_time")
 	if value3 != "03:00" {
 		t.Errorf("expected bulk_data_update_time='03:00' (unchanged), got '%s'", value3)
+	}
+}
+
+func TestSettingsHandler_GetAll_OmitsUnknownKeys(t *testing.T) {
+	app, service := setupSettingsTestApp(t)
+
+	if err := service.Set(context.Background(), "app_version", "0.1.0"); err != nil {
+		t.Fatalf("failed to seed app_version: %v", err)
+	}
+
+	resp, err := app.Test(httptest.NewRequest("GET", "/api/settings", nil))
+	if err != nil {
+		t.Fatalf("failed to make request: %v", err)
+	}
+
+	var settings map[string]string
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &settings); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if _, ok := settings["app_version"]; ok {
+		t.Error("expected app_version to be omitted from GET /api/settings")
+	}
+	if _, ok := settings["data_backup_enabled"]; !ok {
+		t.Error("expected whitelisted keys to be present")
+	}
+}
+
+func TestSettingsUpdateBulk_InvalidValue(t *testing.T) {
+	app, service := setupSettingsTestApp(t)
+
+	reqBody, _ := json.Marshal(map[string]string{
+		"data_backup_time":            "25:99",
+		"data_backup_retention_count": "3",
+	})
+	req := httptest.NewRequest("PUT", "/api/settings", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("failed to make request: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d. Body: %s", fiber.StatusBadRequest, resp.StatusCode, body)
+	}
+
+	var result map[string]string
+	json.Unmarshal(body, &result)
+	if !strings.Contains(result["error"], "data_backup_time") {
+		t.Errorf("expected error to name the invalid key, got %q", result["error"])
+	}
+	if value, _ := service.Get(context.Background(), "data_backup_retention_count"); value != "14" {
+		t.Errorf("expected no settings to be written, retention = %q", value)
+	}
+}
+
+func TestSettingsUpdate_InvalidValue(t *testing.T) {
+	app, _ := setupSettingsTestApp(t)
+
+	reqBody, _ := json.Marshal(map[string]string{"value": "sometimes"})
+	req := httptest.NewRequest("PUT", "/api/settings/data_backup_enabled", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("key", "data_backup_enabled")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("failed to make request: %v", err)
+	}
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", fiber.StatusBadRequest, resp.StatusCode)
 	}
 }

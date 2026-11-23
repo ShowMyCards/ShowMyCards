@@ -561,3 +561,72 @@ func TestNewClient_StartupDoesNotReclassifyDeckExtras(t *testing.T) {
 		t.Errorf("zone after restart = %q, want %q", got.Zone, models.ZoneMain)
 	}
 }
+
+func TestRenameSettingKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	client, err := NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	// Simulate a pre-upgrade database: legacy keys with user values, plus one
+	// legacy key whose new key already exists (new key must win).
+	seed := []models.Setting{
+		{Key: "bulk_data_auto_update", Value: "false"},
+		{Key: "backup_create_time", Value: "04:15"},
+		{Key: "backup_last_run_status", Value: "success"},
+		{Key: "set_data_auto_update", Value: "false"},
+		{Key: "set_data_update_enabled", Value: "true"},
+	}
+	if err := client.DB.Create(&seed).Error; err != nil {
+		t.Fatalf("failed to seed legacy settings: %v", err)
+	}
+	client.Close()
+
+	// Restart twice to prove idempotency.
+	for range 2 {
+		client, err = NewClient(dbPath)
+		if err != nil {
+			t.Fatalf("failed to re-run migrations: %v", err)
+		}
+		client.Close()
+	}
+
+	client, err = NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open client: %v", err)
+	}
+	defer client.Close()
+
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"bulk_data_update_enabled", "false"},
+		{"data_backup_time", "04:15"},
+		{"data_backup_last_status", "success"},
+		{"set_data_update_enabled", "true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			var setting models.Setting
+			if err := client.DB.Where("key = ?", tt.key).First(&setting).Error; err != nil {
+				t.Fatalf("expected %s to exist: %v", tt.key, err)
+			}
+			if setting.Value != tt.want {
+				t.Errorf("%s = %q, want %q", tt.key, setting.Value, tt.want)
+			}
+		})
+	}
+
+	var legacyCount int64
+	legacy := []string{"bulk_data_auto_update", "backup_create_time", "backup_last_run_status", "set_data_auto_update"}
+	if err := client.DB.Model(&models.Setting{}).Where("key IN ?", legacy).Count(&legacyCount).Error; err != nil {
+		t.Fatalf("failed to count legacy keys: %v", err)
+	}
+	if legacyCount != 0 {
+		t.Errorf("expected legacy keys to be removed, found %d", legacyCount)
+	}
+}

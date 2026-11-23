@@ -13,56 +13,41 @@
 		EmptyState,
 		Pagination,
 		ScheduledTaskCard,
-		Modal,
-		type Job
+		JobDetailModal,
+		TIMEOUTS,
+		formatDuration,
+		jobProgress,
+		jobTypeLabel,
+		jobTypeLabels,
+		parseJobMetadata,
+		statusColor,
+		statusText,
+		type JobRecord
 	} from '#lib';
 	import type { PageData } from './$types';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
 	let { data }: { data: PageData } = $props();
 
-	let errorModalOpen = $state(false);
-	let errorModalMessage = $state('');
+	// While any task is running, poll so its card and the history table update.
+	const anyTaskRunning = $derived(
+		(data.scheduledTasks ?? []).some((task) => {
+			const status = task.last_job_status ?? task.last_status;
+			return status === JobStatusPending || status === JobStatusInProgress;
+		})
+	);
 
-	function getStatusColor(status: string): 'info' | 'warning' | 'success' | 'error' | null {
-		if (status === JobStatusPending) return 'info';
-		if (status === JobStatusInProgress) return 'warning';
-		if (status === JobStatusCompleted) return 'success';
-		if (status === JobStatusFailed) return 'error';
-		return null;
-	}
+	$effect(() => {
+		if (!anyTaskRunning) return;
+		const interval = setInterval(() => invalidateAll(), TIMEOUTS.POLLING_INTERVAL);
+		return () => clearInterval(interval);
+	});
 
-	function getStatusText(status: string) {
-		if (status === JobStatusPending) return 'Pending';
-		if (status === JobStatusInProgress) return 'In Progress';
-		if (status === JobStatusCompleted) return 'Completed';
-		if (status === JobStatusFailed) return 'Failed';
-		if (status === JobStatusCancelled) return 'Cancelled';
-		return status;
-	}
+	// Job type labels come from the scheduler registry (each task's display name).
+	const typeLabels = $derived(jobTypeLabels(data.scheduledTasks ?? []));
 
-	function formatDuration(job: Job): string {
-		if (!job.started_at) return 'Not started';
-
-		const start = new Date(job.started_at).getTime();
-		const end = job.completed_at ? new Date(job.completed_at).getTime() : Date.now();
-		const duration = Math.floor((end - start) / 1000);
-
-		if (duration < 60) return `${duration}s`;
-		if (duration < 3600) return `${Math.floor(duration / 60)}m ${duration % 60}s`;
-		return `${Math.floor(duration / 3600)}h ${Math.floor((duration % 3600) / 60)}m`;
-	}
-
-	function parseJobMetadata(
-		raw: string
-	): { total_cards?: number; processed_cards?: number; phase?: string } | null {
-		try {
-			return JSON.parse(raw);
-		} catch {
-			return null;
-		}
-	}
+	let selectedJob = $state<JobRecord | null>(null);
 
 	function handlePageChange(newPage: number) {
 		goto(resolve(`/jobs?page=${newPage}`));
@@ -124,7 +109,7 @@
 			<h2 class="text-2xl font-bold mb-4">Scheduled Tasks</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 				{#each data.scheduledTasks as task (task.name)}
-					<ScheduledTaskCard {task} />
+					<ScheduledTaskCard {task} onUpdated={() => invalidateAll()} />
 				{/each}
 			</div>
 		</div>
@@ -154,21 +139,17 @@
 				</thead>
 				<tbody>
 					{#each data.jobs as job (job.id)}
-						<tr>
+						{@const progress = jobProgress(parseJobMetadata(job.metadata))}
+						<tr id="job-{job.id}" class="scroll-mt-20 target:bg-base-300">
 							<td>{job.id}</td>
 							<td>
-								<!-- <span class="badge badge-outline">
-									{job.type === 'bulk_data_import' ? 'Bulk Data Import' : job.type}
-								</span> -->
-								<Lozenge style="outline">
-									{job.type === 'bulk_data_import' ? 'Bulk Data Import' : job.type}
-								</Lozenge>
+								<Lozenge style="outline">{jobTypeLabel(job.type, typeLabels)}</Lozenge>
 							</td>
 							<td>
 								<Lozenge
-									color={getStatusColor(job.status)}
+									color={statusColor(job.status)}
 									style={job.status === JobStatusCancelled ? 'ghost' : null}>
-									{getStatusText(job.status)}
+									{statusText(job.status)}
 								</Lozenge>
 							</td>
 							<td>
@@ -180,40 +161,26 @@
 							</td>
 							<td>{formatDuration(job)}</td>
 							<td>
-								{#if job.metadata}
-									{@const metadata = parseJobMetadata(job.metadata)}
-									{#if metadata && (metadata.total_cards || metadata.processed_cards)}
-										<div class="text-xs">
-											{metadata.processed_cards || 0} / {metadata.total_cards || 0}
-											{#if metadata.total_cards && metadata.total_cards > 0}
-												({Math.round(
-													((metadata.processed_cards || 0) / metadata.total_cards) * 100
-												)}%)
-											{/if}
-										</div>
-										{#if metadata.phase}
-											<div class="text-xs opacity-70">{metadata.phase}</div>
-										{/if}
-									{:else}
-										<span class="opacity-50">-</span>
+								{#if progress}
+									<div class="text-xs">
+										{progress.processed} / {progress.total}
+										{#if progress.percent !== null}({progress.percent}%){/if}
+									</div>
+									{#if progress.phase}
+										<div class="text-xs opacity-70">{progress.phase}</div>
 									{/if}
 								{:else}
 									<span class="opacity-50">-</span>
 								{/if}
 							</td>
 							<td>
-								{#if job.error}
-									<button
-										class="btn btn-ghost btn-xs"
-										onclick={() => {
-											errorModalMessage = job.error || 'Unknown error';
-											errorModalOpen = true;
-										}}>
-										View Error
-									</button>
-								{:else}
-									<span class="opacity-50">-</span>
-								{/if}
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs {job.error ? 'text-error' : ''}"
+									aria-label="Details for job {job.id}"
+									onclick={() => (selectedJob = job)}>
+									{job.error ? 'View error' : 'Details'}
+								</button>
 							</td>
 						</tr>
 					{/each}
@@ -228,12 +195,7 @@
 	{/if}
 </div>
 
-<!-- Error Details Modal -->
-<Modal open={errorModalOpen} onClose={() => (errorModalOpen = false)} title="Job Error Details">
-	<pre class="bg-base-200 p-4 rounded overflow-x-auto text-sm">{errorModalMessage}</pre>
-	<div class="modal-action">
-		<button type="button" onclick={() => (errorModalOpen = false)} class="btn btn-ghost">
-			Close
-		</button>
-	</div>
-</Modal>
+<JobDetailModal
+	job={selectedJob}
+	typeLabel={selectedJob ? jobTypeLabel(selectedJob.type, typeLabels) : ''}
+	onClose={() => (selectedJob = null)} />

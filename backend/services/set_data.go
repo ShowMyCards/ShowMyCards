@@ -89,7 +89,7 @@ func (s *SetDataService) TriggerInitialImport(ctx context.Context) error {
 
 	// Record that an import was just triggered so the scheduler's catch-up
 	// doesn't create a duplicate job before this one finishes.
-	if err := s.settingsService.SetTime(ctx, "set_data_last_update", time.Now()); err != nil {
+	if err := s.settingsService.SetTime(ctx, "set_data_update_last_run", time.Now()); err != nil {
 		slog.Warn("failed to record initial set import time", "error", err)
 	}
 
@@ -110,7 +110,7 @@ func (s *SetDataService) DownloadAndImport(ctx context.Context, jobID uint) erro
 		return fmt.Errorf("failed to start job: %w", err)
 	}
 
-	if err := s.settingsService.Set(ctx, "set_data_last_update_status", "in_progress"); err != nil {
+	if err := s.settingsService.Set(ctx, "set_data_update_last_status", "in_progress"); err != nil {
 		slog.Warn("failed to update status setting", "error", err)
 	}
 
@@ -118,11 +118,11 @@ func (s *SetDataService) DownloadAndImport(ctx context.Context, jobID uint) erro
 		if failErr := s.jobService.Fail(ctx, jobID, err.Error()); failErr != nil {
 			slog.Error("failed to mark job as failed", "job_id", jobID, "error", failErr)
 		}
-		if setErr := s.settingsService.Set(ctx, "set_data_last_update_status", "failed"); setErr != nil {
-			slog.Warn("failed to update status setting", "key", "set_data_last_update_status", "error", setErr)
+		if setErr := s.settingsService.Set(ctx, "set_data_update_last_status", "failed"); setErr != nil {
+			slog.Warn("failed to update status setting", "key", "set_data_update_last_status", "error", setErr)
 		}
-		if setErr := s.settingsService.SetTime(ctx, "set_data_last_update", time.Now()); setErr != nil {
-			slog.Warn("failed to update time setting", "key", "set_data_last_update", "error", setErr)
+		if setErr := s.settingsService.SetTime(ctx, "set_data_update_last_run", time.Now()); setErr != nil {
+			slog.Warn("failed to update time setting", "key", "set_data_update_last_run", "error", setErr)
 		}
 		return err
 	}
@@ -131,11 +131,11 @@ func (s *SetDataService) DownloadAndImport(ctx context.Context, jobID uint) erro
 		return fmt.Errorf("failed to complete job: %w", err)
 	}
 
-	if setErr := s.settingsService.Set(ctx, "set_data_last_update_status", "success"); setErr != nil {
-		slog.Warn("failed to update status setting", "key", "set_data_last_update_status", "error", setErr)
+	if setErr := s.settingsService.Set(ctx, "set_data_update_last_status", "success"); setErr != nil {
+		slog.Warn("failed to update status setting", "key", "set_data_update_last_status", "error", setErr)
 	}
-	if setErr := s.settingsService.SetTime(ctx, "set_data_last_update", time.Now()); setErr != nil {
-		slog.Warn("failed to update time setting", "key", "set_data_last_update", "error", setErr)
+	if setErr := s.settingsService.SetTime(ctx, "set_data_update_last_run", time.Now()); setErr != nil {
+		slog.Warn("failed to update time setting", "key", "set_data_update_last_run", "error", setErr)
 	}
 
 	return nil

@@ -62,31 +62,5 @@ export const actions = {
 		} catch {
 			return fail(500, { error: 'Failed to save settings' });
 		}
-	},
-
-	// Trigger bulk data import
-	triggerImport: async ({ fetch }) => {
-		try {
-			const response = await fetch(`${BACKEND_URL}/api/bulk-data/import`, {
-				method: 'POST'
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				return fail(response.status, {
-					error: errorData.error || 'Failed to trigger import'
-				});
-			}
-
-			const result = await response.json();
-			return {
-				success: true,
-				action: 'import',
-				job_id: result.job_id,
-				message: `Import started (Job ID: ${result.job_id})`
-			};
-		} catch {
-			return fail(500, { error: 'Failed to trigger import' });
-		}
 	}
 } satisfies Actions;

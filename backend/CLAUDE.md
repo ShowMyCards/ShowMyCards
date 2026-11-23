@@ -246,18 +246,35 @@ Go types are mapped to TypeScript as follows:
 
 ### Scheduler
 
-- `GET /api/scheduler/tasks` - List all scheduled tasks
-- `POST /api/scheduler/tasks` - Create/update scheduled task
-- `POST /api/scheduler/tasks/:name/run` - Manually trigger a task
+- `GET /api/scheduler/tasks` - List every task registered in `services.Scheduler`
+  (the registry is the single source of truth — registering a task surfaces it)
+- `POST /api/scheduler/tasks/:name/run` - Start a task now, bypassing its
+  enabled flag and time window. `202 {message, job_id}`; `404` for an unknown
+  task; `409` if the task is already running (an in-progress Job of its type).
+
+Each task's settings keys are derived from its `Name`: `<name>_enabled`,
+`<name>_time` (`HH:MM`), `<name>_last_run` (RFC3339), `<name>_last_status`
+(`in_progress` | `success` | `failed`), plus task-specific extras such as
+`data_backup_retention_count` or `bulk_data_url` (declared as `Extras` on the task so the jobs
+screen can edit them). New keys must be added to `defaultSettings()` in
+`services/settings.go` (which also drives the whitelist). Legacy keys are
+renamed on startup by `renameSettingKeys` in `database/client.go`.
 
 ### Settings
 
-- `GET /api/settings` - Get application settings
-- `PUT /api/settings` - Update application settings
+- `GET /api/settings` - Get application settings (whitelisted keys only)
+- `PUT /api/settings` - Update application settings. Send only the keys you
+  changed. Known keys are validated (`services.ValidateSetting`): `*_enabled`
+  must be `true`/`false`, `*_time` must be `HH:MM`, `*_url` must be an
+  absolute `http`/`https` URL, and integer settings must
+  meet their minimum (`settingMinimums`). One invalid value rejects the whole
+  request with `400`.
 
 ### Bulk Data
 
-- `POST /api/bulk-data/import` - Trigger bulk data import from Scryfall
+- `POST /api/bulk-data/import` - Alias of `POST /api/scheduler/tasks/bulk_data_update/run`
+  (`/api/sets/import` and `/api/symbols/import` alias `set_data_update` and
+  `symbol_data_update` the same way)
 
 ### Card Search
 
@@ -370,9 +387,10 @@ Defines automated rules for sorting cards into storage locations.
 
 Background job tracking for long-running operations.
 
-- `Type` (string) - Job type (e.g., "bulk_import", "card_update")
-- `Status` (string) - Current status (pending, in_progress, completed, failed)
-- `Progress` (int) - Completion percentage (0-100)
+- `Type` (string) - Job type: `bulk_data_import`, `set_data_import`,
+  `symbol_data_import`, `data_backup`, `job_cleanup`. Every scheduled task
+  writes a Job record (its `JobType` in the scheduler registry).
+- `Status` (string) - Current status (pending, in_progress, completed, failed, cancelled)
 - `Error` (string) - Error message if failed
 - `StartedAt` (\*time.Time) - When job started
 - `CompletedAt` (\*time.Time) - When job finished

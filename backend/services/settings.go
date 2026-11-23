@@ -4,8 +4,11 @@ import (
 	"backend/models"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -26,30 +29,94 @@ func NewSettingsService(db *gorm.DB) *SettingsService {
 	return service
 }
 
-// initializeDefaults creates default settings if they don't exist
-func (s *SettingsService) initializeDefaults(ctx context.Context) {
-	defaults := map[string]string{
-		"bulk_data_auto_update":           "true",
+// defaultSettings returns every known setting key with its default value.
+// It is the single source of truth for both seeding and the key whitelist.
+func defaultSettings() map[string]string {
+	return map[string]string{
+		"bulk_data_update_enabled":        "true",
 		"bulk_data_update_time":           "03:00",
+		"bulk_data_update_last_run":       "",
+		"bulk_data_update_last_status":    "",
 		"bulk_data_url":                   "https://api.scryfall.com/bulk-data",
-		"bulk_data_last_update":           "",
-		"bulk_data_last_update_status":    "",
-		"set_data_auto_update":            "true",
+		"set_data_update_enabled":         "true",
 		"set_data_update_time":            "02:30",
-		"set_data_last_update":            "",
-		"set_data_last_update_status":     "",
+		"set_data_update_last_run":        "",
+		"set_data_update_last_status":     "",
+		"symbol_data_update_enabled":      "true",
+		"symbol_data_update_time":         "02:00",
+		"symbol_data_update_last_run":     "",
+		"symbol_data_update_last_status":  "",
+		"job_cleanup_enabled":             "true",
+		"job_cleanup_time":                "00:00",
+		"job_cleanup_last_run":            "",
+		"job_cleanup_last_status":         "",
+		"job_cleanup_retention_days":      strconv.Itoa(DefaultJobCleanupRetentionDays),
+		"data_backup_enabled":             "true",
+		"data_backup_time":                "03:30",
+		"data_backup_last_run":            "",
+		"data_backup_last_status":         "",
+		"data_backup_retention_count":     strconv.Itoa(DefaultBackupRetention),
 		"scryfall_default_search":         "game:paper",
 		"scryfall_unique_mode":            "cards",
 		"scryfall_default_language":       "en",
-		"job_cleanup_last_run":            "",
 		"scheduler_catchup_enabled":       "true",
 		"scheduler_catchup_delay_seconds": "60",
-		"backup_auto_create":              "true",
-		"backup_create_time":              "03:30",
-		"backup_retention_count":          strconv.Itoa(DefaultBackupRetention),
-		"backup_last_run":                 "",
-		"backup_last_run_status":          "",
 	}
+}
+
+// ErrInvalidSettingValue is returned when a known setting is given a value of the wrong shape.
+var ErrInvalidSettingValue = errors.New("invalid setting value")
+
+// settingMinimums holds the minimum value of each integer setting.
+var settingMinimums = map[string]int{
+	"data_backup_retention_count":     0, // 0 keeps every backup
+	"job_cleanup_retention_days":      1,
+	"scheduler_catchup_delay_seconds": 0,
+}
+
+// SettingMinimum returns the minimum value of an integer setting.
+func SettingMinimum(key string) (int, bool) {
+	min, ok := settingMinimums[key]
+	return min, ok
+}
+
+// ValidateSetting checks the value of a known setting: *_enabled keys must be
+// "true"/"false", *_time keys "HH:MM", *_url keys absolute http(s) URLs, and
+// integer settings at least their minimum. Unknown keys are not validated.
+func ValidateSetting(key, value string) error {
+	if _, known := defaultSettings()[key]; !known {
+		return nil
+	}
+
+	switch {
+	case strings.HasSuffix(key, "_enabled"):
+		if value != "true" && value != "false" {
+			return fmt.Errorf("%w: %s must be true or false", ErrInvalidSettingValue, key)
+		}
+	case strings.HasSuffix(key, "_time"):
+		if _, err := time.Parse("15:04", value); err != nil {
+			return fmt.Errorf("%w: %s must be a time of day (HH:MM)", ErrInvalidSettingValue, key)
+		}
+	case strings.HasSuffix(key, "_url"):
+		u, err := url.Parse(value)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("%w: %s must be an http or https URL", ErrInvalidSettingValue, key)
+		}
+	}
+
+	if min, ok := settingMinimums[key]; ok {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < min {
+			return fmt.Errorf("%w: %s must be a whole number of at least %d", ErrInvalidSettingValue, key, min)
+		}
+	}
+
+	return nil
+}
+
+// initializeDefaults creates default settings if they don't exist
+func (s *SettingsService) initializeDefaults(ctx context.Context) {
+	defaults := defaultSettings()
 
 	for key, value := range defaults {
 		var count int64
@@ -82,6 +149,10 @@ func (s *SettingsService) Get(ctx context.Context, key string) (string, error) {
 
 // Set creates or updates a setting
 func (s *SettingsService) Set(ctx context.Context, key, value string) error {
+	if err := ValidateSetting(key, value); err != nil {
+		return err
+	}
+
 	var setting models.Setting
 	err := s.db.WithContext(ctx).Where("key = ?", key).First(&setting).Error
 
@@ -166,32 +237,22 @@ func (s *SettingsService) SetTime(ctx context.Context, key string, value time.Ti
 
 // ValidSettingKeys returns the set of valid setting keys
 func ValidSettingKeys() map[string]bool {
-	return map[string]bool{
-		"bulk_data_auto_update":           true,
-		"bulk_data_update_time":           true,
-		"bulk_data_url":                   true,
-		"bulk_data_last_update":           true,
-		"bulk_data_last_update_status":    true,
-		"set_data_auto_update":            true,
-		"set_data_update_time":            true,
-		"set_data_last_update":            true,
-		"set_data_last_update_status":     true,
-		"scryfall_default_search":         true,
-		"scryfall_unique_mode":            true,
-		"scryfall_default_language":       true,
-		"job_cleanup_last_run":            true,
-		"scheduler_catchup_enabled":       true,
-		"scheduler_catchup_delay_seconds": true,
-		"backup_auto_create":              true,
-		"backup_create_time":              true,
-		"backup_retention_count":          true,
-		"backup_last_run":                 true,
-		"backup_last_run_status":          true,
+	defaults := defaultSettings()
+	keys := make(map[string]bool, len(defaults))
+	for key := range defaults {
+		keys[key] = true
 	}
+	return keys
 }
 
 // SetBulk updates multiple settings in a single transaction
 func (s *SettingsService) SetBulk(ctx context.Context, settings map[string]string) error {
+	for key, value := range settings {
+		if err := ValidateSetting(key, value); err != nil {
+			return err
+		}
+	}
+
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for key, value := range settings {
 			var setting models.Setting

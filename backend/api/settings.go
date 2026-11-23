@@ -3,6 +3,7 @@ package api
 import (
 	"backend/services"
 	"backend/utils"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -33,7 +34,7 @@ func (h *SettingsHandler) GetAll(c fiber.Ctx) error {
 			filtered[key] = value
 		}
 	}
-	return c.JSON(settings)
+	return c.JSON(filtered)
 }
 
 // Get retrieves a single setting by key
@@ -75,6 +76,9 @@ func (h *SettingsHandler) Update(c fiber.Ctx) error {
 	}
 
 	if err := h.service.Set(c.RequestCtx(), key, req.Value); err != nil {
+		if errors.Is(err, services.ErrInvalidSettingValue) {
+			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to update setting", "setting update failed", err)
 	}
@@ -104,6 +108,9 @@ func (h *SettingsHandler) UpdateBulk(c fiber.Ctx) error {
 	}
 
 	if err := h.service.SetBulk(c.RequestCtx(), req); err != nil {
+		if errors.Is(err, services.ErrInvalidSettingValue) {
+			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to update settings", "bulk setting update failed", err)
 	}

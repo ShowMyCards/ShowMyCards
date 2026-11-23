@@ -2,11 +2,8 @@ package api
 
 import (
 	"backend/models"
-	"backend/services"
 	"backend/utils"
-	"context"
 	"errors"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,17 +14,15 @@ import (
 
 // SetHandler handles set endpoints
 type SetHandler struct {
-	db             *gorm.DB
-	setDataService *services.SetDataService
-	dataDir        string
+	db      *gorm.DB
+	dataDir string
 }
 
 // NewSetHandler creates a new set handler
-func NewSetHandler(db *gorm.DB, setDataService *services.SetDataService, dataDir string) *SetHandler {
+func NewSetHandler(db *gorm.DB, dataDir string) *SetHandler {
 	return &SetHandler{
-		db:             db,
-		setDataService: setDataService,
-		dataDir:        dataDir,
+		db:      db,
+		dataDir: dataDir,
 	}
 }
 
@@ -117,32 +112,4 @@ func (h *SetHandler) GetIcon(c fiber.Ctx) error {
 	c.Set("Content-Type", "image/svg+xml")
 	c.Set("Cache-Control", "public, max-age=86400")
 	return c.SendFile(iconPath)
-}
-
-// TriggerImportResponse represents the response from triggering an import
-// tygo:export
-type TriggerImportResponse struct {
-	Message string `json:"message"`
-	JobID   uint   `json:"job_id"`
-}
-
-// TriggerImport triggers a set data import
-func (h *SetHandler) TriggerImport(c fiber.Ctx, appCtx context.Context) error {
-	job, err := h.setDataService.CreateImportJob(appCtx)
-	if err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to create import job", "job creation failed", err)
-	}
-
-	// Run import in background
-	go func() {
-		if err := h.setDataService.DownloadAndImport(appCtx, job.ID); err != nil {
-			slog.Error("set data import failed", "job_id", job.ID, "error", err)
-		}
-	}()
-
-	return c.Status(fiber.StatusAccepted).JSON(TriggerImportResponse{
-		Message: "Set data import started",
-		JobID:   job.ID,
-	})
 }

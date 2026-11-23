@@ -133,11 +133,15 @@ func (s *JobService) Fail(ctx context.Context, id uint, errorMessage string) err
 	return nil
 }
 
-// CleanupOldJobs deletes jobs older than the specified retention period
+// CleanupOldJobs deletes finished jobs older than the specified retention
+// period. Pending and in-progress jobs are never deleted.
 func (s *JobService) CleanupOldJobs(ctx context.Context, retentionDays int) (int64, error) {
 	cutoffDate := time.Now().AddDate(0, 0, -retentionDays)
 
-	result := s.db.WithContext(ctx).Where("created_at < ?", cutoffDate).Delete(&models.Job{})
+	result := s.db.WithContext(ctx).
+		Where("created_at < ?", cutoffDate).
+		Where("status NOT IN ?", []models.JobStatus{models.JobStatusPending, models.JobStatusInProgress}).
+		Delete(&models.Job{})
 	if result.Error != nil {
 		return 0, fmt.Errorf("cleaning up jobs older than %d days: %w", retentionDays, result.Error)
 	}
@@ -171,6 +175,18 @@ func (s *JobService) CancelStaleJobs(ctx context.Context) (int64, error) {
 	}
 
 	return result.RowsAffected, nil
+}
+
+// HasActive reports whether a pending or in-progress job of the given type exists.
+func (s *JobService) HasActive(ctx context.Context, jobType models.JobType) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&models.Job{}).
+		Where("type = ?", jobType).
+		Where("status IN ?", []models.JobStatus{models.JobStatusPending, models.JobStatusInProgress}).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("checking for active %s jobs: %w", jobType, err)
+	}
+	return count > 0, nil
 }
 
 // GetLastJobByType retrieves the most recent job of a specific type

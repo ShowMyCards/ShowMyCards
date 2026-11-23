@@ -514,12 +514,12 @@ func TestBulkDataService_DownloadAndImport_UpdatesSettings(t *testing.T) {
 	}
 
 	// Verify settings were updated
-	status, _ := settingsService.Get(context.Background(), "bulk_data_last_update_status")
+	status, _ := settingsService.Get(context.Background(), "bulk_data_update_last_status")
 	if status != "success" {
 		t.Errorf("expected status 'success', got '%s'", status)
 	}
 
-	lastUpdate, _ := settingsService.GetTime(context.Background(), "bulk_data_last_update")
+	lastUpdate, _ := settingsService.GetTime(context.Background(), "bulk_data_update_last_run")
 	if lastUpdate == nil {
 		t.Error("expected last_update timestamp to be set")
 	}

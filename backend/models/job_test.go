@@ -27,6 +27,9 @@ func TestJobType_Valid(t *testing.T) {
 	}{
 		{"BulkDataImport", JobTypeBulkDataImport, true},
 		{"SetDataImport", JobTypeSetDataImport, true},
+		{"SymbolDataImport", JobTypeSymbolDataImport, true},
+		{"DataBackup", JobTypeDataBackup, true},
+		{"JobCleanup", JobTypeJobCleanup, true},
 		{"Empty", JobType(""), false},
 		{"InvalidType", JobType("invalid_type"), false},
 		{"CaseSensitive", JobType("Bulk_Data_Import"), false},
@@ -322,5 +325,17 @@ func TestJobStatus_Scan_NonString(t *testing.T) {
 	err := js.Scan(42)
 	if err == nil {
 		t.Error("expected error for non-string value")
+	}
+}
+
+func TestJob_BeforeCreate_DefaultsEmptyStatusToPending(t *testing.T) {
+	db := setupJobTestDB(t)
+
+	job := &Job{Type: JobTypeDataBackup}
+	if err := db.Create(job).Error; err != nil {
+		t.Fatalf("expected job with empty status to be created, got %v", err)
+	}
+	if job.Status != JobStatusPending {
+		t.Errorf("status = %q, want %q", job.Status, JobStatusPending)
 	}
 }
