@@ -31,6 +31,7 @@ func card(name string, opts ...option) scryfall.Card {
 }
 
 func typeLine(t string) option    { return func(c *scryfall.Card) { c.TypeLine = t } }
+func printedName(n string) option { return func(c *scryfall.Card) { c.PrintedName = &n } }
 func text(t string) option        { return func(c *scryfall.Card) { c.OracleText = t } }
 func keywords(k ...string) option { return func(c *scryfall.Card) { c.Keywords = k } }
 func power(p string) option       { return func(c *scryfall.Card) { c.Power = &p } }
@@ -510,6 +511,77 @@ func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 			add(themeCard, models.ZoneMain, 1).
 			add(emblem, models.ZoneSide, 1).
 			check()
+		expect(t, results, "commander")
+	})
+}
+
+func TestCheck_LocalizedCardNames(t *testing.T) {
+	t.Run("uses printed_name in constructed violations and falls back to english", func(t *testing.T) {
+		lotus := card("Black Lotus", printedName("Schwarzer Lotus"), legal(func(l *scryfall.Legalities) {
+			l.Modern = scryfall.LegalityBanned
+			l.Vintage = scryfall.LegalityRestricted
+		}))
+		bolt := card("Lightning Bolt", printedName("Blitzschlag"))
+		unlocalized := card("Zeta", legal(func(l *scryfall.Legalities) { l.Modern = scryfall.LegalityNotLegal }))
+		localizedNotLegal := card("Sol Ring", printedName("Aether-Ring"), legal(func(l *scryfall.Legalities) { l.Modern = scryfall.LegalityNotLegal }))
+
+		results := newDeck().
+			fill(models.ZoneMain, 52).
+			add(lotus, models.ZoneMain, 2).
+			add(bolt, models.ZoneMain, 5).
+			add(unlocalized, models.ZoneMain, 1).
+			add(localizedNotLegal, models.ZoneMain, 1).
+			check()
+
+		expect(t, results, "modern",
+			"Banned: Schwarzer Lotus",
+			"Not legal: Aether-Ring, Zeta",
+			"More than 4 copies: Blitzschlag (5)",
+		)
+		expect(t, results, "vintage",
+			"Restricted (max 1): Schwarzer Lotus (2)",
+			"More than 4 copies: Blitzschlag (5)",
+		)
+	})
+
+	t.Run("uses printed_name in commander violations", func(t *testing.T) {
+		bear := card("Grizzly Bears", printedName("Grizzlybären"), typeLine("Creature — Bear"), colors(G))
+		expect(t, newDeck().add(bear, models.ZoneCommand, 1).fill(models.ZoneMain, 99).check(),
+			"commander", "Not a valid commander: Grizzlybären")
+
+		leaderA := card("Leader A", printedName("Anführer Eins"), typeLine("Legendary Creature — Human"), colors(G))
+		leaderB := card("Leader B", printedName("Anführer Zwei"), typeLine("Legendary Creature — Human"), colors(G))
+		expect(t, newDeck().add(leaderA, models.ZoneCommand, 1).add(leaderB, models.ZoneCommand, 1).fill(models.ZoneMain, 98).check(),
+			"commander", "Not a valid commander pair: Anführer Eins + Anführer Zwei")
+
+		redCard := card("Lightning Bolt", printedName("Blitzschlag"), colors(R))
+		sideCard := card("Negate", printedName("Negieren"), colors(G))
+		expect(t, newDeck().
+			add(legend("Leader", G), models.ZoneCommand, 1).
+			add(redCard, models.ZoneMain, 1).
+			add(sideCard, models.ZoneSide, 1).
+			fill(models.ZoneMain, 98).
+			check(),
+			"commander",
+			"Sideboard not allowed (except one companion): Negieren",
+			"Outside the commander's color identity: Blitzschlag",
+		)
+	})
+
+	t.Run("partner-with matching still uses canonical english name", func(t *testing.T) {
+		pir := card("Pir, Imaginative Rascal",
+			printedName("Pir, fantasievoller Schlingel"),
+			typeLine("Legendary Creature — Human"),
+			keywords("Partner with", "Partner"),
+			text("Partner with Toothy, Imaginary Friend (When this creature enters, target player may put Toothy, Imaginary Friend into their hand.)"),
+		)
+		toothy := card("Toothy, Imaginary Friend",
+			printedName("Zähnchen, imaginärer Freund"),
+			typeLine("Legendary Creature — Illusion"),
+			keywords("Partner with", "Partner"),
+			text("Partner with Pir, Imaginative Rascal (When this creature enters, target player may put Pir, Imaginative Rascal into their hand.)"),
+		)
+		results := newDeck().add(pir, models.ZoneCommand, 1).add(toothy, models.ZoneCommand, 1).fill(models.ZoneMain, 98).check()
 		expect(t, results, "commander")
 	})
 }

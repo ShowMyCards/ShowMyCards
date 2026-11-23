@@ -40,6 +40,15 @@ import (
 // maxNames caps the card names listed in one reason.
 const maxNames = 10
 
+// displayName returns the card's printed (localized) name when available,
+// falling back to its canonical English name.
+func displayName(c scryfall.Card) string {
+	if c.PrintedName != nil && *c.PrintedName != "" {
+		return *c.PrintedName
+	}
+	return c.Name
+}
+
 // Result is a deck's verdict for one format.
 type Result struct {
 	Format  string
@@ -150,9 +159,9 @@ func (d deck) checkCardLegality(f format, r *reasons) {
 			switch f.legality(c.Legalities) {
 			case scryfall.LegalityLegal, scryfall.LegalityRestricted:
 			case scryfall.LegalityBanned:
-				banned = append(banned, c.Name)
+				banned = append(banned, displayName(c))
 			default: // not_legal, or no data for this format
-				notLegal = append(notLegal, c.Name)
+				notLegal = append(notLegal, displayName(c))
 			}
 		}
 	}
@@ -212,7 +221,7 @@ func (d deck) checkCommandZone(r *reasons) (identity map[scryfall.Color]bool, ok
 	var invalid []string
 	for _, c := range leaders {
 		if !canLead(c) {
-			invalid = append(invalid, c.Name)
+			invalid = append(invalid, displayName(c))
 		}
 	}
 	if len(invalid) > 0 {
@@ -220,7 +229,7 @@ func (d deck) checkCommandZone(r *reasons) (identity map[scryfall.Color]bool, ok
 		return nil, false
 	}
 	if len(leaders) == 2 && (leaders[0].OracleID == leaders[1].OracleID || !validPair(leaders[0], leaders[1])) {
-		r.add("Not a valid commander pair: %s + %s", leaders[0].Name, leaders[1].Name)
+		r.add("Not a valid commander pair: %s + %s", displayName(leaders[0]), displayName(leaders[1]))
 		return nil, false
 	}
 	return identityOf(leaders), true
@@ -293,12 +302,12 @@ func (d deck) checkCopies(f format, r *reasons, defaultLimit int, zones ...zoneC
 		}
 		if f.legality(c.Legalities) == scryfall.LegalityRestricted {
 			if n > 1 {
-				restricted = append(restricted, fmt.Sprintf("%s (%d)", c.Name, n))
+				restricted = append(restricted, fmt.Sprintf("%s (%d)", displayName(c), n))
 			}
 			continue
 		}
 		if limit := copyLimit(c, defaultLimit); n > limit {
-			over[limit] = append(over[limit], fmt.Sprintf("%s (%d)", c.Name, n))
+			over[limit] = append(over[limit], fmt.Sprintf("%s (%d)", displayName(c), n))
 		}
 	}
 
@@ -330,7 +339,7 @@ func (d deck) checkIdentity(r *reasons, leader string, identity map[scryfall.Col
 				continue
 			}
 			if slices.ContainsFunc(c.ColorIdentity, func(col scryfall.Color) bool { return !identity[col] }) {
-				outside = append(outside, c.Name)
+				outside = append(outside, displayName(c))
 			}
 		}
 	}
@@ -339,8 +348,8 @@ func (d deck) checkIdentity(r *reasons, leader string, identity map[scryfall.Col
 	}
 }
 
-// expand returns the zone's cards, one entry per copy, sorted by name. known
-// is false when any of them has no card data.
+// expand returns the zone's cards, one entry per copy, sorted by displayed name.
+// known is false when any of them has no card data.
 func (d deck) expand(z zoneCounts) (cards []scryfall.Card, known bool) {
 	known = true
 	for oracleID, n := range z {
@@ -353,16 +362,16 @@ func (d deck) expand(z zoneCounts) (cards []scryfall.Card, known bool) {
 			cards = append(cards, c)
 		}
 	}
-	slices.SortFunc(cards, func(a, b scryfall.Card) int { return cmp.Compare(a.Name, b.Name) })
+	slices.SortFunc(cards, func(a, b scryfall.Card) int { return cmp.Compare(displayName(a), displayName(b)) })
 	return cards, known
 }
 
-// names returns the names of the zone's cards that have card data.
+// names returns the displayed names of the zone's cards that have card data.
 func (d deck) names(z zoneCounts) []string {
 	var names []string
 	for oracleID := range z {
 		if c, ok := d.cards[oracleID]; ok {
-			names = append(names, c.Name)
+			names = append(names, displayName(c))
 		}
 	}
 	return names

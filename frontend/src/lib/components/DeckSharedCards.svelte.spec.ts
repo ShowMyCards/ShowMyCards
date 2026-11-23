@@ -89,4 +89,13 @@ describe('DeckSharedCards', () => {
 		await page.getByRole('button', { name: 'Swamp' }).click();
 		await expect.element(page.getByText(/you own/)).not.toBeInTheDocument();
 	});
+
+	it('shows printed_name on the chip when present', async () => {
+		await render(DeckSharedCards, {
+			cards: [{ ...swamp, printed_name: 'Sumpf' }],
+			deckId: THIS_DECK
+		});
+
+		await expect.element(page.getByRole('button', { name: 'Sumpf' })).toBeInTheDocument();
+	});
 });

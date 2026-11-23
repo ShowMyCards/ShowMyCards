@@ -125,4 +125,13 @@ describe('DeckCardActions', () => {
 		document.body.click();
 		await vi.waitFor(() => expect(menu.open).toBe(false));
 	});
+
+	it('uses printed_name for the actions aria-label when available', async () => {
+		await render(DeckCardActions, {
+			item: makeItem({ name: 'Lightning Bolt', printed_name: 'Blitzschlag' }),
+			deckWants: 1
+		});
+
+		await expect.element(page.getByLabelText('Card actions for Blitzschlag')).toBeInTheDocument();
+	});
 });

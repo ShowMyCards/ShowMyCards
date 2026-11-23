@@ -4,7 +4,7 @@
 	// pin one printing more often than you own it. Each reason lists the decks
 	// behind it, so a conflict caused elsewhere is visible from every deck it flags.
 	import type { AllocationConflict, SharedCard } from '#lib';
-	import { SCRYFALL_LANGUAGES } from '#lib';
+	import { getDisplayName, SCRYFALL_LANGUAGES } from '#lib';
 	import { resolve } from '$app/paths';
 
 	let { cards, deckId }: { cards: SharedCard[]; deckId: number } = $props();
@@ -39,7 +39,7 @@
 			class="btn btn-xs"
 			class:btn-active={openId === card.oracle_id}
 			aria-expanded={openId === card.oracle_id}
-			onclick={() => toggle(card.oracle_id)}>{card.name || 'Unknown card'}</button>
+			onclick={() => toggle(card.oracle_id)}>{getDisplayName(card) || 'Unknown card'}</button>
 	{/each}
 </div>
 

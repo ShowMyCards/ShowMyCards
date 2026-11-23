@@ -5,12 +5,15 @@
  * pure client-side computation over the already-loaded deck items.
  */
 
+import { getDisplayName } from './card-name';
+
 export type DeckGroupMode = 'none' | 'type' | 'manaValue';
 export type DeckSortMode = 'name' | 'manaValue';
 
 /** Minimal shape needed to group/sort a deck item. */
 export interface GroupableCard {
 	name?: string;
+	printed_name?: string;
 	cmc?: number;
 	type_line?: string;
 }
@@ -61,13 +64,13 @@ export function manaValueBucket(card: GroupableCard): string {
 	return cmc >= 7 ? '7+' : String(cmc);
 }
 
-/** Compare two cards for the given sort mode; name is always the tiebreaker. */
+/** Compare two cards for the given sort mode; displayed name is always the tiebreaker. */
 export function compareCards(a: GroupableCard, b: GroupableCard, sort: DeckSortMode): number {
 	if (sort === 'manaValue') {
 		const delta = (a.cmc ?? 0) - (b.cmc ?? 0);
 		if (delta !== 0) return delta;
 	}
-	return (a.name ?? '').localeCompare(b.name ?? '');
+	return getDisplayName(a).localeCompare(getDisplayName(b));
 }
 
 export interface CardGroup<T> {

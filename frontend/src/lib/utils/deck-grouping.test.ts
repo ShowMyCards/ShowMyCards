@@ -42,6 +42,24 @@ describe('compareCards', () => {
 	it('sorts by name', () => {
 		expect(compareCards({ name: 'Alpha' }, { name: 'Beta' }, 'name')).toBeLessThan(0);
 	});
+
+	it('sorts by printed_name when present', () => {
+		// "Blitzschlag" sorts before "Forest", even though English "Lightning Bolt" sorts after.
+		expect(
+			compareCards(
+				{ name: 'Lightning Bolt', printed_name: 'Blitzschlag', cmc: 1 },
+				{ name: 'Forest', cmc: 1 },
+				'name'
+			)
+		).toBeLessThan(0);
+		expect(
+			compareCards(
+				{ name: 'Lightning Bolt', printed_name: 'Blitzschlag', cmc: 1 },
+				{ name: 'Forest', cmc: 1 },
+				'manaValue'
+			)
+		).toBeLessThan(0);
+	});
 });
 
 describe('groupCards', () => {

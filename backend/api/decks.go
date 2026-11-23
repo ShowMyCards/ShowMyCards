@@ -349,6 +349,8 @@ type EnrichedDeckItem struct {
 	DesiredQuantity int             `json:"desired_quantity"`
 	// Enriched fields (populated from Scryfall card data in 1b).
 	Name            string   `json:"name,omitempty"`
+	PrintedName     *string  `json:"printed_name,omitempty"`
+	Language        string   `json:"language,omitempty"`
 	SetName         string   `json:"set_name,omitempty"`
 	SetCode         string   `json:"set_code,omitempty"`
 	CollectorNumber string   `json:"collector_number,omitempty"`
@@ -400,9 +402,10 @@ type ConflictDeck struct {
 //
 // tygo:export
 type SharedCard struct {
-	OracleID  string               `json:"oracle_id"`
-	Name      string               `json:"name"`
-	Conflicts []AllocationConflict `json:"conflicts"`
+	OracleID    string               `json:"oracle_id"`
+	Name        string               `json:"name"`
+	PrintedName *string              `json:"printed_name,omitempty"`
+	Conflicts   []AllocationConflict `json:"conflicts"`
 }
 
 // DeckItemsResponse represents the items in a deck, grouped by zone, with
@@ -508,14 +511,27 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
+// deckCardDisplayName returns the localized printed name when present,
+// falling back to the canonical English name.
+func deckCardDisplayName(name string, printedName *string) string {
+	if printedName != nil && *printedName != "" {
+		return *printedName
+	}
+	return name
+}
+
 // sharedCards explains the deck's over-committed Oracles: each card's name (from
 // its first demand-zone item) and the allocation conflicts behind the flag, with
-// set, number and language for pinned printings. Sorted by name; never nil.
+// set, number and language for pinned printings. Sorted by displayed name; never nil.
 func (h *DeckHandler) sharedCards(ctx context.Context, oracleIDs []string, items []EnrichedDeckItem, availability services.AvailabilityMap) []SharedCard {
-	names := make(map[string]string)
+	type cardNames struct {
+		name        string
+		printedName *string
+	}
+	names := make(map[string]cardNames)
 	for _, item := range items {
 		if _, ok := names[item.OracleID]; !ok && item.Zone.CountsAsDemand() {
-			names[item.OracleID] = item.Name
+			names[item.OracleID] = cardNames{name: item.Name, printedName: item.PrintedName}
 		}
 	}
 
@@ -541,7 +557,8 @@ func (h *DeckHandler) sharedCards(ctx context.Context, oracleIDs []string, items
 
 	shared := make([]SharedCard, 0, len(oracleIDs))
 	for _, oracleID := range oracleIDs {
-		card := SharedCard{OracleID: oracleID, Name: names[oracleID], Conflicts: []AllocationConflict{}}
+		n := names[oracleID]
+		card := SharedCard{OracleID: oracleID, Name: n.name, PrintedName: n.printedName, Conflicts: []AllocationConflict{}}
 		for _, c := range conflictsByOracle[oracleID] {
 			conflict := AllocationConflict{
 				ScryfallID: c.ScryfallID,
@@ -561,7 +578,9 @@ func (h *DeckHandler) sharedCards(ctx context.Context, oracleIDs []string, items
 		}
 		shared = append(shared, card)
 	}
-	slices.SortStableFunc(shared, func(a, b SharedCard) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortStableFunc(shared, func(a, b SharedCard) int {
+		return strings.Compare(deckCardDisplayName(a.Name, a.PrintedName), deckCardDisplayName(b.Name, b.PrintedName))
+	})
 	return shared
 }
 
@@ -596,27 +615,64 @@ func (h *DeckHandler) Legality(c fiber.Ctx) error {
 	}
 
 	var items []models.DeckItem
-	if err := db.Where("deck_id = ? AND zone <> ?", deck.ID, models.ZoneMaybe).Find(&items).Error; err != nil {
+	if err := db.Where("deck_id = ? AND zone <> ?", deck.ID, models.ZoneMaybe).
+		Order("created_at ASC").
+		Find(&items).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch deck items", "database query failed", err)
 	}
 
-	// Legality and rules text are the same for every printing of a card, so any
-	// one printing per Oracle is enough, pinned or not; GetAnyCardsByOracle skips
-	// the costly printing ranking used for display. A missing Oracle in the
-	// result means the card has no local data yet.
-	oracleIDs := make([]string, 0, len(items))
-	seen := make(map[string]bool)
+	// Resolve each item's printing the same way ListItems does so legality
+	// reasons use the same localized card names shown in the deck view. Pinned
+	// items whose exact printing is not stored locally still fall back to a
+	// representative printing of their Oracle so missing printings don't look
+	// like missing card data.
+	ctx := c.RequestCtx()
+	pinnedIDs := make([]string, 0, len(items))
 	for _, item := range items {
-		if !seen[item.OracleID] {
-			seen[item.OracleID] = true
-			oracleIDs = append(oracleIDs, item.OracleID)
+		if item.ScryfallID != "" {
+			pinnedIDs = append(pinnedIDs, item.ScryfallID)
 		}
 	}
-	cards, err := models.GetAnyCardsByOracle(db, oracleIDs)
+	pinnedCards, err := models.GetScryfallCardsByIDs(db, pinnedIDs)
 	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to check deck legality", "card query failed", err)
+	}
+
+	fallbackOracleIDs := make([]string, 0, len(items))
+	seenFallback := make(map[string]bool)
+	for _, item := range items {
+		if item.ScryfallID != "" {
+			if _, ok := pinnedCards[item.ScryfallID]; ok {
+				continue
+			}
+		}
+		if !seenFallback[item.OracleID] {
+			seenFallback[item.OracleID] = true
+			fallbackOracleIDs = append(fallbackOracleIDs, item.OracleID)
+		}
+	}
+	oracleCards, err := h.preferredCardsByOracle(ctx, fallbackOracleIDs)
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to check deck legality", "card query failed", err)
+	}
+
+	cards := make(map[string]scryfall.Card, len(items))
+	for _, item := range items {
+		if _, exists := cards[item.OracleID]; exists {
+			continue
+		}
+		if item.ScryfallID != "" {
+			if card, ok := pinnedCards[item.ScryfallID]; ok {
+				cards[item.OracleID] = card
+				continue
+			}
+		}
+		if card, ok := oracleCards[item.OracleID]; ok {
+			cards[item.OracleID] = card
+		}
 	}
 
 	results := legality.Check(items, cards)
@@ -636,6 +692,8 @@ func (h *DeckHandler) Legality(c fiber.Ctx) error {
 // Scryfall card onto an enriched deck item.
 func applyCardDataToDeckItem(e *EnrichedDeckItem, card scryfall.Card) {
 	e.Name = card.Name
+	e.PrintedName = card.PrintedName
+	e.Language = string(card.Lang)
 	e.SetName = card.SetName
 	e.SetCode = card.Set
 	e.CollectorNumber = card.CollectorNumber
@@ -718,6 +776,24 @@ func (h *DeckHandler) enrichDeckItems(ctx context.Context, items []models.DeckIt
 	return enriched
 }
 
+// preferredCardsByOracle fetches one representative Scryfall card per Oracle ID,
+// preferring a printing the user owns, then the configured default search
+// language, then English, then the most "default" looking printing.
+func (h *DeckHandler) preferredCardsByOracle(ctx context.Context, oracleIDs []string) (map[string]scryfall.Card, error) {
+	if len(oracleIDs) == 0 {
+		return map[string]scryfall.Card{}, nil
+	}
+
+	lang := "en"
+	if h.settings != nil {
+		if v, err := h.settings.Get(ctx, "scryfall_default_language"); err == nil && v != "" {
+			lang = v
+		}
+	}
+
+	return models.GetPreferredCardsByOracle(h.db.WithContext(ctx), oracleIDs, lang, true)
+}
+
 // representativeCardsByOracle returns one Scryfall card per Oracle ID for the
 // any-printing items in the slice, so they can be shown with a name, set and
 // image even though no specific printing was pinned. It prefers a printing the
@@ -732,18 +808,8 @@ func (h *DeckHandler) representativeCardsByOracle(ctx context.Context, items []m
 			oracleIDs = append(oracleIDs, item.OracleID)
 		}
 	}
-	if len(oracleIDs) == 0 {
-		return map[string]scryfall.Card{}
-	}
 
-	lang := "en"
-	if h.settings != nil {
-		if v, err := h.settings.Get(ctx, "scryfall_default_language"); err == nil && v != "" {
-			lang = v
-		}
-	}
-
-	cards, err := models.GetPreferredCardsByOracle(h.db.WithContext(ctx), oracleIDs, lang, true)
+	cards, err := h.preferredCardsByOracle(ctx, oracleIDs)
 	if err != nil {
 		slog.Warn("failed to fetch representative cards for deck enrichment", "component", "decks", "error", err)
 		return map[string]scryfall.Card{}
