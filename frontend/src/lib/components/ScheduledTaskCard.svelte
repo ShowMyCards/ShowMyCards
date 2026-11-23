@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FormField, Lozenge, notifications, settingsApi } from '#lib';
+	import { FormField, Lozenge, notifications, settingsApi, statusColor, statusText } from '#lib';
 	import { resolve } from '$app/paths';
 	import type { ScheduledTaskInfo } from '#lib';
 	import { Play, SlidersHorizontal } from '@lucide/svelte';
@@ -118,26 +118,6 @@
 		// Cleanup
 		return () => clearInterval(interval);
 	});
-
-	function getStatusColor(status?: string): 'info' | 'warning' | 'success' | 'error' | null {
-		if (!status) return null;
-		if (status === 'pending') return 'info';
-		if (status === 'in_progress') return 'warning';
-		if (status === 'completed' || status === 'success') return 'success';
-		if (status === 'failed') return 'error';
-		return null;
-	}
-
-	function getStatusText(status?: string): string {
-		if (!status) return 'Unknown';
-		if (status === 'pending') return 'Pending';
-		if (status === 'in_progress') return 'In Progress';
-		if (status === 'completed') return 'Completed';
-		if (status === 'success') return 'Succeeded';
-		if (status === 'failed') return 'Failed';
-		if (status === 'cancelled') return 'Cancelled';
-		return status;
-	}
 </script>
 
 <div class="card bg-base-100 shadow-md border border-base-300">
@@ -184,8 +164,8 @@
 					</div>
 					{#if lastStatus}
 						<div class="mt-1">
-							<Lozenge color={getStatusColor(lastStatus)} size="small">
-								{getStatusText(lastStatus)}
+							<Lozenge color={statusColor(lastStatus)} size="small">
+								{statusText(lastStatus)}
 							</Lozenge>
 						</div>
 					{/if}
@@ -215,7 +195,7 @@
 					<FormField
 						label={extra.label}
 						id="{task.name}-{extra.key}"
-						type={extra.kind === 'int' ? 'number' : 'text'}
+						type={extra.kind === 'int' ? 'number' : extra.kind === 'url' ? 'url' : 'text'}
 						helper={extra.description}
 						min={extra.min}
 						bind:value={draftExtras[extra.key]}

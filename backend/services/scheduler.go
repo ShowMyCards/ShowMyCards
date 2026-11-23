@@ -54,7 +54,7 @@ type TaskSetting struct {
 	Key         string
 	Label       string
 	Description string
-	Kind        string // "int"
+	Kind        string // "int" or "url"
 }
 
 // EnabledKey is the settings key holding whether the task is enabled ("true"/"false").
@@ -120,7 +120,13 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 			Description: "Downloads Scryfall's bulk card data and refreshes the local card database.",
 			Interval:    24 * time.Hour,
 			JobType:     models.JobTypeBulkDataImport,
-			Run:         s.runBulkDataUpdate,
+			Extras: []TaskSetting{{
+				Key:         "bulk_data_url",
+				Label:       "Bulk data source",
+				Description: "Scryfall bulk data API endpoint the update downloads from.",
+				Kind:        "url",
+			}},
+			Run: s.runBulkDataUpdate,
 		},
 		{
 			Name:        "set_data_update",

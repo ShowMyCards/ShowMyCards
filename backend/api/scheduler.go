@@ -39,7 +39,7 @@ type TaskSettingInfo struct {
 	Key         string `json:"key"`
 	Label       string `json:"label"`
 	Description string `json:"description"`
-	Kind        string `json:"kind"` // "int"
+	Kind        string `json:"kind"` // "int" or "url"
 	Value       string `json:"value"`
 	Min         *int   `json:"min,omitempty"`
 }

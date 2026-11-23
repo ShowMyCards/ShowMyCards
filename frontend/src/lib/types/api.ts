@@ -757,7 +757,7 @@ export interface TaskSettingInfo {
 	key: string;
 	label: string;
 	description: string;
-	kind: string; // "int"
+	kind: string; // "int" or "url"
 	value: string;
 	min?: number /* int */;
 }
