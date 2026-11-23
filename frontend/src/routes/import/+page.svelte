@@ -10,6 +10,7 @@
 		getCardTreatmentName,
 		getActionError,
 		SCRYFALL_LANGUAGES,
+		ZONE_LABELS,
 		type EnhancedCardResult,
 		type CardResult,
 		type ResolveResult,
@@ -20,8 +21,7 @@
 		resolveTreatment,
 		getTreatmentDisplayName,
 		getTreatmentMarker,
-		type ParsedCard,
-		type ImportZone
+		type ParsedCard
 	} from '#lib/utils/card-list-parser.ts';
 	import { deserialize } from '$app/forms';
 	import { refreshAll } from '$app/navigation';
@@ -56,13 +56,6 @@
 
 	const textareaPlaceholder =
 		"1 Ashnod's Altar (BRR) 67 *F*\n4 Lightning Bolt\n\nSideboard\n2 Damn";
-
-	const ZONE_LABELS: Record<ImportZone, string> = {
-		command: 'Command',
-		main: 'Main',
-		side: 'Side',
-		maybe: 'Maybe'
-	};
 
 	// Preview state - combines parsing and searching
 	interface PreviewCard {

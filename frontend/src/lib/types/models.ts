@@ -17,10 +17,11 @@
  * BannerSeverity controls how a Banner is styled in the UI.
  * tygo:export
  */
-export type BannerSeverity = string;
-export const BannerSeverityInfo: BannerSeverity = 'info';
-export const BannerSeverityWarning: BannerSeverity = 'warning';
-export const BannerSeverityError: BannerSeverity = 'error';
+export const BannerSeverityInfo = 'info';
+export const BannerSeverityWarning = 'warning';
+export const BannerSeverityError = 'error';
+export type BannerSeverity =
+	typeof BannerSeverityInfo | typeof BannerSeverityWarning | typeof BannerSeverityError;
 /**
  * Banner is a transient, server-derived message surfaced in the UI.
  * Banners are computed on demand (see services.BannerService) and never
@@ -207,22 +208,32 @@ export interface Inventory {
  * JobType represents the type of job
  * tygo:export
  */
-export type JobType = string;
-export const JobTypeBulkDataImport: JobType = 'bulk_data_import';
-export const JobTypeSetDataImport: JobType = 'set_data_import';
-export const JobTypeSymbolDataImport: JobType = 'symbol_data_import';
-export const JobTypeDataBackup: JobType = 'data_backup';
-export const JobTypeJobCleanup: JobType = 'job_cleanup';
+export const JobTypeBulkDataImport = 'bulk_data_import';
+export const JobTypeSetDataImport = 'set_data_import';
+export const JobTypeSymbolDataImport = 'symbol_data_import';
+export const JobTypeDataBackup = 'data_backup';
+export const JobTypeJobCleanup = 'job_cleanup';
+export type JobType =
+	| typeof JobTypeBulkDataImport
+	| typeof JobTypeSetDataImport
+	| typeof JobTypeSymbolDataImport
+	| typeof JobTypeDataBackup
+	| typeof JobTypeJobCleanup;
 /**
  * JobStatus represents the status of a job
  * tygo:export
  */
-export type JobStatus = string;
-export const JobStatusPending: JobStatus = 'pending';
-export const JobStatusInProgress: JobStatus = 'in_progress';
-export const JobStatusCompleted: JobStatus = 'completed';
-export const JobStatusFailed: JobStatus = 'failed';
-export const JobStatusCancelled: JobStatus = 'cancelled';
+export const JobStatusPending = 'pending';
+export const JobStatusInProgress = 'in_progress';
+export const JobStatusCompleted = 'completed';
+export const JobStatusFailed = 'failed';
+export const JobStatusCancelled = 'cancelled';
+export type JobStatus =
+	| typeof JobStatusPending
+	| typeof JobStatusInProgress
+	| typeof JobStatusCompleted
+	| typeof JobStatusFailed
+	| typeof JobStatusCancelled;
 /**
  * Job represents a long-running background job
  * tygo:export

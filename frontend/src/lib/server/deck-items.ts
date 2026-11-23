@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '#lib';
+import { BACKEND_URL, type DeckZone } from '#lib';
 
 /** A single deck item to add, matching the backend CreateDeckItemRequest shape. */
 export interface DeckItemInput {
@@ -6,7 +6,7 @@ export interface DeckItemInput {
 	scryfall_id: string;
 	treatment: string;
 	desired_quantity: number;
-	zone: string;
+	zone: DeckZone;
 }
 
 type FetchFn = typeof fetch;
@@ -17,7 +17,7 @@ type FetchFn = typeof fetch;
  * zone was asked for, so callers report these zones rather than the requested one.
  */
 export type UpsertResult =
-	{ ok: true; zones: string[] } | { ok: false; status: number; error: string };
+	{ ok: true; zones: DeckZone[] } | { ok: false; status: number; error: string };
 
 /**
  * Add items to a deck with upsert semantics.
@@ -51,7 +51,7 @@ export async function upsertDeckItems(
 		...(existing.maybe ?? [])
 	];
 
-	const zones = new Set<string>();
+	const zones = new Set<DeckZone>();
 	const toCreate: DeckItemInput[] = [];
 	for (const item of items) {
 		const match = allExisting.find(
@@ -92,7 +92,7 @@ export async function upsertDeckItems(
 					: errorData.error || 'Failed to add cards';
 			return { ok: false, status: res.status, error };
 		}
-		const created: Array<{ zone: string }> = await res.json().catch(() => toCreate);
+		const created: Array<{ zone: DeckZone }> = await res.json().catch(() => toCreate);
 		for (const row of created) zones.add(row.zone);
 	}
 
