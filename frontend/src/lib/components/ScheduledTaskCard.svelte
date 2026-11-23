@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { Lozenge, notifications } from '#lib';
+	import { FormField, Lozenge, notifications, settingsApi } from '#lib';
 	import { resolve } from '$app/paths';
 	import type { ScheduledTaskInfo } from '#lib';
-	import { Play } from '@lucide/svelte';
+	import { Play, SlidersHorizontal } from '@lucide/svelte';
 
 	let {
 		task,
-		onStarted
+		onUpdated
 	}: {
 		task: ScheduledTaskInfo;
-		/** Called after a run has been requested (successfully or not), e.g. to reload data. */
-		onStarted?: () => void;
+		/** Called after a run is requested or the schedule is saved, e.g. to reload data. */
+		onUpdated?: () => void;
 	} = $props();
 
 	// Live countdown state
@@ -41,7 +41,42 @@
 		} finally {
 			starting = false;
 		}
-		onStarted?.();
+		onUpdated?.();
+	}
+
+	// Schedule editing
+	let editing = $state(false);
+	let saving = $state(false);
+	let draftEnabled = $state(false);
+	let draftTime = $state('');
+	let draftExtras = $state<Record<string, string | number>>({});
+
+	function startEditing() {
+		draftEnabled = task.enabled;
+		draftTime = task.time;
+		draftExtras = Object.fromEntries(task.extras.map((extra) => [extra.key, extra.value]));
+		editing = true;
+	}
+
+	async function saveSchedule(event: SubmitEvent) {
+		event.preventDefault();
+		saving = true;
+		try {
+			await settingsApi.update({
+				[task.enabled_key]: String(draftEnabled),
+				[task.time_key]: draftTime,
+				...Object.fromEntries(
+					Object.entries(draftExtras).map(([key, value]) => [key, String(value)])
+				)
+			});
+			notifications.success(`${task.display_name} schedule saved`);
+			editing = false;
+			onUpdated?.();
+		} catch (err) {
+			notifications.error(err instanceof Error ? err.message : 'Failed to save schedule');
+		} finally {
+			saving = false;
+		}
 	}
 
 	// Update countdown every second
@@ -160,6 +195,46 @@
 			</div>
 		</div>
 
+		{#if editing}
+			<form class="mt-3 space-y-4" onsubmit={saveSchedule}>
+				<label class="flex items-center justify-between gap-2 text-sm font-semibold">
+					Enabled
+					<input
+						type="checkbox"
+						class="toggle toggle-primary"
+						bind:checked={draftEnabled}
+						aria-label="Enabled" />
+				</label>
+				<FormField
+					label="Time of day"
+					id="{task.name}-time"
+					type="time"
+					bind:value={draftTime}
+					required />
+				{#each task.extras as extra (extra.key)}
+					<FormField
+						label={extra.label}
+						id="{task.name}-{extra.key}"
+						type={extra.kind === 'int' ? 'number' : 'text'}
+						helper={extra.description}
+						min={extra.min}
+						bind:value={draftExtras[extra.key]}
+						required />
+				{/each}
+				<div class="flex justify-end gap-2">
+					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (editing = false)}>
+						Cancel
+					</button>
+					<button type="submit" class="btn btn-sm btn-primary" disabled={saving}>
+						{#if saving}
+							<span class="loading loading-spinner loading-xs"></span>
+						{/if}
+						Save
+					</button>
+				</div>
+			</form>
+		{/if}
+
 		<div class="mt-3 flex items-center justify-between gap-2">
 			{#if task.last_job_id}
 				<a
@@ -170,19 +245,27 @@
 			{:else}
 				<span></span>
 			{/if}
-			<button
-				type="button"
-				class="btn btn-sm btn-outline"
-				disabled={starting || running}
-				title={running ? `${task.display_name} is already running` : undefined}
-				onclick={runNow}>
-				{#if starting}
-					<span class="loading loading-spinner loading-xs"></span>
-				{:else}
-					<Play class="w-4 h-4" />
+			<div class="flex gap-2">
+				{#if !editing}
+					<button type="button" class="btn btn-sm btn-ghost" onclick={startEditing}>
+						<SlidersHorizontal class="w-4 h-4" />
+						Edit schedule
+					</button>
 				{/if}
-				Run now
-			</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-outline"
+					disabled={starting || running}
+					title={running ? `${task.display_name} is already running` : undefined}
+					onclick={runNow}>
+					{#if starting}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<Play class="w-4 h-4" />
+					{/if}
+					Run now
+				</button>
+			</div>
 		</div>
 	</div>
 </div>

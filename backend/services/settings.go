@@ -4,8 +4,10 @@ import (
 	"backend/models"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -61,6 +63,51 @@ func defaultSettings() map[string]string {
 	}
 }
 
+// ErrInvalidSettingValue is returned when a known setting is given a value of the wrong shape.
+var ErrInvalidSettingValue = errors.New("invalid setting value")
+
+// settingMinimums holds the minimum value of each integer setting.
+var settingMinimums = map[string]int{
+	"data_backup_retention_count":     0, // 0 keeps every backup
+	"job_cleanup_retention_days":      1,
+	"scheduler_catchup_delay_seconds": 0,
+}
+
+// SettingMinimum returns the minimum value of an integer setting.
+func SettingMinimum(key string) (int, bool) {
+	min, ok := settingMinimums[key]
+	return min, ok
+}
+
+// ValidateSetting checks the value of a known setting: *_enabled keys must be
+// "true"/"false", *_time keys "HH:MM", and integer settings at least their
+// minimum. Unknown keys are not validated.
+func ValidateSetting(key, value string) error {
+	if _, known := defaultSettings()[key]; !known {
+		return nil
+	}
+
+	switch {
+	case strings.HasSuffix(key, "_enabled"):
+		if value != "true" && value != "false" {
+			return fmt.Errorf("%w: %s must be true or false", ErrInvalidSettingValue, key)
+		}
+	case strings.HasSuffix(key, "_time"):
+		if _, err := time.Parse("15:04", value); err != nil {
+			return fmt.Errorf("%w: %s must be a time of day (HH:MM)", ErrInvalidSettingValue, key)
+		}
+	}
+
+	if min, ok := settingMinimums[key]; ok {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < min {
+			return fmt.Errorf("%w: %s must be a whole number of at least %d", ErrInvalidSettingValue, key, min)
+		}
+	}
+
+	return nil
+}
+
 // initializeDefaults creates default settings if they don't exist
 func (s *SettingsService) initializeDefaults(ctx context.Context) {
 	defaults := defaultSettings()
@@ -96,6 +143,10 @@ func (s *SettingsService) Get(ctx context.Context, key string) (string, error) {
 
 // Set creates or updates a setting
 func (s *SettingsService) Set(ctx context.Context, key, value string) error {
+	if err := ValidateSetting(key, value); err != nil {
+		return err
+	}
+
 	var setting models.Setting
 	err := s.db.WithContext(ctx).Where("key = ?", key).First(&setting).Error
 
@@ -190,6 +241,12 @@ func ValidSettingKeys() map[string]bool {
 
 // SetBulk updates multiple settings in a single transaction
 func (s *SettingsService) SetBulk(ctx context.Context, settings map[string]string) error {
+	for key, value := range settings {
+		if err := ValidateSetting(key, value); err != nil {
+			return err
+		}
+	}
+
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for key, value := range settings {
 			var setting models.Setting

@@ -139,7 +139,7 @@
 			<h2 class="text-2xl font-bold mb-4">Scheduled Tasks</h2>
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 				{#each data.scheduledTasks as task (task.name)}
-					<ScheduledTaskCard {task} onStarted={() => invalidateAll()} />
+					<ScheduledTaskCard {task} onUpdated={() => invalidateAll()} />
 				{/each}
 			</div>
 		</div>
