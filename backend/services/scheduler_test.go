@@ -807,10 +807,21 @@ func TestScheduler_TaskExtrasAreValidSettings(t *testing.T) {
 			if !valid[extra.Key] {
 				t.Errorf("task %s: extra %s is not a valid setting key", task.Name, extra.Key)
 			}
-			if extra.Kind == "int" {
+			switch extra.Kind {
+			case "int":
 				if _, ok := SettingMinimum(extra.Key); !ok {
 					t.Errorf("task %s: int extra %s has no minimum", task.Name, extra.Key)
 				}
+			case "url":
+				// *_url keys are what ValidateSetting checks as URLs.
+				if !strings.HasSuffix(extra.Key, "_url") {
+					t.Errorf("task %s: url extra %s must end in _url", task.Name, extra.Key)
+				}
+				if err := ValidateSetting(extra.Key, defaultSettings()[extra.Key]); err != nil {
+					t.Errorf("task %s: default for %s is invalid: %v", task.Name, extra.Key, err)
+				}
+			default:
+				t.Errorf("task %s: extra %s has unknown kind %q", task.Name, extra.Key, extra.Kind)
 			}
 		}
 	}

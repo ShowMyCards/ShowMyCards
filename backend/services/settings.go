@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -80,8 +81,8 @@ func SettingMinimum(key string) (int, bool) {
 }
 
 // ValidateSetting checks the value of a known setting: *_enabled keys must be
-// "true"/"false", *_time keys "HH:MM", and integer settings at least their
-// minimum. Unknown keys are not validated.
+// "true"/"false", *_time keys "HH:MM", *_url keys absolute http(s) URLs, and
+// integer settings at least their minimum. Unknown keys are not validated.
 func ValidateSetting(key, value string) error {
 	if _, known := defaultSettings()[key]; !known {
 		return nil
@@ -95,6 +96,11 @@ func ValidateSetting(key, value string) error {
 	case strings.HasSuffix(key, "_time"):
 		if _, err := time.Parse("15:04", value); err != nil {
 			return fmt.Errorf("%w: %s must be a time of day (HH:MM)", ErrInvalidSettingValue, key)
+		}
+	case strings.HasSuffix(key, "_url"):
+		u, err := url.Parse(value)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("%w: %s must be an http or https URL", ErrInvalidSettingValue, key)
 		}
 	}
 

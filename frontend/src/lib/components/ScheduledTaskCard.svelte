@@ -195,7 +195,7 @@
 					<FormField
 						label={extra.label}
 						id="{task.name}-{extra.key}"
-						type={extra.kind === 'int' ? 'number' : 'text'}
+						type={extra.kind === 'int' ? 'number' : extra.kind === 'url' ? 'url' : 'text'}
 						helper={extra.description}
 						min={extra.min}
 						bind:value={draftExtras[extra.key]}

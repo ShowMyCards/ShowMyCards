@@ -255,7 +255,7 @@ Go types are mapped to TypeScript as follows:
 Each task's settings keys are derived from its `Name`: `<name>_enabled`,
 `<name>_time` (`HH:MM`), `<name>_last_run` (RFC3339), `<name>_last_status`
 (`in_progress` | `success` | `failed`), plus task-specific extras such as
-`data_backup_retention_count` (declared as `Extras` on the task so the jobs
+`data_backup_retention_count` or `bulk_data_url` (declared as `Extras` on the task so the jobs
 screen can edit them). New keys must be added to `defaultSettings()` in
 `services/settings.go` (which also drives the whitelist). Legacy keys are
 renamed on startup by `renameSettingKeys` in `database/client.go`.
@@ -265,7 +265,8 @@ renamed on startup by `renameSettingKeys` in `database/client.go`.
 - `GET /api/settings` - Get application settings (whitelisted keys only)
 - `PUT /api/settings` - Update application settings. Send only the keys you
   changed. Known keys are validated (`services.ValidateSetting`): `*_enabled`
-  must be `true`/`false`, `*_time` must be `HH:MM`, and integer settings must
+  must be `true`/`false`, `*_time` must be `HH:MM`, `*_url` must be an
+  absolute `http`/`https` URL, and integer settings must
   meet their minimum (`settingMinimums`). One invalid value rejects the whole
   request with `400`.
 

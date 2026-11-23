@@ -437,6 +437,11 @@ func TestValidateSetting(t *testing.T) {
 		{"job_cleanup_retention_days", "0", true},
 		{"job_cleanup_retention_days", "7", false},
 		{"job_cleanup_retention_days", "seven", true},
+		{"bulk_data_url", "https://api.scryfall.com/bulk-data", false},
+		{"bulk_data_url", "http://localhost:8080/bulk-data", false},
+		{"bulk_data_url", "", true},
+		{"bulk_data_url", "api.scryfall.com/bulk-data", true},
+		{"bulk_data_url", "ftp://api.scryfall.com/bulk-data", true},
 		{"data_backup_last_run", "", false},            // system-managed, not shape-checked
 		{"scryfall_default_search", "anything", false}, // free text
 		{"test_time", "2026-01-01T00:00:00Z", false},   // unknown keys are not validated

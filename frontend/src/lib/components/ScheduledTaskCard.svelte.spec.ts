@@ -138,6 +138,42 @@ describe('ScheduledTaskCard', () => {
 		await expect.element(page.getByRole('button', { name: 'Save' })).not.toBeInTheDocument();
 	});
 
+	it('edits a URL extra with a URL input', async () => {
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(JSON.stringify({ message: 'ok' }), { status: 200 }));
+		await render(ScheduledTaskCard, {
+			task: task({
+				name: 'bulk_data_update',
+				display_name: 'Card Data Update',
+				enabled_key: 'bulk_data_update_enabled',
+				time_key: 'bulk_data_update_time',
+				extras: [
+					{
+						key: 'bulk_data_url',
+						label: 'Bulk data source',
+						description: 'Scryfall bulk data API endpoint.',
+						kind: 'url',
+						value: 'http://127.0.0.1:9/'
+					}
+				]
+			}),
+			onUpdated: vi.fn()
+		});
+
+		await page.getByRole('button', { name: 'Edit schedule' }).click();
+		const input = page.getByLabelText(/^Bulk data source/);
+		await expect.element(input).toHaveAttribute('type', 'url');
+		await expect.element(input).toHaveValue('http://127.0.0.1:9/');
+		await input.fill('https://api.scryfall.com/bulk-data');
+		await page.getByRole('button', { name: 'Save' }).click();
+
+		await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+		expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({
+			bulk_data_url: 'https://api.scryfall.com/bulk-data'
+		});
+	});
+
 	it('keeps the form open and shows the validation error when saving fails', async () => {
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 			new Response(JSON.stringify({ error: 'invalid setting value: data_backup_time' }), {
