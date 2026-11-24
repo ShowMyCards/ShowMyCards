@@ -8,10 +8,9 @@
 // cards named …" exemptions), and for commander formats the command zone,
 // partner pairs and color identity.
 //
-// Tokens, emblems and other helper cards (counter, art and theme cards) are
-// ignored: they are reminders, not cards in the deck. Planechase planes,
-// Archenemy schemes and Vanguard cards belong to separate decks and are
-// reported as not legal.
+// Deck extras (tokens, emblems, helper cards, Dungeons, art cards, Jumpstart
+// front cards, planes, schemes and vanguards; see models.IsDeckExtra) are
+// ignored: they travel with a deck rather than being cards in it.
 //
 // Sources: Comprehensive Rules 100.2a, 100.4a, 100.5, 702.124 and 903
 // (effective 2026-11-06); magic.wizards.com/en/formats; oathbreakermtg.org/rules.
@@ -50,8 +49,8 @@ type Result struct {
 
 // Check evaluates the deck against every format, in display order. cards maps
 // Oracle ID to card data; a deck item whose Oracle ID is missing has no local
-// card data and makes the deck not legal anywhere. Maybe-board items are
-// ignored.
+// card data and makes the deck not legal anywhere. Maybe-board and other-zone
+// items are ignored, as are deck extras (models.IsDeckExtra).
 func Check(items []models.DeckItem, cards map[string]scryfall.Card) []Result {
 	d := newDeck(items, cards)
 	results := make([]Result, len(formats))
@@ -101,7 +100,7 @@ func newDeck(items []models.DeckItem, cards map[string]scryfall.Card) deck {
 			continue
 		}
 		c, ok := cards[item.OracleID]
-		if ok && isNonDeckCard(c) {
+		if ok && models.IsDeckExtra(c) {
 			continue
 		}
 		if !ok {
