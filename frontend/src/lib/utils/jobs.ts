@@ -128,25 +128,29 @@ export interface MetadataEntry {
 	value: string;
 	/** True for structured values (arrays/objects) rendered as preformatted JSON. */
 	structured: boolean;
+	/** True for non-fatal step errors (keys ending in `_error`). */
+	error: boolean;
 }
 
 /**
  * Turns job metadata into display rows without knowing the job type. Keys
  * ending in `_bytes` are formatted as sizes (and labelled without the suffix);
- * structured values are pretty-printed JSON.
+ * keys ending in `_error` with a non-empty string are flagged as non-fatal
+ * errors; structured values are pretty-printed JSON.
  */
 export function metadataEntries(metadata: JobMetadata): MetadataEntry[] {
 	return Object.entries(metadata).map(([key, raw]) => {
 		const isBytes = key.endsWith('_bytes') && typeof raw === 'number';
 		const label = humanizeKey(isBytes ? key.slice(0, -'_bytes'.length) : key);
 
-		if (isBytes) return { key, label, value: formatBytes(raw), structured: false };
+		if (isBytes) return { key, label, value: formatBytes(raw), structured: false, error: false };
 		if (raw !== null && typeof raw === 'object') {
-			return { key, label, value: JSON.stringify(raw, null, 2), structured: true };
+			return { key, label, value: JSON.stringify(raw, null, 2), structured: true, error: false };
 		}
 		if (typeof raw === 'number')
-			return { key, label, value: raw.toLocaleString(), structured: false };
-		return { key, label, value: String(raw), structured: false };
+			return { key, label, value: raw.toLocaleString(), structured: false, error: false };
+		const error = key.endsWith('_error') && typeof raw === 'string' && raw.length > 0;
+		return { key, label, value: String(raw), structured: false, error };
 	});
 }
 

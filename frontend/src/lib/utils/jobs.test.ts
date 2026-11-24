@@ -106,7 +106,8 @@ describe('metadataEntries', () => {
 			file_name: 'showmycards-backup.json.gz',
 			size_bytes: 2048,
 			pruned: 1200,
-			failure_examples: ['a', 'b']
+			failure_examples: ['a', 'b'],
+			deck_resort_error: 'database is locked'
 		});
 
 		expect(entries).toEqual([
@@ -114,17 +115,37 @@ describe('metadataEntries', () => {
 				key: 'file_name',
 				label: 'File Name',
 				value: 'showmycards-backup.json.gz',
-				structured: false
+				structured: false,
+				error: false
 			},
-			{ key: 'size_bytes', label: 'Size', value: '2.0 KB', structured: false },
-			{ key: 'pruned', label: 'Pruned', value: (1200).toLocaleString(), structured: false },
+			{ key: 'size_bytes', label: 'Size', value: '2.0 KB', structured: false, error: false },
+			{
+				key: 'pruned',
+				label: 'Pruned',
+				value: (1200).toLocaleString(),
+				structured: false,
+				error: false
+			},
 			{
 				key: 'failure_examples',
 				label: 'Failure Examples',
 				value: JSON.stringify(['a', 'b'], null, 2),
-				structured: true
+				structured: true,
+				error: false
+			},
+			{
+				key: 'deck_resort_error',
+				label: 'Deck Resort Error',
+				value: 'database is locked',
+				structured: false,
+				error: true
 			}
 		]);
+	});
+
+	it('does not flag empty _error strings as errors', () => {
+		const [entry] = metadataEntries({ deck_resort_error: '' });
+		expect(entry.error).toBe(false);
 	});
 });
 

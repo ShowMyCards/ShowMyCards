@@ -134,11 +134,14 @@ type BulkDataListResponse struct {
 
 // JobMetadata represents the metadata stored in job.Metadata field
 type JobMetadata struct {
-	TotalCards      int      `json:"total_cards"`
-	ProcessedCards  int      `json:"processed_cards"`
-	FailedCards     int      `json:"failed_cards"`
-	FailureExamples []string `json:"failure_examples"` // First 10 failures, max 100 chars each
-	Phase           string   `json:"phase"`            // "downloading", "importing", "completed"
+	TotalCards       int      `json:"total_cards"`
+	ProcessedCards   int      `json:"processed_cards"`
+	FailedCards      int      `json:"failed_cards"`
+	FailureExamples  []string `json:"failure_examples"` // First 10 failures, max 100 chars each
+	Phase            string   `json:"phase"`            // "fetching_list", "downloading_and_importing", "resorting_decks", "completed", "failed"
+	DeckItemsChecked *int     `json:"deck_items_checked,omitempty"`
+	DeckItemsMoved   *int     `json:"deck_items_moved,omitempty"`
+	DeckResortError  string   `json:"deck_resort_error,omitempty"`
 }
 
 // DownloadAndImport downloads and imports bulk data from Scryfall with context support
@@ -254,16 +257,17 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 		failureRate = float64(totalFailed) / float64(totalCards)
 	}
 
-	s.updateJobMetadata(ctx, jobID, JobMetadata{
-		Phase:           "completed",
+	metadata := JobMetadata{
 		TotalCards:      totalCards,
 		ProcessedCards:  totalProcessed,
 		FailedCards:     totalFailed,
 		FailureExamples: allFailureExamples,
-	})
+	}
 
 	// If failure rate exceeds threshold, return error to mark job as failed
 	if failureRate > BulkDataMaxFailureRate {
+		metadata.Phase = "failed"
+		s.updateJobMetadata(ctx, jobID, metadata)
 		return fmt.Errorf("bulk import failed: %d/%d cards failed (%.2f%% > %.2f%% threshold)",
 			totalFailed, totalCards, failureRate*100, BulkDataMaxFailureRate*100)
 	}
@@ -274,10 +278,23 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 	}
 
 	// Step 4: With fresh card data, put deck tokens and other extras in their
-	// zone. A failure is logged, not returned: the card data itself was imported fine.
-	if _, err := models.ReclassifyDeckExtras(ctx, s.db); err != nil {
+	// zone. A failure is logged and recorded in metadata, not returned: the
+	// card data itself was imported fine.
+	metadata.Phase = "resorting_decks"
+	s.updateJobMetadata(ctx, jobID, metadata)
+
+	reclassify, err := models.ReclassifyDeckExtras(ctx, s.db)
+	if err != nil {
 		slog.Error("failed to reclassify deck extras after bulk import", "error", err)
+		metadata.DeckResortError = err.Error()
+	} else {
+		slog.Info("reclassified deck extras after bulk import", "checked", reclassify.Checked, "moved", reclassify.Moved)
+		metadata.DeckItemsChecked = &reclassify.Checked
+		metadata.DeckItemsMoved = &reclassify.Moved
 	}
+
+	metadata.Phase = "completed"
+	s.updateJobMetadata(ctx, jobID, metadata)
 
 	return nil
 }
