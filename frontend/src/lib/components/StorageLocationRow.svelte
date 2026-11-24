@@ -3,13 +3,28 @@
 	import { resolve } from '$app/paths';
 	import type { StorageLocation } from '#lib';
 	import { notifications, getActionError } from '#lib';
-	import { Box, BookOpen, Pencil, Trash2, Grid2x2 } from '@lucide/svelte';
+	import {
+		Box,
+		BookOpen,
+		Pencil,
+		Trash2,
+		Grid2x2,
+		GripVertical,
+		ChevronUp,
+		ChevronDown
+	} from '@lucide/svelte';
+	import { draggable, droppable, type DragDropState } from '@thisux/sveltednd';
 
 	interface Props {
 		location: StorageLocation;
+		index: number;
+		total: number;
+		onDrop: (state: DragDropState<StorageLocation>) => void;
+		onMoveUp: () => void;
+		onMoveDown: () => void;
 	}
 
-	let { location }: Props = $props();
+	let { location, index, total, onDrop, onMoveUp, onMoveDown }: Props = $props();
 
 	// Edit state
 	let isEditing = $state(false);
@@ -32,7 +47,12 @@
 	}
 </script>
 
-<div class="flex items-center gap-4 p-4">
+<div
+	use:droppable={{
+		container: index.toString(),
+		callbacks: { onDrop }
+	}}
+	class="flex items-center gap-4 p-4 transition-all duration-200">
 	{#if isEditing}
 		<!-- Edit Mode -->
 		<form
@@ -112,6 +132,17 @@
 		</form>
 	{:else}
 		<!-- View Mode -->
+		<!-- Drag Handle -->
+		<div
+			use:draggable={{
+				container: index.toString(),
+				dragData: location
+			}}
+			class="cursor-grab active:cursor-grabbing p-1 -m-1 rounded hover:bg-base-300 shrink-0"
+			title="Drag to reorder">
+			<GripVertical class="w-4 h-4 opacity-60" />
+		</div>
+
 		<!-- Storage Type Icon -->
 		<div class="shrink-0">
 			{#if location.storage_type === 'Box'}
@@ -129,6 +160,24 @@
 
 		<!-- Action Buttons -->
 		<div class="flex gap-2 ml-auto">
+			<button
+				type="button"
+				onclick={onMoveUp}
+				disabled={index === 0}
+				class="btn bg-base-100 btn-sm"
+				aria-label="Move {location.name} up"
+				title="Move up">
+				<ChevronUp class="w-4 h-4" />
+			</button>
+			<button
+				type="button"
+				onclick={onMoveDown}
+				disabled={index === total - 1}
+				class="btn bg-base-100 btn-sm"
+				aria-label="Move {location.name} down"
+				title="Move down">
+				<ChevronDown class="w-4 h-4" />
+			</button>
 			<a
 				href={resolve(`inventory/${location.id}`)}
 				class="btn bg-base-100 btn-sm"

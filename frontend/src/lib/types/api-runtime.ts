@@ -34,6 +34,7 @@ export interface StorageLocationWithCount {
 	updated_at: string;
 	name: string;
 	storage_type: StorageType;
+	sort_order: number;
 	card_count: number;
 }
 

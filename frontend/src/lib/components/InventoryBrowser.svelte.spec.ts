@@ -18,7 +18,8 @@ const cards = [
 			storage_location: {
 				BaseModel: { id: 1, created_at: '', updated_at: '' },
 				name: 'Red Box',
-				storage_type: 'Box'
+				storage_type: 'Box',
+				sort_order: 1
 			},
 			quantity: 2
 		}),

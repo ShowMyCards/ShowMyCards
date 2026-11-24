@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -30,6 +31,7 @@ type StorageLocation struct {
 	BaseModel
 	Name        string      `gorm:"type:varchar(255);not null" json:"name"`
 	StorageType StorageType `gorm:"type:varchar(50);not null;check:storage_type IN ('Box', 'Binder')" json:"storage_type"`
+	SortOrder   int         `gorm:"not null;default:0;index" json:"sort_order"`
 }
 
 func (s *StorageLocation) ValidateStorageLocation(tx *gorm.DB) error {
@@ -50,4 +52,22 @@ func (s *StorageLocation) BeforeCreate(tx *gorm.DB) error {
 // BeforeUpdate validates the storage location before updating a record
 func (s *StorageLocation) BeforeUpdate(tx *gorm.DB) error {
 	return s.ValidateStorageLocation(tx)
+}
+
+// OrderStorageLocations orders a storage_locations query by manual sort_order,
+// tie-breaking by ID ascending.
+func OrderStorageLocations(db *gorm.DB) *gorm.DB {
+	return db.Order("sort_order ASC, id ASC")
+}
+
+// MaxStorageSortOrder returns the highest sort_order across storage_locations,
+// or 0 when no storage locations exist.
+func MaxStorageSortOrder(db *gorm.DB) (int, error) {
+	var maxSortOrder int
+	if err := db.Model(&StorageLocation{}).
+		Select("COALESCE(MAX(sort_order), 0)").
+		Scan(&maxSortOrder).Error; err != nil {
+		return 0, fmt.Errorf("querying max storage sort_order: %w", err)
+	}
+	return maxSortOrder, nil
 }

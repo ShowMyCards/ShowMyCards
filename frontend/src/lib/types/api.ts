@@ -77,7 +77,7 @@ export interface DashboardStats {
  * CurrentExportVersion is the latest export format version.
  * Bump this when the export schema changes and add a migration function.
  */
-export const CurrentExportVersion = 2;
+export const CurrentExportVersion = 3;
 /**
  * DataHandler handles data import and export endpoints
  */
@@ -103,6 +103,7 @@ export interface ExportStorageLocation {
 	ref_id: number /* uint */;
 	name: string;
 	storage_type: any /* models.StorageType */;
+	sort_order: number /* int */;
 }
 /**
  * ExportSortingRule represents a sorting rule in export format
@@ -975,9 +976,33 @@ export interface StorageLocationWithCount {
 	updated_at: string;
 	name: string;
 	storage_type: any /* models.StorageType */;
+	sort_order: number /* int */;
 	card_count: number /* int */; // Sum of quantities
 	item_count: number /* int */; // Count of distinct records
 	total_value: number /* float64 */; // USD total value
+}
+/**
+ * BatchUpdateSortOrderItem represents a single storage location sort_order update.
+ * tygo:export
+ */
+export interface BatchUpdateSortOrderItem {
+	id: number /* uint */;
+	sort_order: number /* int */;
+}
+/**
+ * BatchUpdateSortOrderRequest represents the request body for batch updating storage sort order.
+ * tygo:export
+ */
+export interface BatchUpdateSortOrderRequest {
+	updates: BatchUpdateSortOrderItem[];
+}
+/**
+ * BatchUpdateSortOrderResponse represents the response for batch storage sort order updates.
+ * tygo:export
+ */
+export interface BatchUpdateSortOrderResponse {
+	updated_count: number /* int */;
+	error?: string;
 }
 
 //////////

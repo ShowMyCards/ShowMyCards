@@ -353,6 +353,7 @@ export interface StorageLocation {
 	BaseModel: BaseModel;
 	name: string;
 	storage_type: StorageType;
+	sort_order: number /* int */;
 }
 
 //////////

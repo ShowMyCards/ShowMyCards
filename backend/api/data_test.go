@@ -927,6 +927,129 @@ func TestApplyMigrations_V1ToV2AddsDecks(t *testing.T) {
 	}
 }
 
+func TestApplyMigrations_V2ToV3AddsSortOrder(t *testing.T) {
+	data := map[string]any{
+		"version": float64(2),
+		"storage_locations": []any{
+			map[string]any{"ref_id": float64(1), "name": "Second Created", "storage_type": "Box"},
+			map[string]any{"ref_id": float64(2), "name": "First Created", "storage_type": "Binder"},
+		},
+	}
+
+	if err := applyMigrations(data, 2); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	locs := data["storage_locations"].([]any)
+	for i, raw := range locs {
+		m := raw.(map[string]any)
+		if m["sort_order"] != float64(i+1) {
+			t.Errorf("loc %d sort_order = %v, want %v", i, m["sort_order"], float64(i+1))
+		}
+	}
+	if data["version"] != float64(CurrentExportVersion) {
+		t.Errorf("expected version %d, got %v", CurrentExportVersion, data["version"])
+	}
+}
+
+func TestExportImportRoundTrip_PreservesStorageLocationOrder(t *testing.T) {
+	srcApp, srcDB := setupDataTestApp(t)
+
+	// Create in reverse order of sort_order to verify sort_order (not ID) governs order
+	srcDB.Create(&models.StorageLocation{Name: "Zebra Box", StorageType: models.Box, SortOrder: 20})
+	srcDB.Create(&models.StorageLocation{Name: "Alpha Binder", StorageType: models.Binder, SortOrder: 10})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/data/export", nil)
+	resp, err := srcApp.Test(req)
+	if err != nil {
+		t.Fatalf("export request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var exported ExportData
+	if err := json.NewDecoder(resp.Body).Decode(&exported); err != nil {
+		t.Fatalf("failed to decode export: %v", err)
+	}
+
+	if len(exported.StorageLocations) != 2 {
+		t.Fatalf("expected 2 storage locations, got %d", len(exported.StorageLocations))
+	}
+	if exported.StorageLocations[0].Name != "Alpha Binder" || exported.StorageLocations[0].SortOrder != 10 {
+		t.Errorf("expected first exported location to be Alpha Binder (10), got %+v", exported.StorageLocations[0])
+	}
+	if exported.StorageLocations[1].Name != "Zebra Box" || exported.StorageLocations[1].SortOrder != 20 {
+		t.Errorf("expected second exported location to be Zebra Box (20), got %+v", exported.StorageLocations[1])
+	}
+
+	// Import into destination DB that already has two locations
+	dstApp, dstDB := setupDataTestApp(t)
+	dstDB.Create(&models.StorageLocation{Name: "Existing 1", StorageType: models.Box, SortOrder: 1})
+	dstDB.Create(&models.StorageLocation{Name: "Existing 2", StorageType: models.Binder, SortOrder: 2})
+
+	body, _ := json.Marshal(exported)
+	status, res := postImport(t, dstApp, body)
+	if status != http.StatusOK {
+		t.Fatalf("import failed with status %d", status)
+	}
+	if res.StorageLocationsCreated != 2 {
+		t.Fatalf("expected 2 locations created, got %d", res.StorageLocationsCreated)
+	}
+
+	var dstLocs []models.StorageLocation
+	dstDB.Order("sort_order ASC, id ASC").Find(&dstLocs)
+	want := []struct {
+		name      string
+		sortOrder int
+	}{
+		{"Existing 1", 1},
+		{"Existing 2", 2},
+		{"Alpha Binder", 3},
+		{"Zebra Box", 4},
+	}
+	if len(dstLocs) != len(want) {
+		t.Fatalf("expected %d locations in dst, got %d", len(want), len(dstLocs))
+	}
+	for i, w := range want {
+		if dstLocs[i].Name != w.name || dstLocs[i].SortOrder != w.sortOrder {
+			t.Errorf("dst[%d] = (%q, %d), want (%q, %d)", i, dstLocs[i].Name, dstLocs[i].SortOrder, w.name, w.sortOrder)
+		}
+	}
+}
+
+func TestImport_StorageLocationsAppendedInRelativeOrder(t *testing.T) {
+	app, db := setupDataTestApp(t)
+	db.Create(&models.StorageLocation{Name: "Existing", StorageType: models.Box, SortOrder: 5})
+
+	importData := ExportData{
+		Version:    CurrentExportVersion,
+		ExportedAt: "2026-01-01T00:00:00Z",
+		StorageLocations: []ExportStorageLocation{
+			{RefID: 1, Name: "Imported Second", StorageType: models.Box, SortOrder: 50},
+			{RefID: 2, Name: "Imported First", StorageType: models.Binder, SortOrder: 10},
+		},
+	}
+	body, _ := json.Marshal(importData)
+	status, _ := postImport(t, app, body)
+	if status != http.StatusOK {
+		t.Fatalf("expected 200, got %d", status)
+	}
+
+	var locs []models.StorageLocation
+	db.Order("sort_order ASC").Find(&locs)
+	want := []string{"Existing", "Imported First", "Imported Second"}
+	if len(locs) != len(want) {
+		t.Fatalf("expected %d locations, got %d", len(want), len(locs))
+	}
+	for i, w := range want {
+		if locs[i].Name != w {
+			t.Errorf("loc[%d] = %q, want %q", i, locs[i].Name, w)
+		}
+	}
+	if locs[1].SortOrder != 6 || locs[2].SortOrder != 7 {
+		t.Errorf("expected imported sort_orders 6 and 7, got %d and %d", locs[1].SortOrder, locs[2].SortOrder)
+	}
+}
+
 func uintPtr(v uint) *uint {
 	return &v
 }
