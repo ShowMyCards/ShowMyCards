@@ -2,7 +2,6 @@ package services
 
 import (
 	"backend/models"
-	scryfallclient "backend/scryfall"
 	"backend/version"
 	"context"
 	"encoding/json"
@@ -16,21 +15,25 @@ import (
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
+
+// SetLister retrieves the Magic set catalog from an upstream source (Scryfall).
+type SetLister interface {
+	ListSets(ctx context.Context) ([]scryfall.Set, error)
+}
 
 // SetDataService handles set data download and import
 type SetDataService struct {
 	db              *gorm.DB
 	jobService      *JobService
 	settingsService *SettingsService
-	scryfallClient  *scryfallclient.Client
+	scryfallClient  SetLister
 	dataDir         string
 	httpClient      *http.Client
 }
 
 // NewSetDataService creates a new set data service
-func NewSetDataService(db *gorm.DB, jobService *JobService, settingsService *SettingsService, scryfallClient *scryfallclient.Client, dataDir string) *SetDataService {
+func NewSetDataService(db *gorm.DB, jobService *JobService, settingsService *SettingsService, scryfallClient SetLister, dataDir string) *SetDataService {
 	return &SetDataService{
 		db:              db,
 		jobService:      jobService,
@@ -210,7 +213,7 @@ func (s *SetDataService) downloadAndImportInternal(ctx context.Context, jobID ui
 		}
 	}
 
-	// Step 4: Upsert all sets to database
+	// Step 4: Replace sets in database
 	s.updateJobMetadata(ctx, jobID, SetJobMetadata{
 		Phase:           "saving",
 		TotalSets:       len(sets),
@@ -221,7 +224,7 @@ func (s *SetDataService) downloadAndImportInternal(ctx context.Context, jobID ui
 		FailureExamples: metadata.FailureExamples,
 	})
 
-	if err := s.upsertSets(ctx, dbSets); err != nil {
+	if err := s.replaceSets(ctx, dbSets); err != nil {
 		return fmt.Errorf("failed to save sets: %w", err)
 	}
 
@@ -307,16 +310,30 @@ func (s *SetDataService) scryfallSetToModel(set scryfall.Set, iconFilename strin
 	}
 }
 
-func (s *SetDataService) upsertSets(ctx context.Context, sets []*models.Set) error {
+const setInsertBatchSize = 100
+
+func (s *SetDataService) replaceSets(ctx context.Context, sets []*models.Set) error {
 	if len(sets) == 0 {
 		return nil
 	}
 
-	// Use UPSERT (ON CONFLICT) to handle updates
-	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "scryfall_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"code", "name", "set_type", "released_at", "card_count", "digital", "icon_filename", "parent_set_code"}),
-	}).Create(&sets).Error
+	// Replace the full set catalog atomically in a transaction. The sets table
+	// enforces uniqueness on both scryfall_id (PK) and code (uniqueIndex), so an
+	// ON CONFLICT (scryfall_id) upsert fails whenever Scryfall renames a set's
+	// code and assigns the old code to another set, swaps codes, or reuses a
+	// removed set's code. Scryfall's /sets endpoint returns the complete catalog
+	// and no other table references sets via foreign key, so clearing and
+	// re-inserting in one transaction avoids transient unique collisions, prunes
+	// removed sets, and rolls back cleanly on error.
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.Set{}).Error; err != nil {
+			return fmt.Errorf("clearing existing sets: %w", err)
+		}
+		if err := tx.CreateInBatches(sets, setInsertBatchSize).Error; err != nil {
+			return fmt.Errorf("inserting sets: %w", err)
+		}
+		return nil
+	})
 }
 
 func (s *SetDataService) updateJobMetadata(ctx context.Context, jobID uint, metadata SetJobMetadata) {
