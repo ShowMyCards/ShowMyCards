@@ -482,7 +482,7 @@ func TestCheck_Oathbreaker(t *testing.T) {
 	})
 }
 
-func TestCheck_IgnoresNonDeckCards(t *testing.T) {
+func TestCheck_IgnoresDeckExtras(t *testing.T) {
 	notLegalAnywhere := legal(func(l *scryfall.Legalities) { *l = scryfall.Legalities{} })
 	fish := card("Fish", layout(scryfall.LayoutToken), typeLine("Token Creature — Fish"), colors(U), notLegalAnywhere)
 	role := card("Monster Role", layout(scryfall.LayoutFlip), typeLine("Token Enchantment — Aura Role"), notLegalAnywhere)
@@ -490,12 +490,32 @@ func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 	poison := card("Poison Counter", layout(scryfall.LayoutNormal), typeLine("Card"), notLegalAnywhere)
 	artCard := card("Sol Ring // Sol Ring", layout(scryfall.LayoutArtSeries), typeLine("Card // Card"), notLegalAnywhere)
 	themeCard := card("Dragons", layout(scryfall.Layout("front_card")), typeLine("Card"), notLegalAnywhere)
+	plane := card("Dominaria", layout(scryfall.LayoutPlanar), typeLine("Plane — Dominaria"), notLegalAnywhere)
+	scheme := card("All in Good Time", layout(scryfall.LayoutScheme), typeLine("Scheme"), notLegalAnywhere)
+	vanguard := card("Squee", layout(scryfall.LayoutVanguard), typeLine("Vanguard"), notLegalAnywhere)
+	dungeon := card("Undercity", layout(scryfall.LayoutNormal), typeLine("Dungeon — Undercity"), notLegalAnywhere)
+	reversibleToken := card("Construct // Construct",
+		layout(scryfall.LayoutReversible),
+		typeLine(""),
+		func(c *scryfall.Card) {
+			c.CardFaces = []scryfall.CardFace{
+				{TypeLine: "Token Legendary Artifact Creature — Construct"},
+				{TypeLine: "Token Legendary Artifact Creature — Construct"},
+			}
+		},
+		notLegalAnywhere,
+	)
 
 	t.Run("constructed", func(t *testing.T) {
 		results := newDeck().
 			fill(models.ZoneMain, 60).
 			add(fish, models.ZoneMain, 5).
 			add(role, models.ZoneSide, 16).
+			add(plane, models.ZoneMain, 1).
+			add(scheme, models.ZoneMain, 1).
+			add(vanguard, models.ZoneMain, 1).
+			add(dungeon, models.ZoneMain, 1).
+			add(reversibleToken, models.ZoneMain, 1).
 			check()
 		expect(t, results, "modern")
 	})
@@ -509,7 +529,18 @@ func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 			add(artCard, models.ZoneMain, 1).
 			add(themeCard, models.ZoneMain, 1).
 			add(emblem, models.ZoneSide, 1).
+			add(plane, models.ZoneMain, 1).
+			add(scheme, models.ZoneMain, 1).
+			add(vanguard, models.ZoneMain, 1).
+			add(dungeon, models.ZoneMain, 1).
+			add(reversibleToken, models.ZoneMain, 1).
 			check()
 		expect(t, results, "commander")
+	})
+
+	t.Run("other zone is ignored even without card data", func(t *testing.T) {
+		d := newDeck().fill(models.ZoneMain, 60)
+		d.items = append(d.items, models.DeckItem{OracleID: "unknown-extra", Zone: models.ZoneOther, DesiredQuantity: 2})
+		expect(t, d.check(), "modern")
 	})
 }
