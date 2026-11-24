@@ -83,12 +83,12 @@
 					<h3 class="font-semibold mb-2">Details</h3>
 					<dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
 						{#each entries as entry (entry.key)}
-							<dt class="opacity-70">{entry.label}</dt>
+							<dt class={entry.error ? 'text-error font-medium' : 'opacity-70'}>{entry.label}</dt>
 							<dd class="min-w-0">
 								{#if entry.structured}
 									<pre class="bg-base-200 p-2 rounded overflow-x-auto text-xs">{entry.value}</pre>
 								{:else}
-									<span class="break-all">{entry.value}</span>
+									<span class="break-all" class:text-error={entry.error}>{entry.value}</span>
 								{/if}
 							</dd>
 						{/each}

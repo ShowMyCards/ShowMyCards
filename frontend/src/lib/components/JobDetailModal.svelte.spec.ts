@@ -76,6 +76,59 @@ describe('JobDetailModal', () => {
 		expect(onClose).toHaveBeenCalled();
 	});
 
+	it('shows deck re-sort counts on a completed bulk import', async () => {
+		await render(JobDetailModal, {
+			job: job({
+				type: 'bulk_data_import',
+				status: 'completed',
+				metadata: JSON.stringify({
+					total_cards: 100,
+					processed_cards: 100,
+					failed_cards: 0,
+					phase: 'completed',
+					deck_items_checked: 14,
+					deck_items_moved: 3
+				})
+			}),
+			typeLabel: 'Card Data Update',
+			onClose: vi.fn()
+		});
+
+		await expect.element(page.getByText('Completed', { exact: true })).toBeInTheDocument();
+		const details = page.getByRole('region', { name: 'Details' });
+		await expect.element(details.getByText('Deck Items Checked')).toBeInTheDocument();
+		await expect.element(details.getByText('14', { exact: true })).toBeInTheDocument();
+		await expect.element(details.getByText('Deck Items Moved')).toBeInTheDocument();
+		await expect.element(details.getByText('3', { exact: true })).toBeInTheDocument();
+	});
+
+	it('highlights a non-fatal deck re-sort error on a completed job', async () => {
+		await render(JobDetailModal, {
+			job: job({
+				type: 'bulk_data_import',
+				status: 'completed',
+				metadata: JSON.stringify({
+					total_cards: 100,
+					processed_cards: 100,
+					failed_cards: 0,
+					phase: 'completed',
+					deck_resort_error: 'loading deck items: database is locked'
+				})
+			}),
+			typeLabel: 'Card Data Update',
+			onClose: vi.fn()
+		});
+
+		await expect.element(page.getByText('Completed', { exact: true })).toBeInTheDocument();
+		await expect.element(page.getByRole('region', { name: 'Error' })).not.toBeInTheDocument();
+
+		const details = page.getByRole('region', { name: 'Details' });
+		const label = details.getByText('Deck Resort Error');
+		const message = details.getByText('loading deck items: database is locked');
+		await expect.element(label).toHaveClass('text-error');
+		await expect.element(message).toHaveClass('text-error');
+	});
+
 	it('renders nothing without a job', async () => {
 		await render(JobDetailModal, { job: null, typeLabel: '', onClose: vi.fn() });
 

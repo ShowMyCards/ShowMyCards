@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -243,10 +244,20 @@ func TestBulkDataService_DownloadAndImport_SuccessfulImport(t *testing.T) {
 		t.Errorf("expected 2 cards imported, got %d", count)
 	}
 
-	// Verify job was completed
+	// Verify job was completed and recorded zero deck items checked/moved
 	updatedJob, _ := jobService.Get(context.Background(), job.ID)
 	if updatedJob.Status != models.JobStatusCompleted {
 		t.Errorf("expected job status %s, got %s", models.JobStatusCompleted, updatedJob.Status)
+	}
+	md := decodeJobMetadata(t, updatedJob)
+	if md.DeckItemsChecked == nil || *md.DeckItemsChecked != 0 {
+		t.Errorf("deck_items_checked = %v, want 0", md.DeckItemsChecked)
+	}
+	if md.DeckItemsMoved == nil || *md.DeckItemsMoved != 0 {
+		t.Errorf("deck_items_moved = %v, want 0", md.DeckItemsMoved)
+	}
+	if md.DeckResortError != "" {
+		t.Errorf("deck_resort_error = %q, want empty", md.DeckResortError)
 	}
 }
 
@@ -622,6 +633,20 @@ var rabbitToken = scryfall.Card{
 	Layout: scryfall.LayoutToken, TypeLine: "Token Creature — Rabbit",
 }
 
+var normalCard = scryfall.Card{
+	ID: "bolt-1", OracleID: "oracle-bolt", Name: "Lightning Bolt", Set: "lea",
+	Layout: scryfall.LayoutNormal, TypeLine: "Instant",
+}
+
+func decodeJobMetadata(t *testing.T, job *models.Job) JobMetadata {
+	t.Helper()
+	var md JobMetadata
+	if err := json.Unmarshal([]byte(job.Metadata), &md); err != nil {
+		t.Fatalf("failed to decode job metadata %q: %v", job.Metadata, err)
+	}
+	return md
+}
+
 func deckItemZone(t *testing.T, db *gorm.DB, id uint) models.DeckZone {
 	t.Helper()
 	var item models.DeckItem
@@ -634,7 +659,17 @@ func deckItemZone(t *testing.T, db *gorm.DB, id uint) models.DeckZone {
 func TestBulkDataService_DownloadAndImport_ReclassifiesDeckExtras(t *testing.T) {
 	service, jobService, _, db := setupBulkDataServiceTest(t)
 	item := seedTokenInMain(t, db)
-	serveBulkData(t, service, []scryfall.Card{rabbitToken})
+	normalItem := models.DeckItem{
+		DeckID:          item.DeckID,
+		OracleID:        normalCard.OracleID,
+		ScryfallID:      normalCard.ID,
+		Zone:            models.ZoneMain,
+		DesiredQuantity: 4,
+	}
+	if err := db.Create(&normalItem).Error; err != nil {
+		t.Fatalf("failed to create normal deck item: %v", err)
+	}
+	serveBulkData(t, service, []scryfall.Card{rabbitToken, normalCard})
 
 	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
 	if err := service.DownloadAndImport(context.Background(), job.ID); err != nil {
@@ -643,6 +678,80 @@ func TestBulkDataService_DownloadAndImport_ReclassifiesDeckExtras(t *testing.T) 
 
 	if zone := deckItemZone(t, db, item.ID); zone != models.ZoneOther {
 		t.Errorf("token zone after import = %q, want %q", zone, models.ZoneOther)
+	}
+	if zone := deckItemZone(t, db, normalItem.ID); zone != models.ZoneMain {
+		t.Errorf("normal card zone after import = %q, want %q", zone, models.ZoneMain)
+	}
+
+	updatedJob, err := jobService.Get(context.Background(), job.ID)
+	if err != nil {
+		t.Fatalf("failed to reload job: %v", err)
+	}
+	if updatedJob.Status != models.JobStatusCompleted {
+		t.Errorf("job status = %q, want %q", updatedJob.Status, models.JobStatusCompleted)
+	}
+	md := decodeJobMetadata(t, updatedJob)
+	if md.Phase != "completed" {
+		t.Errorf("phase = %q, want completed", md.Phase)
+	}
+	if md.DeckItemsChecked == nil || *md.DeckItemsChecked != 2 {
+		t.Errorf("deck_items_checked = %v, want 2", md.DeckItemsChecked)
+	}
+	if md.DeckItemsMoved == nil || *md.DeckItemsMoved != 1 {
+		t.Errorf("deck_items_moved = %v, want 1", md.DeckItemsMoved)
+	}
+	if md.DeckResortError != "" {
+		t.Errorf("deck_resort_error = %q, want empty", md.DeckResortError)
+	}
+}
+
+func TestBulkDataService_DownloadAndImport_RecordsReclassifyError(t *testing.T) {
+	service, jobService, settingsService, db := setupBulkDataServiceTest(t)
+	serveBulkData(t, service, []scryfall.Card{rabbitToken})
+
+	// Drop deck_items so card import succeeds but Step 4 reclassification fails.
+	if err := db.Migrator().DropTable(&models.DeckItem{}); err != nil {
+		t.Fatalf("failed to drop deck_items: %v", err)
+	}
+
+	job, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
+	if err := service.DownloadAndImport(context.Background(), job.ID); err != nil {
+		t.Fatalf("DownloadAndImport returned error on reclassify failure: %v", err)
+	}
+
+	var cardCount int64
+	db.Model(&models.Card{}).Count(&cardCount)
+	if cardCount != 1 {
+		t.Errorf("imported card count = %d, want 1", cardCount)
+	}
+
+	updatedJob, err := jobService.Get(context.Background(), job.ID)
+	if err != nil {
+		t.Fatalf("failed to reload job: %v", err)
+	}
+	if updatedJob.Status != models.JobStatusCompleted {
+		t.Errorf("job status = %q, want %q", updatedJob.Status, models.JobStatusCompleted)
+	}
+	if updatedJob.Error != "" {
+		t.Errorf("job error = %q, want empty", updatedJob.Error)
+	}
+
+	md := decodeJobMetadata(t, updatedJob)
+	if md.Phase != "completed" {
+		t.Errorf("phase = %q, want completed", md.Phase)
+	}
+	if md.DeckItemsChecked != nil {
+		t.Errorf("deck_items_checked = %d, want nil on error", *md.DeckItemsChecked)
+	}
+	if md.DeckItemsMoved != nil {
+		t.Errorf("deck_items_moved = %d, want nil on error", *md.DeckItemsMoved)
+	}
+	if !strings.Contains(md.DeckResortError, "deck_items") {
+		t.Errorf("deck_resort_error = %q, want error mentioning deck_items", md.DeckResortError)
+	}
+
+	if status, _ := settingsService.Get(context.Background(), "bulk_data_update_last_status"); status != "success" {
+		t.Errorf("bulk_data_update_last_status = %q, want success", status)
 	}
 }
 
@@ -664,5 +773,15 @@ func TestBulkDataService_DownloadAndImport_FailedImportDoesNotReclassify(t *test
 
 	if zone := deckItemZone(t, db, item.ID); zone != models.ZoneMain {
 		t.Errorf("token zone after failed import = %q, want %q", zone, models.ZoneMain)
+	}
+
+	updatedJob, err := jobService.Get(context.Background(), job.ID)
+	if err != nil {
+		t.Fatalf("failed to reload job: %v", err)
+	}
+	md := decodeJobMetadata(t, updatedJob)
+	if md.DeckItemsChecked != nil || md.DeckItemsMoved != nil || md.DeckResortError != "" {
+		t.Errorf("expected no deck resort metadata on failed import, got checked=%v moved=%v err=%q",
+			md.DeckItemsChecked, md.DeckItemsMoved, md.DeckResortError)
 	}
 }
