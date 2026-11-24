@@ -29,8 +29,9 @@ export default defineConfig({
 					setupFiles: ['./vitest-setup-client.ts'],
 					browser: {
 						enabled: true,
+						headless: true,
 						provider: playwright(),
-						instances: [{ browser: 'chromium', headless: true }]
+						instances: [{ browser: 'chromium' }]
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
 					exclude: ['src/lib/server/**']
