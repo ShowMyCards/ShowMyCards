@@ -22,6 +22,7 @@ frontend/node_modules/
 frontend/.svelte-kit/
 frontend/build/
 frontend/test-results/
+frontend/.vitest/
 frontend/.output/
 frontend/.vercel/
 frontend/.netlify/

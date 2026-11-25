@@ -5,6 +5,7 @@ import (
 	"backend/scryfall"
 	"backend/services"
 	"backend/utils"
+	"context"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -16,16 +17,23 @@ import (
 
 var languageClauseRegExp = regexp.MustCompile(`(?i)(^|\s)[-!]?(l|lang):`)
 
+// cardSource is the part of the Scryfall client the search handler uses.
+type cardSource interface {
+	SearchWithOptions(ctx context.Context, query string, opts scryfall.SearchOptions) (scryfall.SearchResult, error)
+	GetByID(ctx context.Context, id string) (goscryfall.Card, error)
+	Autocomplete(ctx context.Context, query string) ([]string, error)
+}
+
 // SearchHandler handles card search endpoints
 type SearchHandler struct {
-	client          *scryfall.Client
+	client          cardSource
 	db              *gorm.DB
 	settingsService *services.SettingsService
 	allocation      *services.AllocationService
 }
 
 // NewSearchHandler creates a new search handler
-func NewSearchHandler(client *scryfall.Client, db *gorm.DB, settingsService *services.SettingsService) *SearchHandler {
+func NewSearchHandler(client cardSource, db *gorm.DB, settingsService *services.SettingsService) *SearchHandler {
 	return &SearchHandler{
 		client:          client,
 		db:              db,
@@ -179,29 +187,9 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 	// Build enhanced results
 	cards := make([]EnhancedCardResult, len(result.Cards))
 	for i, card := range result.Cards {
-		cardResult := BuildCardResult(card)
-
-		// Split inventory into this printing vs other printings
-		inventoryData := CardInventoryData{
-			ThisPrinting:   []models.Inventory{},
-			OtherPrintings: []models.Inventory{},
-			TotalQuantity:  0,
-		}
-
-		if inventory, ok := inventoryByOracle[card.OracleID]; ok {
-			for _, inv := range inventory {
-				inventoryData.TotalQuantity += inv.Quantity
-				if inv.ScryfallID == card.ID {
-					inventoryData.ThisPrinting = append(inventoryData.ThisPrinting, inv)
-				} else {
-					inventoryData.OtherPrintings = append(inventoryData.OtherPrintings, inv)
-				}
-			}
-		}
-
 		cards[i] = EnhancedCardResult{
-			CardResult: cardResult,
-			Inventory:  inventoryData,
+			CardResult: BuildCardResult(card),
+			Inventory:  buildOracleInventoryData(card.ID, inventoryByOracle[card.OracleID]),
 		}
 	}
 
@@ -256,13 +244,6 @@ func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 
 	cardResult := BuildCardResult(card)
 
-	// Look up inventory by oracle_id
-	inventoryData := CardInventoryData{
-		ThisPrinting:   []models.Inventory{},
-		OtherPrintings: []models.Inventory{},
-		TotalQuantity:  0,
-	}
-
 	var inventory []models.Inventory
 	if err := h.db.WithContext(c.RequestCtx()).Preload("StorageLocation").
 		Where("oracle_id = ?", card.OracleID).
@@ -270,22 +251,32 @@ func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 		slog.Warn("inventory lookup failed", "component", "search", "error", err)
 	}
 
-	for _, inv := range inventory {
-		inventoryData.TotalQuantity += inv.Quantity
-		if inv.ScryfallID == card.ID {
-			inventoryData.ThisPrinting = append(inventoryData.ThisPrinting, inv)
-		} else {
-			inventoryData.OtherPrintings = append(inventoryData.OtherPrintings, inv)
-		}
-	}
-
 	// Back-fill prices for a non-English printing from its English counterpart.
 	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), []*CardResult{&cardResult})
 
 	return c.JSON(EnhancedCardResult{
 		CardResult: cardResult,
-		Inventory:  inventoryData,
+		Inventory:  buildOracleInventoryData(card.ID, inventory),
 	})
+}
+
+// buildOracleInventoryData splits an oracle's inventory rows into this printing
+// versus other printings and sums total quantity across the oracle.
+func buildOracleInventoryData(cardID string, oracleInventory []models.Inventory) CardInventoryData {
+	inventoryData := CardInventoryData{
+		ThisPrinting:   []models.Inventory{},
+		OtherPrintings: []models.Inventory{},
+		TotalQuantity:  0,
+	}
+	for _, inv := range oracleInventory {
+		inventoryData.TotalQuantity += inv.Quantity
+		if inv.ScryfallID == cardID {
+			inventoryData.ThisPrinting = append(inventoryData.ThisPrinting, inv)
+		} else {
+			inventoryData.OtherPrintings = append(inventoryData.OtherPrintings, inv)
+		}
+	}
+	return inventoryData
 }
 
 // AutocompleteResponse represents card name autocomplete suggestions

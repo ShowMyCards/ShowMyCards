@@ -1,6 +1,35 @@
-import { BACKEND_URL, type EnhancedCardResult, type DeckCardUsage } from '#lib';
+import { BACKEND_URL, type DeckCardUsage, type EnhancedCardResult, type InventoryCard } from '#lib';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
+
+async function loadOtherPrintings(
+	fetch: typeof globalThis.fetch,
+	card: EnhancedCardResult
+): Promise<InventoryCard[]> {
+	if (!card.oracle_id) return [];
+	try {
+		const params = new URLSearchParams();
+		if (card.language) params.set('lang', card.language);
+		const query = params.toString();
+		const response = await fetch(
+			`${BACKEND_URL}/api/cards/printings/${encodeURIComponent(card.oracle_id)}${query ? `?${query}` : ''}`
+		);
+		if (!response.ok) return [];
+		const printings: InventoryCard[] = await response.json();
+		return (printings ?? []).filter((c) => c.id !== card.id);
+	} catch {
+		return [];
+	}
+}
+
+async function loadDeckUsage(fetch: typeof globalThis.fetch, id: string): Promise<DeckCardUsage[]> {
+	try {
+		const response = await fetch(`${BACKEND_URL}/api/decks/for-card/${id}`);
+		return response.ok ? await response.json() : [];
+	} catch {
+		return [];
+	}
+}
 
 export const load: PageServerLoad = async ({ params, fetch }) => {
 	const { id } = params;
@@ -17,37 +46,10 @@ export const load: PageServerLoad = async ({ params, fetch }) => {
 		}
 
 		const card: EnhancedCardResult = await cardResponse.json();
-
-		// Fetch other printings by oracle_id (search for all cards with same oracle_id)
-		let otherPrintings: EnhancedCardResult[] = [];
-		if (card.oracle_id) {
-			try {
-				const searchResponse = await fetch(
-					`${BACKEND_URL}/api/search?q=oracle_id:${card.oracle_id}&unique=prints`
-				);
-				if (searchResponse.ok) {
-					const searchData = await searchResponse.json();
-					// Filter out the current card
-					otherPrintings = (searchData.data || []).filter(
-						(c: EnhancedCardResult) => c.id !== card.id
-					);
-				}
-			} catch {
-				// Ignore errors fetching other printings
-			}
-		}
-
-		// Fetch which decks use this printing (any-printing or pinned to it). A
-		// failure here must not break the card page, so degrade to an empty list.
-		let deckUsage: DeckCardUsage[] = [];
-		try {
-			const decksResponse = await fetch(`${BACKEND_URL}/api/decks/for-card/${id}`);
-			if (decksResponse.ok) {
-				deckUsage = await decksResponse.json();
-			}
-		} catch {
-			// Ignore errors fetching deck usage.
-		}
+		const [otherPrintings, deckUsage] = await Promise.all([
+			loadOtherPrintings(fetch, card),
+			loadDeckUsage(fetch, id)
+		]);
 
 		return {
 			card,
