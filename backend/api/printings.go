@@ -188,8 +188,8 @@ func (h *SearchHandler) mergeOwnedPrintings(
 		)
 	})
 
-	emitted := make(map[string]bool, len(ownedCards)+len(catalogCards))
-	merged := make([]goscryfall.Card, 0, len(ownedCards)+len(catalogCards))
+	emitted := make(map[string]bool)
+	var merged []goscryfall.Card
 	for _, card := range ownedCards {
 		if emitted[card.ID] {
 			continue
