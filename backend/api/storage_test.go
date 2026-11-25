@@ -32,8 +32,10 @@ func setupTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewStorageHandler(db)
 
 	app.Get("/api/storage", handler.List)
+	app.Get("/api/storage/with-counts", handler.ListWithCounts)
 	app.Get("/api/storage/:id", handler.Get)
 	app.Post("/api/storage", handler.Create)
+	app.Post("/api/storage/batch/sort-order", handler.BatchUpdateSortOrder)
 	app.Put("/api/storage/:id", handler.Update)
 	app.Delete("/api/storage/:id", handler.Delete)
 
@@ -587,4 +589,242 @@ func TestDelete_WithBothReferences(t *testing.T) {
 	if count != 1 {
 		t.Errorf("expected location to still exist, got count %d", count)
 	}
+}
+
+func TestCreate_AssignsIncrementingSortOrder(t *testing.T) {
+	app, _ := setupTestApp(t)
+
+	names := []string{"First", "Second", "Third"}
+	for i, name := range names {
+		body := fmt.Sprintf(`{"name": %q, "storage_type": "Box"}`, name)
+		req := httptest.NewRequest(http.MethodPost, "/api/storage", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		var created models.StorageLocation
+		if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		resp.Body.Close()
+
+		if created.SortOrder != i+1 {
+			t.Errorf("created %q: expected sort_order %d, got %d", name, i+1, created.SortOrder)
+		}
+	}
+}
+
+func TestUpdate_PreservesSortOrder(t *testing.T) {
+	app, db := setupTestApp(t)
+
+	loc := models.StorageLocation{Name: "Original", StorageType: models.Box, SortOrder: 7}
+	if err := db.Create(&loc).Error; err != nil {
+		t.Fatalf("failed to create location: %v", err)
+	}
+
+	body := `{"name": "Renamed", "storage_type": "Binder"}`
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/storage/%d", loc.ID), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var updated models.StorageLocation
+	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if updated.SortOrder != 7 {
+		t.Errorf("expected sort_order 7 to be preserved, got %d", updated.SortOrder)
+	}
+}
+
+func TestListAndListWithCounts_OrderedBySortOrder(t *testing.T) {
+	app, db := setupTestApp(t)
+
+	// Mix Box and Binder intentionally with manual sort orders
+	locs := []models.StorageLocation{
+		{Name: "Third Box", StorageType: models.Box, SortOrder: 3},
+		{Name: "First Binder", StorageType: models.Binder, SortOrder: 1},
+		{Name: "Second Box", StorageType: models.Box, SortOrder: 2},
+	}
+	for i := range locs {
+		if err := db.Create(&locs[i]).Error; err != nil {
+			t.Fatalf("failed to create location: %v", err)
+		}
+	}
+
+	// Check /api/storage
+	req := httptest.NewRequest(http.MethodGet, "/api/storage", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var listResult utils.PaginatedResponse[models.StorageLocation]
+	if err := json.NewDecoder(resp.Body).Decode(&listResult); err != nil {
+		t.Fatalf("failed to decode list response: %v", err)
+	}
+	wantNames := []string{"First Binder", "Second Box", "Third Box"}
+	if len(listResult.Data) != len(wantNames) {
+		t.Fatalf("expected %d items from /api/storage, got %d", len(wantNames), len(listResult.Data))
+	}
+	for i, want := range wantNames {
+		if listResult.Data[i].Name != want {
+			t.Errorf("/api/storage[%d] = %q, want %q", i, listResult.Data[i].Name, want)
+		}
+	}
+
+	// Check /api/storage/with-counts (unified order across Box and Binder)
+	reqCounts := httptest.NewRequest(http.MethodGet, "/api/storage/with-counts", nil)
+	respCounts, err := app.Test(reqCounts)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer respCounts.Body.Close()
+
+	if respCounts.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200 from with-counts, got %d", respCounts.StatusCode)
+	}
+
+	var countResults []StorageLocationWithCount
+	if err := json.NewDecoder(respCounts.Body).Decode(&countResults); err != nil {
+		t.Fatalf("failed to decode with-counts response: %v", err)
+	}
+	if len(countResults) != len(wantNames) {
+		t.Fatalf("expected %d items from with-counts, got %d", len(wantNames), len(countResults))
+	}
+	for i, want := range wantNames {
+		if countResults[i].Name != want {
+			t.Errorf("with-counts[%d] = %q, want %q", i, countResults[i].Name, want)
+		}
+		if countResults[i].SortOrder != i+1 {
+			t.Errorf("with-counts[%d].SortOrder = %d, want %d", i, countResults[i].SortOrder, i+1)
+		}
+	}
+}
+
+func TestBatchUpdateSortOrder_Success(t *testing.T) {
+	app, db := setupTestApp(t)
+
+	a := models.StorageLocation{Name: "A", StorageType: models.Box, SortOrder: 1}
+	b := models.StorageLocation{Name: "B", StorageType: models.Binder, SortOrder: 2}
+	c := models.StorageLocation{Name: "C", StorageType: models.Box, SortOrder: 3}
+	db.Create(&a)
+	db.Create(&b)
+	db.Create(&c)
+
+	body := fmt.Sprintf(`{"updates": [{"id": %d, "sort_order": 1}, {"id": %d, "sort_order": 2}, {"id": %d, "sort_order": 3}]}`, c.ID, a.ID, b.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/storage/batch/sort-order", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res BatchUpdateSortOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if res.UpdatedCount != 3 {
+		t.Errorf("expected updated_count 3, got %d", res.UpdatedCount)
+	}
+
+	var ordered []models.StorageLocation
+	db.Order("sort_order ASC").Find(&ordered)
+	want := []string{"C", "A", "B"}
+	for i, w := range want {
+		if ordered[i].Name != w {
+			t.Errorf("pos %d: got %q, want %q", i, ordered[i].Name, w)
+		}
+	}
+}
+
+func TestBatchUpdateSortOrder_ValidationAndRollback(t *testing.T) {
+	app, db := setupTestApp(t)
+
+	a := models.StorageLocation{Name: "A", StorageType: models.Box, SortOrder: 1}
+	b := models.StorageLocation{Name: "B", StorageType: models.Binder, SortOrder: 2}
+	db.Create(&a)
+	db.Create(&b)
+
+	badRequests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "empty updates",
+			body: `{"updates": []}`,
+		},
+		{
+			name: "zero id",
+			body: `{"updates": [{"id": 0, "sort_order": 1}]}`,
+		},
+		{
+			name: "sort_order zero",
+			body: fmt.Sprintf(`{"updates": [{"id": %d, "sort_order": 0}]}`, a.ID),
+		},
+		{
+			name: "negative sort_order",
+			body: fmt.Sprintf(`{"updates": [{"id": %d, "sort_order": -1}]}`, a.ID),
+		},
+		{
+			name: "duplicate ids",
+			body: fmt.Sprintf(`{"updates": [{"id": %d, "sort_order": 5}, {"id": %d, "sort_order": 2}, {"id": %d, "sort_order": 3}]}`, b.ID, a.ID, a.ID),
+		},
+	}
+
+	for _, tc := range badRequests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/storage/batch/sort-order", bytes.NewBufferString(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("expected 400, got %d", resp.StatusCode)
+			}
+
+			var reloadedA, reloadedB models.StorageLocation
+			db.First(&reloadedA, a.ID)
+			db.First(&reloadedB, b.ID)
+			if reloadedA.SortOrder != 1 || reloadedB.SortOrder != 2 {
+				t.Errorf("expected sort orders to remain (1, 2), got (%d, %d)", reloadedA.SortOrder, reloadedB.SortOrder)
+			}
+		})
+	}
+
+	// Nonexistent ID in batch -> 404 and rollback earlier update in transaction
+	t.Run("nonexistent id rolls back", func(t *testing.T) {
+		reqMissing := httptest.NewRequest(http.MethodPost, "/api/storage/batch/sort-order", bytes.NewBufferString(fmt.Sprintf(`{"updates": [{"id": %d, "sort_order": 9}, {"id": 99999, "sort_order": 2}]}`, a.ID)))
+		reqMissing.Header.Set("Content-Type", "application/json")
+		respMissing, err := app.Test(reqMissing)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer respMissing.Body.Close()
+		if respMissing.StatusCode != http.StatusNotFound {
+			t.Errorf("missing ID: expected 404, got %d", respMissing.StatusCode)
+		}
+
+		var reloaded models.StorageLocation
+		db.First(&reloaded, a.ID)
+		if reloaded.SortOrder != 1 {
+			t.Errorf("expected transaction rollback to keep sort_order 1, got %d", reloaded.SortOrder)
+		}
+	})
 }

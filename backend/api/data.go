@@ -3,10 +3,12 @@ package api
 import (
 	"backend/models"
 	"backend/utils"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -15,7 +17,7 @@ import (
 
 // CurrentExportVersion is the latest export format version.
 // Bump this when the export schema changes and add a migration function.
-const CurrentExportVersion = 2
+const CurrentExportVersion = 3
 
 // DataHandler handles data import and export endpoints
 type DataHandler struct {
@@ -45,6 +47,7 @@ type ExportStorageLocation struct {
 	RefID       uint               `json:"ref_id"`
 	Name        string             `json:"name"`
 	StorageType models.StorageType `json:"storage_type"`
+	SortOrder   int                `json:"sort_order"`
 }
 
 // ExportSortingRule represents a sorting rule in export format
@@ -132,7 +135,7 @@ func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 	var decks []models.Deck
 
 	err := h.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Find(&storageLocations).Error; err != nil {
+		if err := tx.Scopes(models.OrderStorageLocations).Find(&storageLocations).Error; err != nil {
 			return fmt.Errorf("storage locations: %w", err)
 		}
 		if err := tx.Find(&sortingRules).Error; err != nil {
@@ -159,6 +162,7 @@ func (h *DataHandler) BuildExport(ctx context.Context) (ExportData, error) {
 			RefID:       loc.ID,
 			Name:        loc.Name,
 			StorageType: loc.StorageType,
+			SortOrder:   loc.SortOrder,
 		}
 	}
 
@@ -314,11 +318,21 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 	storageRefMap := make(map[uint]uint) // old ref_id -> new DB id
 
 	err = h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
-		// 1. Storage Locations — created first because inventory and rules reference them
-		for _, loc := range data.StorageLocations {
+		// 1. Storage Locations — created first because inventory and rules reference them.
+		// Sort incoming locations by sort_order and append after any existing locations.
+		maxSortOrder, err := models.MaxStorageSortOrder(tx)
+		if err != nil {
+			return fmt.Errorf("importing storage locations: %w", err)
+		}
+		sortedLocations := slices.Clone(data.StorageLocations)
+		slices.SortStableFunc(sortedLocations, func(a, b ExportStorageLocation) int {
+			return cmp.Compare(a.SortOrder, b.SortOrder)
+		})
+		for i, loc := range sortedLocations {
 			newLoc := models.StorageLocation{
 				Name:        loc.Name,
 				StorageType: loc.StorageType,
+				SortOrder:   maxSortOrder + i + 1,
 			}
 			if err := tx.Create(&newLoc).Error; err != nil {
 				return fmt.Errorf("failed to create storage location %q: %w", loc.Name, err)
@@ -466,6 +480,7 @@ func (h *DataHandler) Import(c fiber.Ctx) error {
 // When bumping CurrentExportVersion, add a migration here.
 var migrations = map[int]func(map[string]any) error{
 	1: migrateV1ToV2,
+	2: migrateV2ToV3,
 }
 
 // migrateV1ToV2 adds the decks collection introduced in version 2. Version 1
@@ -473,6 +488,25 @@ var migrations = map[int]func(map[string]any) error{
 func migrateV1ToV2(data map[string]any) error {
 	if _, ok := data["decks"]; !ok {
 		data["decks"] = []any{}
+	}
+	return nil
+}
+
+// migrateV2ToV3 adds sequential sort_order values to storage_locations exported
+// before version 3, preserving their exported array order.
+func migrateV2ToV3(data map[string]any) error {
+	locs, ok := data["storage_locations"].([]any)
+	if !ok {
+		return nil
+	}
+	for i, rawLoc := range locs {
+		locMap, ok := rawLoc.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, exists := locMap["sort_order"]; !exists {
+			locMap["sort_order"] = float64(i + 1)
+		}
 	}
 	return nil
 }

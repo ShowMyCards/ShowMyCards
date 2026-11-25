@@ -36,7 +36,7 @@ func (h *StorageHandler) List(c fiber.Ctx) error {
 
 	var locations []models.StorageLocation
 	offset := utils.CalculateOffset(params.Page, params.PageSize)
-	if err := h.db.WithContext(c.RequestCtx()).Offset(offset).Limit(params.PageSize).Find(&locations).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Scopes(models.OrderStorageLocations).Offset(offset).Limit(params.PageSize).Find(&locations).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch storage locations", "database query failed", err)
 	}
@@ -85,7 +85,14 @@ func (h *StorageHandler) Create(c fiber.Ctx) error {
 		StorageType: req.StorageType,
 	}
 
-	if err := h.db.WithContext(c.RequestCtx()).Create(&location).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		maxSortOrder, err := models.MaxStorageSortOrder(tx)
+		if err != nil {
+			return err
+		}
+		location.SortOrder = maxSortOrder + 1
+		return tx.Create(&location).Error
+	}); err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to create storage location", "database insert failed", err)
 	}
@@ -189,16 +196,17 @@ type StorageLocationWithCount struct {
 	UpdatedAt   string             `json:"updated_at"`
 	Name        string             `json:"name"`
 	StorageType models.StorageType `json:"storage_type"`
-	CardCount   int                `json:"card_count"`   // Sum of quantities
-	ItemCount   int                `json:"item_count"`   // Count of distinct records
-	TotalValue  float64            `json:"total_value"`  // USD total value
+	SortOrder   int                `json:"sort_order"`
+	CardCount   int                `json:"card_count"`  // Sum of quantities
+	ItemCount   int                `json:"item_count"`  // Count of distinct records
+	TotalValue  float64            `json:"total_value"` // USD total value
 }
 
 // ListWithCounts returns all storage locations with card counts, item counts, and total values
 func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 	// Step 1: Get all storage locations
 	var locations []models.StorageLocation
-	if err := h.db.WithContext(c.RequestCtx()).Order("storage_type ASC, id ASC").Find(&locations).Error; err != nil {
+	if err := h.db.WithContext(c.RequestCtx()).Scopes(models.OrderStorageLocations).Find(&locations).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch storage locations", "query failed", err)
 	}
@@ -269,6 +277,7 @@ func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 			UpdatedAt:   location.UpdatedAt.Format(time.RFC3339),
 			Name:        location.Name,
 			StorageType: location.StorageType,
+			SortOrder:   location.SortOrder,
 			CardCount:   lc.CardCount,
 			ItemCount:   lc.ItemCount,
 			TotalValue:  totalValue,
@@ -276,4 +285,79 @@ func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 	}
 
 	return c.JSON(results)
+}
+
+// BatchUpdateSortOrderItem represents a single storage location sort_order update.
+// tygo:export
+type BatchUpdateSortOrderItem struct {
+	ID        uint `json:"id"`
+	SortOrder int  `json:"sort_order"`
+}
+
+// BatchUpdateSortOrderRequest represents the request body for batch updating storage sort order.
+// tygo:export
+type BatchUpdateSortOrderRequest struct {
+	Updates []BatchUpdateSortOrderItem `json:"updates"`
+}
+
+// BatchUpdateSortOrderResponse represents the response for batch storage sort order updates.
+// tygo:export
+type BatchUpdateSortOrderResponse struct {
+	UpdatedCount int    `json:"updated_count"`
+	Error        string `json:"error,omitempty"`
+}
+
+// BatchUpdateSortOrder updates sort_order for multiple storage locations in a single transaction.
+func (h *StorageHandler) BatchUpdateSortOrder(c fiber.Ctx) error {
+	var req BatchUpdateSortOrderRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if len(req.Updates) == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "updates array cannot be empty")
+	}
+
+	seenIDs := make(map[uint]struct{}, len(req.Updates))
+	for _, update := range req.Updates {
+		if update.ID == 0 {
+			return utils.ReturnError(c, fiber.StatusBadRequest, "invalid storage location id")
+		}
+		if update.SortOrder < 1 {
+			return utils.ReturnError(c, fiber.StatusBadRequest, "sort_order must be at least 1")
+		}
+		if _, exists := seenIDs[update.ID]; exists {
+			return utils.ReturnError(c, fiber.StatusBadRequest, fmt.Sprintf("duplicate storage location id: %d", update.ID))
+		}
+		seenIDs[update.ID] = struct{}{}
+	}
+
+	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		for _, update := range req.Updates {
+			var location models.StorageLocation
+			if err := tx.First(&location, update.ID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return fmt.Errorf("storage location with id %d not found: %w", update.ID, err)
+				}
+				return fmt.Errorf("failed to fetch storage location %d: %w", update.ID, err)
+			}
+
+			if err := tx.Model(&location).Update("sort_order", update.SortOrder).Error; err != nil {
+				return fmt.Errorf("failed to update sort_order for storage location %d: %w", update.ID, err)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ReturnError(c, fiber.StatusNotFound, err.Error())
+		}
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to update storage location order", "batch sort order update failed", err)
+	}
+
+	return c.JSON(BatchUpdateSortOrderResponse{
+		UpdatedCount: len(req.Updates),
+	})
 }

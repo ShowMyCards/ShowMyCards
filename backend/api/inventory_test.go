@@ -2289,3 +2289,54 @@ func TestBatchDelete_DoesNotAffectOtherItems(t *testing.T) {
 		t.Error("expected item2 to be deleted, but it still exists")
 	}
 }
+
+func TestByOracle_LocationsSortedBySortOrder(t *testing.T) {
+	app, db := setupInventoryTestApp(t)
+	handler := NewInventoryHandler(db, services.NewAutoSortService(db))
+	app.Get("/api/inventory/by-oracle/:oracle_id", handler.ByOracle)
+
+	locThird := models.StorageLocation{Name: "Third", StorageType: models.Box, SortOrder: 30}
+	locFirst := models.StorageLocation{Name: "First", StorageType: models.Binder, SortOrder: 10}
+	locSecond := models.StorageLocation{Name: "Second", StorageType: models.Box, SortOrder: 20}
+	db.Create(&locThird)
+	db.Create(&locFirst)
+	db.Create(&locSecond)
+
+	items := []models.Inventory{
+		{ScryfallID: "s1", OracleID: "shared-oracle", Treatment: "nonfoil", Quantity: 1, StorageLocationID: &locThird.ID},
+		{ScryfallID: "s2", OracleID: "shared-oracle", Treatment: "foil", Quantity: 1, StorageLocationID: &locFirst.ID},
+		{ScryfallID: "s3", OracleID: "shared-oracle", Treatment: "nonfoil", Quantity: 2, StorageLocationID: &locSecond.ID},
+		{ScryfallID: "s4", OracleID: "shared-oracle", Treatment: "nonfoil", Quantity: 1, StorageLocationID: nil},
+	}
+	for i := range items {
+		if err := db.Create(&items[i]).Error; err != nil {
+			t.Fatalf("failed to create inventory item: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/inventory/by-oracle/shared-oracle", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var result ByOracleResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	want := []string{"First", "Second", "Third"}
+	if len(result.Locations) != len(want) {
+		t.Fatalf("expected %d locations, got %d", len(want), len(result.Locations))
+	}
+	for i, w := range want {
+		if result.Locations[i].Name != w {
+			t.Errorf("location[%d] = %q, want %q", i, result.Locations[i].Name, w)
+		}
+	}
+}

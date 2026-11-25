@@ -5,9 +5,11 @@ import (
 	"backend/rules"
 	"backend/services"
 	"backend/utils"
+	"cmp"
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"github.com/gofiber/fiber/v3"
@@ -492,11 +494,17 @@ func (h *InventoryHandler) ByOracle(c fiber.Ctx) error {
 		}
 	}
 
-	// Convert location map to slice
+	// Convert location map to slice in manual sort order
 	locations := make([]models.StorageLocation, 0, len(locationMap))
 	for _, loc := range locationMap {
 		locations = append(locations, loc)
 	}
+	slices.SortFunc(locations, func(a, b models.StorageLocation) int {
+		if c := cmp.Compare(a.SortOrder, b.SortOrder); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
 
 	return c.JSON(ByOracleResponse{
 		OracleID:  oracleID,

@@ -28,7 +28,7 @@ ShowMyCards/
 │   │   ├── search.go            # Scryfall card search with inventory data
 │   │   ├── settings.go          # Application settings
 │   │   ├── sorting_rules.go     # Sorting rule CRUD + evaluation endpoints
-│   │   ├── storage.go           # Storage location CRUD operations
+│   │   ├── storage.go           # Storage location CRUD + batch sort-order operations
 │   │   └── *_test.go            # Test files for each handler
 │   ├── database/                # Database layer
 │   │   └── client.go            # SQLite connection and lifecycle, migrations
@@ -186,11 +186,13 @@ Go types are mapped to TypeScript as follows:
 
 ### Storage Locations
 
-- `GET /api/storage` - List storage locations (paginated)
+- `GET /api/storage` - List storage locations (paginated, ordered by `sort_order` ascending, then `id`)
+- `GET /api/storage/with-counts` - List all storage locations with card counts, item counts, and total values
 - `GET /api/storage/:id` - Get single storage location
-- `POST /api/storage` - Create storage location
+- `POST /api/storage` - Create storage location (appended with `sort_order = max + 1`)
 - `PUT /api/storage/:id` - Update storage location
 - `DELETE /api/storage/:id` - Delete storage location
+- `POST /api/storage/batch/sort-order` - Batch update `sort_order` for multiple storage locations in a single transaction
 
 ### Inventory
 
@@ -303,6 +305,7 @@ Represents where cards are stored.
 
 - `Name` (string) - Name of the storage location
 - `StorageType` (enum: Box, Binder) - Type of storage with database-level validation
+- `SortOrder` (int, indexed) - Manual display order (`sort_order`; ascending with `id` tie-break, new locations append at `max + 1`, pre-migration rows with `sort_order <= 0` backfilled alphabetically on startup)
 
 ### Card
 
@@ -424,6 +427,11 @@ These types are exported to TypeScript via tygo and used in API responses.
 - **BatchMoveRequest/Response** - Batch move operations
 - **BatchDeleteRequest/Response** - Batch delete operations
 - **ResortRequest/ResortMovement/ResortResponse** - Re-sorting inventory against rules
+
+### Storage Types (`api/storage.go`)
+
+- **StorageLocationWithCount** - Storage location (including `sort_order`) with `card_count`, `item_count`, and `total_value`
+- **BatchUpdateSortOrderItem/Request/Response** - Batch `sort_order` update operations
 
 ### List Types (`api/lists.go`)
 

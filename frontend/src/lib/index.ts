@@ -210,6 +210,8 @@ export {
 	sortCardsBySetAndCollector
 } from './utils/sort-cards';
 export type { SetSortable } from './utils/sort-cards';
+export { compareStorageLocations } from './utils/sort-storage';
+export type { StorageLocationSortable } from './utils/sort-storage';
 export { getUniqueTreatments, groupCardsByTreatment } from './utils/search-results';
 export type { CardWithTreatment, GroupedCardsResult } from './utils/search-results';
 export { audio } from './utils/audio';

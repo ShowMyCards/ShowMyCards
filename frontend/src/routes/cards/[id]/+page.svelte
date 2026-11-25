@@ -3,6 +3,7 @@
 	import {
 		PageHeader,
 		ZONE_LABELS,
+		compareStorageLocations,
 		getCardTreatmentName,
 		getDisplayName,
 		type DeckCardUsage
@@ -139,7 +140,10 @@
 	// Adding the same card to the same location creates separate inventory rows,
 	// so consolidate them into a single badge per location/treatment.
 	const storageByLocation = $derived.by(() => {
-		const map = new SvelteMap<string, { name: string; treatment: string; quantity: number }>();
+		const map = new SvelteMap<
+			string,
+			{ id: number; name: string; treatment: string; quantity: number; sortOrder: number }
+		>();
 		for (const inv of card.inventory.this_printing) {
 			if (!inv.storage_location) continue;
 			const treatment = inv.treatment || 'nonfoil';
@@ -148,10 +152,18 @@
 			if (existing) {
 				existing.quantity += inv.quantity;
 			} else {
-				map.set(key, { name: inv.storage_location.name, treatment, quantity: inv.quantity });
+				map.set(key, {
+					id: inv.storage_location_id ?? 0,
+					name: inv.storage_location.name,
+					treatment,
+					quantity: inv.quantity,
+					sortOrder: inv.storage_location.sort_order
+				});
 			}
 		}
-		return [...map.entries()].map(([key, value]) => ({ key, ...value }));
+		return [...map.entries()]
+			.map(([key, value]) => ({ key, ...value }))
+			.sort(compareStorageLocations);
 	});
 </script>
 
@@ -230,13 +242,13 @@
 						{#if storageByLocation.length > 0}
 							<div class="mt-4">
 								<h4 class="font-semibold mb-2">Storage Locations</h4>
-								<div class="flex flex-wrap gap-2">
+								<ul class="flex flex-wrap gap-2" aria-label="Storage locations">
 									{#each storageByLocation as location (location.key)}
-										<div class="badge badge-outline">
+										<li class="badge badge-outline">
 											{location.name} ({location.quantity}x {location.treatment})
-										</div>
+										</li>
 									{/each}
-								</div>
+								</ul>
 							</div>
 						{/if}
 					{:else}

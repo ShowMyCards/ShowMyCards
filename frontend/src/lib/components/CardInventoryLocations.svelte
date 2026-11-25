@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import type { Inventory } from '#lib';
+	import { compareStorageLocations } from '#lib/utils/sort-storage.ts';
 
 	let { inventory }: { inventory: Inventory[] } = $props();
 
 	const locations = $derived.by(() => {
-		const groups: { id: number | null; name: string; quantity: number }[] = [];
+		const groups: { id: number | null; name: string; quantity: number; sortOrder?: number }[] = [];
 		for (const item of inventory) {
 			const id = item.storage_location_id ?? null;
 			const existing = groups.find((location) => location.id === id);
@@ -15,10 +16,12 @@
 				groups.push({
 					id,
 					name: id === null ? 'Unassigned' : (item.storage_location?.name ?? `Location ${id}`),
-					quantity: item.quantity
+					quantity: item.quantity,
+					sortOrder: item.storage_location?.sort_order
 				});
 			}
 		}
+		groups.sort(compareStorageLocations);
 		return groups;
 	});
 </script>

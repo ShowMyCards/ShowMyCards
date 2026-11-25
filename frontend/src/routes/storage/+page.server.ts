@@ -128,5 +128,37 @@ export const actions: Actions = {
 		} catch {
 			return fail(500, { error: 'Failed to delete storage location' });
 		}
+	},
+
+	reorder: async ({ request, fetch }) => {
+		const data = await request.formData();
+		const updatesJson = data.get('updates') as string;
+
+		if (!updatesJson) {
+			return fail(400, { error: 'Updates data is required' });
+		}
+
+		try {
+			const updates = JSON.parse(updatesJson);
+
+			const response = await fetch(`${BACKEND_URL}/api/storage/batch/sort-order`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ updates })
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				return fail(response.status, {
+					error: errorData.error || 'Failed to update storage location order'
+				});
+			}
+
+			return { success: true, action: 'reorder' };
+		} catch {
+			return fail(500, { error: 'Failed to update storage location order' });
+		}
 	}
 };

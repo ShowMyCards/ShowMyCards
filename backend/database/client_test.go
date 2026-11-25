@@ -630,3 +630,88 @@ func TestRenameSettingKeys(t *testing.T) {
 		t.Errorf("expected legacy keys to be removed, found %d", legacyCount)
 	}
 }
+
+func TestMigrate_BackfillStorageSortOrder(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	client, err := NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	// Simulate pre-migration rows (sort_order = 0) inserted in non-alphabetical order,
+	// including mixed casing and duplicate names to verify case-insensitive alphabetical
+	// sorting with ID tie-breaking.
+	seed := []models.StorageLocation{
+		{Name: "zeta Box", StorageType: models.Box},
+		{Name: "alpha Box", StorageType: models.Box},
+		{Name: "Alpha Binder", StorageType: models.Binder},
+		{Name: "Same", StorageType: models.Box},
+		{Name: "Same", StorageType: models.Binder},
+	}
+	for i := range seed {
+		if err := client.DB.Create(&seed[i]).Error; err != nil {
+			t.Fatalf("failed to seed storage location %d: %v", i, err)
+		}
+		if err := client.DB.Model(&seed[i]).Update("sort_order", 0).Error; err != nil {
+			t.Fatalf("failed to reset sort_order for %d: %v", i, err)
+		}
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("failed to close client: %v", err)
+	}
+
+	// Reopen to trigger migrate() -> backfillStorageSortOrder()
+	client, err = NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to reopen client: %v", err)
+	}
+
+	var ordered []models.StorageLocation
+	if err := client.DB.Order("sort_order ASC, id ASC").Find(&ordered).Error; err != nil {
+		t.Fatalf("failed to query storage locations: %v", err)
+	}
+
+	wantNames := []string{"Alpha Binder", "alpha Box", "Same", "Same", "zeta Box"}
+	if len(ordered) != len(wantNames) {
+		t.Fatalf("expected %d locations, got %d", len(wantNames), len(ordered))
+	}
+	for i, loc := range ordered {
+		if loc.Name != wantNames[i] {
+			t.Errorf("position %d: got %q, want %q", i, loc.Name, wantNames[i])
+		}
+		if loc.SortOrder != i+1 {
+			t.Errorf("position %d (%q): got sort_order %d, want %d", i, loc.Name, loc.SortOrder, i+1)
+		}
+	}
+	// Tie-break check for identical names
+	if ordered[2].ID > ordered[3].ID {
+		t.Errorf("expected identical names to tie-break by ID ascending, got %d before %d", ordered[2].ID, ordered[3].ID)
+	}
+
+	// Apply a manual reorder and verify reopening does not overwrite it.
+	if err := client.DB.Model(&ordered[4]).Update("sort_order", 1).Error; err != nil {
+		t.Fatalf("failed to update sort_order: %v", err)
+	}
+	if err := client.DB.Model(&ordered[0]).Update("sort_order", 5).Error; err != nil {
+		t.Fatalf("failed to update sort_order: %v", err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("failed to close client: %v", err)
+	}
+
+	client, err = NewClient(dbPath)
+	if err != nil {
+		t.Fatalf("failed to reopen client second time: %v", err)
+	}
+	defer client.Close()
+
+	var afterReopen []models.StorageLocation
+	if err := client.DB.Order("sort_order ASC, id ASC").Find(&afterReopen).Error; err != nil {
+		t.Fatalf("failed to query storage locations after reopen: %v", err)
+	}
+	if afterReopen[0].Name != "zeta Box" || afterReopen[4].Name != "Alpha Binder" {
+		t.Errorf("manual sort order was overwritten on reopen: got first=%q last=%q", afterReopen[0].Name, afterReopen[4].Name)
+	}
+}

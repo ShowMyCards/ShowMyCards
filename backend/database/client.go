@@ -110,6 +110,10 @@ func migrate(db *gorm.DB) error {
 		return fmt.Errorf("auto-migrate failed: %w", err)
 	}
 
+	if err := backfillStorageSortOrder(db); err != nil {
+		return err
+	}
+
 	if err := renameSettingKeys(db); err != nil {
 		return err
 	}
@@ -137,6 +141,36 @@ func tableColumns(db *gorm.DB, table string) (map[string]bool, error) {
 		m[c.Name] = true
 	}
 	return m, nil
+}
+
+// backfillStorageSortOrder assigns deterministic alphabetical sort_order values
+// (1..N, case-insensitive, tie-breaking by ID) to any existing storage_locations
+// that still have sort_order <= 0. Once populated, restarts are no-ops so
+// manual ordering is preserved.
+func backfillStorageSortOrder(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var uninitialized []models.StorageLocation
+		if err := tx.Where("sort_order <= 0").
+			Order("name COLLATE NOCASE ASC, id ASC").
+			Find(&uninitialized).Error; err != nil {
+			return fmt.Errorf("failed to query storage locations for sort_order backfill: %w", err)
+		}
+		if len(uninitialized) == 0 {
+			return nil
+		}
+
+		maxSortOrder, err := models.MaxStorageSortOrder(tx)
+		if err != nil {
+			return fmt.Errorf("backfilling storage sort_order: %w", err)
+		}
+
+		for i, loc := range uninitialized {
+			if err := tx.Model(&loc).Update("sort_order", maxSortOrder+i+1).Error; err != nil {
+				return fmt.Errorf("failed to backfill sort_order for storage location %d: %w", loc.ID, err)
+			}
+		}
+		return nil
+	})
 }
 
 // settingKeyRenames maps legacy setting keys to the standardized

@@ -326,3 +326,65 @@ func TestStorageLocation_UniqueNames(t *testing.T) {
 		t.Errorf("expected 2 storage locations with duplicate name, found %d", count)
 	}
 }
+
+func TestOrderStorageLocations(t *testing.T) {
+	db := setupStorageTestDB(t)
+
+	// Insert out of sort_order sequence, including two rows sharing sort_order to verify ID tie-breaking.
+	seed := []StorageLocation{
+		{Name: "Third", StorageType: Box, SortOrder: 30},
+		{Name: "Tie First Created", StorageType: Binder, SortOrder: 10},
+		{Name: "Tie Second Created", StorageType: Box, SortOrder: 10},
+		{Name: "Second", StorageType: Box, SortOrder: 20},
+	}
+	for i := range seed {
+		if err := db.Create(&seed[i]).Error; err != nil {
+			t.Fatalf("failed to create storage location %d: %v", i, err)
+		}
+	}
+
+	var ordered []StorageLocation
+	if err := db.Scopes(OrderStorageLocations).Find(&ordered).Error; err != nil {
+		t.Fatalf("failed to query ordered storage locations: %v", err)
+	}
+
+	wantNames := []string{"Tie First Created", "Tie Second Created", "Second", "Third"}
+	if len(ordered) != len(wantNames) {
+		t.Fatalf("expected %d locations, got %d", len(wantNames), len(ordered))
+	}
+	for i, want := range wantNames {
+		if ordered[i].Name != want {
+			t.Errorf("position %d: got %q, want %q", i, ordered[i].Name, want)
+		}
+	}
+}
+
+func TestMaxStorageSortOrder(t *testing.T) {
+	db := setupStorageTestDB(t)
+
+	got, err := MaxStorageSortOrder(db)
+	if err != nil {
+		t.Fatalf("empty table: unexpected error: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("empty table: got %d, want 0", got)
+	}
+
+	for _, loc := range []StorageLocation{
+		{Name: "A", StorageType: Box, SortOrder: 2},
+		{Name: "B", StorageType: Binder, SortOrder: 15},
+		{Name: "C", StorageType: Box, SortOrder: 7},
+	} {
+		if err := db.Create(&loc).Error; err != nil {
+			t.Fatalf("failed to seed %q: %v", loc.Name, err)
+		}
+	}
+
+	got, err = MaxStorageSortOrder(db)
+	if err != nil {
+		t.Fatalf("populated table: unexpected error: %v", err)
+	}
+	if got != 15 {
+		t.Errorf("populated table: got %d, want 15", got)
+	}
+}

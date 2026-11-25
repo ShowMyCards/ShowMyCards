@@ -16,6 +16,7 @@ func StorageRoutes(app *fiber.App, db *gorm.DB) {
 	storage.Get("/with-counts", handler.ListWithCounts)
 	storage.Get("/:id", handler.Get)
 	storage.Post("/", handler.Create)
+	storage.Post("/batch/sort-order", handler.BatchUpdateSortOrder)
 	storage.Put("/:id", handler.Update)
 	storage.Delete("/:id", handler.Delete)
 }
