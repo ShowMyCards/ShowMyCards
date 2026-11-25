@@ -240,6 +240,8 @@ func TestCustomMigrations_Indexes(t *testing.T) {
 	expectedIndexes := []string{
 		"idx_cards_name",
 		"idx_cards_set_code",
+		"idx_cards_print_lookup",
+		"idx_cards_sync_state",
 	}
 
 	for _, indexName := range expectedIndexes {
@@ -247,6 +249,16 @@ func TestCustomMigrations_Indexes(t *testing.T) {
 		client.DB.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name=?", indexName).Scan(&count)
 		if count == 0 {
 			t.Errorf("expected index %s to exist", indexName)
+		}
+	}
+
+	cols, err := tableColumns(client.DB, "cards")
+	if err != nil {
+		t.Fatalf("tableColumns failed: %v", err)
+	}
+	for _, col := range []string{"image_updated_at", "data_updated_at"} {
+		if !cols[col] {
+			t.Errorf("expected column %s on cards table", col)
 		}
 	}
 }

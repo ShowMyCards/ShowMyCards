@@ -666,3 +666,73 @@ func TestBulkDataService_DownloadAndImport_FailedImportDoesNotReclassify(t *test
 		t.Errorf("token zone after failed import = %q, want %q", zone, models.ZoneMain)
 	}
 }
+
+func TestBulkDataService_DownloadAndImport_PersistsSyncTimestamps(t *testing.T) {
+	service, jobService, _, db := setupBulkDataServiceTest(t)
+
+	imgTS := scryfall.Timestamp{Time: time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)}
+	bulkUpdatedAt := time.Date(2026, 11, 25, 10, 23, 1, 0, time.UTC)
+
+	cards := []scryfall.Card{
+		{ID: "card-ts", OracleID: "oracle-ts", Name: "Stamped Card", Set: "tst", ImageUpdatedAt: &imgTS},
+	}
+
+	serveListAndStream := func(updatedAt *time.Time, payload []scryfall.Card) {
+		var server *httptest.Server
+		server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/bulk-data" {
+				entry := map[string]interface{}{
+					"type":               "all_cards",
+					"jsonl_download_uri": server.URL + "/cards.jsonl.gz",
+				}
+				if updatedAt != nil {
+					entry["updated_at"] = updatedAt.Format(time.RFC3339)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": []interface{}{entry}})
+			} else {
+				writeJSONLGzip(t, w, payload)
+			}
+		}))
+		t.Cleanup(server.Close)
+		_ = service.settingsService.Set(context.Background(), "bulk_data_url", server.URL+"/bulk-data")
+	}
+
+	serveListAndStream(&bulkUpdatedAt, cards)
+	job1, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
+	if err := service.DownloadAndImport(context.Background(), job1.ID); err != nil {
+		t.Fatalf("first import failed: %v", err)
+	}
+
+	var stored models.Card
+	if err := db.First(&stored, "scryfall_id = ?", "card-ts").Error; err != nil {
+		t.Fatalf("failed to load card: %v", err)
+	}
+	if stored.ImageUpdatedAt != "2026-11-20T12:00:00Z" {
+		t.Errorf("ImageUpdatedAt = %q, want 2026-11-20T12:00:00Z", stored.ImageUpdatedAt)
+	}
+	if stored.DataUpdatedAt != "2026-11-25T10:23:01Z" {
+		t.Errorf("DataUpdatedAt = %q, want 2026-11-25T10:23:01Z", stored.DataUpdatedAt)
+	}
+
+	// Re-importing when bulk list omits updated_at must preserve existing DataUpdatedAt,
+	// while updating ImageUpdatedAt from the card object.
+	imgTS2 := scryfall.Timestamp{Time: time.Date(2026, 11, 24, 8, 30, 0, 0, time.UTC)}
+	serveListAndStream(nil, []scryfall.Card{
+		{ID: "card-ts", OracleID: "oracle-ts", Name: "Stamped Card", Set: "tst", ImageUpdatedAt: &imgTS2},
+	})
+	job2, _ := jobService.Create(context.Background(), models.JobTypeBulkDataImport, "{}")
+	if err := service.DownloadAndImport(context.Background(), job2.ID); err != nil {
+		t.Fatalf("second import failed: %v", err)
+	}
+
+	if err := db.First(&stored, "scryfall_id = ?", "card-ts").Error; err != nil {
+		t.Fatalf("failed to reload card: %v", err)
+	}
+	if stored.ImageUpdatedAt != "2026-11-24T08:30:00Z" {
+		t.Errorf("ImageUpdatedAt after update = %q, want 2026-11-24T08:30:00Z", stored.ImageUpdatedAt)
+	}
+	if stored.DataUpdatedAt != "2026-11-25T10:23:01Z" {
+		t.Errorf("DataUpdatedAt was clobbered: got %q, want 2026-11-25T10:23:01Z", stored.DataUpdatedAt)
+	}
+}

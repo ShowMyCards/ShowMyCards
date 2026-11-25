@@ -42,10 +42,11 @@ func setupSchedulerTest(t *testing.T) (*Scheduler, *BulkDataService, *JobService
 	if err != nil {
 		t.Fatalf("failed to create scryfall client: %v", err)
 	}
+	incrementalSyncService := NewIncrementalSyncService(db, jobService, settingsService, scryfallClient, bulkDataService)
 	setDataService := NewSetDataService(db, jobService, settingsService, scryfallClient, t.TempDir())
 	symbolDataService := NewSymbolDataService(db, jobService, settingsService, scryfallClient)
 	backupService := NewBackupService(stubExporter{}, settingsService, t.TempDir())
-	scheduler := NewScheduler(bulkDataService, setDataService, symbolDataService, jobService, settingsService, backupService)
+	scheduler := NewScheduler(bulkDataService, incrementalSyncService, setDataService, symbolDataService, jobService, settingsService, backupService)
 
 	return scheduler, bulkDataService, jobService, settingsService, db
 }
@@ -83,7 +84,7 @@ func TestScheduler_NewScheduler_Initialization(t *testing.T) {
 func TestScheduler_NewScheduler_TasksRegistered(t *testing.T) {
 	scheduler, _, _, _, _ := setupSchedulerTest(t)
 
-	expectedTasks := []string{"bulk_data_update", "set_data_update", "symbol_data_update", "job_cleanup", "data_backup"}
+	expectedTasks := []string{"bulk_data_update", "incremental_card_sync", "set_data_update", "symbol_data_update", "job_cleanup", "data_backup"}
 	if len(scheduler.tasks) != len(expectedTasks) {
 		t.Errorf("expected %d tasks, got %d", len(expectedTasks), len(scheduler.tasks))
 	}
@@ -228,9 +229,10 @@ func TestScheduler_TaskIntervals(t *testing.T) {
 	scheduler, _, _, _, _ := setupSchedulerTest(t)
 
 	expectedIntervals := map[string]time.Duration{
-		"bulk_data_update": 24 * time.Hour,
-		"set_data_update":  14 * 24 * time.Hour,
-		"job_cleanup":      24 * time.Hour,
+		"bulk_data_update":      7 * 24 * time.Hour,
+		"incremental_card_sync": 24 * time.Hour,
+		"set_data_update":       14 * 24 * time.Hour,
+		"job_cleanup":           24 * time.Hour,
 	}
 
 	for _, task := range scheduler.tasks {
@@ -746,6 +748,42 @@ func TestScheduler_RunNow_RejectsWhileJobActive(t *testing.T) {
 	if count != 1 {
 		t.Errorf("expected no new job to be created, found %d set import jobs", count)
 	}
+}
+
+func TestScheduler_RunNow_CardSyncMutualExclusion(t *testing.T) {
+	t.Run("incremental rejected while bulk active", func(t *testing.T) {
+		scheduler, _, jobService, _, _ := setupSchedulerTest(t)
+		ctx := context.Background()
+
+		active, err := jobService.Create(ctx, models.JobTypeBulkDataImport, "{}")
+		if err != nil {
+			t.Fatalf("failed to create job: %v", err)
+		}
+		if err := jobService.Start(ctx, active.ID); err != nil {
+			t.Fatalf("failed to start job: %v", err)
+		}
+
+		if _, err := scheduler.RunNow(ctx, "incremental_card_sync"); !errors.Is(err, ErrTaskRunning) {
+			t.Errorf("err = %v, want ErrTaskRunning", err)
+		}
+	})
+
+	t.Run("bulk rejected while incremental active", func(t *testing.T) {
+		scheduler, _, jobService, _, _ := setupSchedulerTest(t)
+		ctx := context.Background()
+
+		active, err := jobService.Create(ctx, models.JobTypeIncrementalCardSync, "{}")
+		if err != nil {
+			t.Fatalf("failed to create job: %v", err)
+		}
+		if err := jobService.Start(ctx, active.ID); err != nil {
+			t.Fatalf("failed to start job: %v", err)
+		}
+
+		if _, err := scheduler.RunNow(ctx, "bulk_data_update"); !errors.Is(err, ErrTaskRunning) {
+			t.Errorf("err = %v, want ErrTaskRunning", err)
+		}
+	})
 }
 
 func TestScheduler_RunNow_RejectsConcurrentStart(t *testing.T) {

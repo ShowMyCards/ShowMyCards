@@ -33,34 +33,40 @@ func NewSettingsService(db *gorm.DB) *SettingsService {
 // It is the single source of truth for both seeding and the key whitelist.
 func defaultSettings() map[string]string {
 	return map[string]string{
-		"bulk_data_update_enabled":        "true",
-		"bulk_data_update_time":           "03:00",
-		"bulk_data_update_last_run":       "",
-		"bulk_data_update_last_status":    "",
-		"bulk_data_url":                   "https://api.scryfall.com/bulk-data",
-		"set_data_update_enabled":         "true",
-		"set_data_update_time":            "02:30",
-		"set_data_update_last_run":        "",
-		"set_data_update_last_status":     "",
-		"symbol_data_update_enabled":      "true",
-		"symbol_data_update_time":         "02:00",
-		"symbol_data_update_last_run":     "",
-		"symbol_data_update_last_status":  "",
-		"job_cleanup_enabled":             "true",
-		"job_cleanup_time":                "00:00",
-		"job_cleanup_last_run":            "",
-		"job_cleanup_last_status":         "",
-		"job_cleanup_retention_days":      strconv.Itoa(DefaultJobCleanupRetentionDays),
-		"data_backup_enabled":             "true",
-		"data_backup_time":                "03:30",
-		"data_backup_last_run":            "",
-		"data_backup_last_status":         "",
-		"data_backup_retention_count":     strconv.Itoa(DefaultBackupRetention),
-		"scryfall_default_search":         "game:paper",
-		"scryfall_unique_mode":            "cards",
-		"scryfall_default_language":       "en",
-		"scheduler_catchup_enabled":       "true",
-		"scheduler_catchup_delay_seconds": "60",
+		"bulk_data_update_enabled":                 "true",
+		"bulk_data_update_time":                    "03:00",
+		"bulk_data_update_last_run":                "",
+		"bulk_data_update_last_status":             "",
+		"bulk_data_url":                            "https://api.scryfall.com/bulk-data",
+		"incremental_card_sync_enabled":            "true",
+		"incremental_card_sync_time":               "04:00",
+		"incremental_card_sync_last_run":           "",
+		"incremental_card_sync_last_status":        "",
+		"card_manifest_url":                        DefaultCardManifestURL,
+		"incremental_card_sync_fallback_threshold": strconv.Itoa(DefaultIncrementalFallbackThreshold),
+		"set_data_update_enabled":                  "true",
+		"set_data_update_time":                     "02:30",
+		"set_data_update_last_run":                 "",
+		"set_data_update_last_status":              "",
+		"symbol_data_update_enabled":               "true",
+		"symbol_data_update_time":                  "02:00",
+		"symbol_data_update_last_run":              "",
+		"symbol_data_update_last_status":           "",
+		"job_cleanup_enabled":                      "true",
+		"job_cleanup_time":                         "00:00",
+		"job_cleanup_last_run":                     "",
+		"job_cleanup_last_status":                  "",
+		"job_cleanup_retention_days":               strconv.Itoa(DefaultJobCleanupRetentionDays),
+		"data_backup_enabled":                      "true",
+		"data_backup_time":                         "03:30",
+		"data_backup_last_run":                     "",
+		"data_backup_last_status":                  "",
+		"data_backup_retention_count":              strconv.Itoa(DefaultBackupRetention),
+		"scryfall_default_search":                  "game:paper",
+		"scryfall_unique_mode":                     "cards",
+		"scryfall_default_language":                "en",
+		"scheduler_catchup_enabled":                "true",
+		"scheduler_catchup_delay_seconds":          "60",
 	}
 }
 
@@ -69,9 +75,10 @@ var ErrInvalidSettingValue = errors.New("invalid setting value")
 
 // settingMinimums holds the minimum value of each integer setting.
 var settingMinimums = map[string]int{
-	"data_backup_retention_count":     0, // 0 keeps every backup
-	"job_cleanup_retention_days":      1,
-	"scheduler_catchup_delay_seconds": 0,
+	"data_backup_retention_count":              0, // 0 keeps every backup
+	"incremental_card_sync_fallback_threshold": 0, // 0 disables fallback
+	"job_cleanup_retention_days":               1,
+	"scheduler_catchup_delay_seconds":          0,
 }
 
 // SettingMinimum returns the minimum value of an integer setting.

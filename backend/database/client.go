@@ -255,6 +255,10 @@ func customMigrations(db *gorm.DB) error {
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_cards_print_lookup ON cards(set_code, collector_number, lang)").Error; err != nil {
 		return fmt.Errorf("failed to create print lookup index: %w", err)
 	}
+	// Covering index for index-only incremental sync state scans.
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_cards_sync_state ON cards(scryfall_id, image_updated_at, data_updated_at)").Error; err != nil {
+		return fmt.Errorf("failed to create card sync state index: %w", err)
+	}
 
 	return nil
 }

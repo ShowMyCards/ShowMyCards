@@ -175,3 +175,32 @@ func TestBannerService_GetActive_BothBannerKinds(t *testing.T) {
 		t.Fatalf("expected 2 banners, got %d", len(banners))
 	}
 }
+
+func TestBannerService_GetActive_IncrementalCardSync(t *testing.T) {
+	t.Run("in progress", func(t *testing.T) {
+		service, db := setupBannerServiceTest(t)
+		createBannerTestJob(t, db, models.JobTypeIncrementalCardSync, models.JobStatusInProgress)
+
+		banners, err := service.GetActive(context.Background())
+		if err != nil {
+			t.Fatalf("GetActive failed: %v", err)
+		}
+		if len(banners) != 1 || banners[0].ID != "sync:incremental_card_sync" || banners[0].Severity != models.BannerSeverityInfo || banners[0].Dismissible {
+			t.Errorf("unexpected banners: %+v", banners)
+		}
+	})
+
+	t.Run("failed", func(t *testing.T) {
+		service, db := setupBannerServiceTest(t)
+		job := createBannerTestJob(t, db, models.JobTypeIncrementalCardSync, models.JobStatusFailed)
+
+		banners, err := service.GetActive(context.Background())
+		if err != nil {
+			t.Fatalf("GetActive failed: %v", err)
+		}
+		wantID := fmt.Sprintf("job-failed:%s:%d", models.JobTypeIncrementalCardSync, job.ID)
+		if len(banners) != 1 || banners[0].ID != wantID || banners[0].Severity != models.BannerSeverityWarning || !banners[0].Dismissible {
+			t.Errorf("unexpected banners: %+v", banners)
+		}
+	})
+}

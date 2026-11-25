@@ -74,6 +74,21 @@ describe('/jobs/+page.svelte', () => {
 		await expect.element(table.getByText('50 / 200 (25%)')).toBeInTheDocument();
 	});
 
+	it('shows phase in progress column before card counts are populated', async () => {
+		await render(Page, {
+			data: makeData([
+				job(4, 'incremental_card_sync', {
+					status: 'in_progress',
+					completed_at: undefined,
+					metadata: JSON.stringify({ mode: 'incremental', phase: 'fetching_manifest' })
+				})
+			])
+		});
+
+		const table = page.getByRole('table');
+		await expect.element(table.getByText('fetching_manifest')).toBeInTheDocument();
+	});
+
 	it('opens the detail view for any job', async () => {
 		await render(Page, {
 			data: makeData([

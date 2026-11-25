@@ -41,6 +41,12 @@ type ScheduledTask struct {
 	// JobType is the type of Job record the task creates, if any
 	JobType models.JobType
 
+	// ExclusiveGroup prevents tasks sharing a group from starting concurrently.
+	ExclusiveGroup string
+
+	// ConflictsWith lists additional job types whose active jobs block starting this task.
+	ConflictsWith []models.JobType
+
 	// Extras are task-specific settings shown alongside the schedule
 	Extras []TaskSetting
 
@@ -84,42 +90,46 @@ const (
 
 // Scheduler handles scheduled tasks
 type Scheduler struct {
-	bulkDataService   *BulkDataService
-	setDataService    *SetDataService
-	symbolDataService *SymbolDataService
-	jobService        *JobService
-	settingsService   *SettingsService
-	backupService     *BackupService
-	ticker            *time.Ticker
-	done              chan bool
-	started           atomic.Bool
-	lastRunMu         sync.RWMutex
-	lastRun           map[string]time.Time
-	runningTasks      sync.Map
-	tasks             []ScheduledTask
+	bulkDataService        *BulkDataService
+	incrementalSyncService *IncrementalSyncService
+	setDataService         *SetDataService
+	symbolDataService      *SymbolDataService
+	jobService             *JobService
+	settingsService        *SettingsService
+	backupService          *BackupService
+	ticker                 *time.Ticker
+	done                   chan bool
+	started                atomic.Bool
+	lastRunMu              sync.RWMutex
+	lastRun                map[string]time.Time
+	runningTasks           sync.Map
+	tasks                  []ScheduledTask
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataService, symbolDataService *SymbolDataService, jobService *JobService, settingsService *SettingsService, backupService *BackupService) *Scheduler {
+func NewScheduler(bulkDataService *BulkDataService, incrementalSyncService *IncrementalSyncService, setDataService *SetDataService, symbolDataService *SymbolDataService, jobService *JobService, settingsService *SettingsService, backupService *BackupService) *Scheduler {
 	s := &Scheduler{
-		bulkDataService:   bulkDataService,
-		setDataService:    setDataService,
-		symbolDataService: symbolDataService,
-		jobService:        jobService,
-		settingsService:   settingsService,
-		backupService:     backupService,
-		done:              make(chan bool, 1),
-		lastRun:           make(map[string]time.Time),
+		bulkDataService:        bulkDataService,
+		incrementalSyncService: incrementalSyncService,
+		setDataService:         setDataService,
+		symbolDataService:      symbolDataService,
+		jobService:             jobService,
+		settingsService:        settingsService,
+		backupService:          backupService,
+		done:                   make(chan bool, 1),
+		lastRun:                make(map[string]time.Time),
 	}
 
 	// Register all scheduled tasks
 	s.tasks = []ScheduledTask{
 		{
-			Name:        "bulk_data_update",
-			DisplayName: "Card Data Update",
-			Description: "Downloads Scryfall's bulk card data and refreshes the local card database.",
-			Interval:    24 * time.Hour,
-			JobType:     models.JobTypeBulkDataImport,
+			Name:           "bulk_data_update",
+			DisplayName:    "Full Card Data Update",
+			Description:    "Downloads Scryfall's full bulk card data to refresh all cards and daily prices.",
+			Interval:       7 * 24 * time.Hour,
+			JobType:        models.JobTypeBulkDataImport,
+			ExclusiveGroup: "card_sync",
+			ConflictsWith:  []models.JobType{models.JobTypeIncrementalCardSync},
 			Extras: []TaskSetting{{
 				Key:         "bulk_data_url",
 				Label:       "Bulk data source",
@@ -127,6 +137,30 @@ func NewScheduler(bulkDataService *BulkDataService, setDataService *SetDataServi
 				Kind:        "url",
 			}},
 			Run: s.runBulkDataUpdate,
+		},
+		{
+			Name:           "incremental_card_sync",
+			DisplayName:    "Incremental Card Sync",
+			Description:    "Syncs new and updated cards from Scryfall's manifest without downloading the full bulk file.",
+			Interval:       24 * time.Hour,
+			JobType:        models.JobTypeIncrementalCardSync,
+			ExclusiveGroup: "card_sync",
+			ConflictsWith:  []models.JobType{models.JobTypeBulkDataImport},
+			Extras: []TaskSetting{
+				{
+					Key:         "card_manifest_url",
+					Label:       "Manifest source",
+					Description: "Scryfall card manifest API endpoint.",
+					Kind:        "url",
+				},
+				{
+					Key:         "incremental_card_sync_fallback_threshold",
+					Label:       "Full sync fallback threshold",
+					Description: "Fall back to a full bulk import if more than this many cards need updating. 0 disables fallback.",
+					Kind:        "int",
+				},
+			},
+			Run: s.runIncrementalCardSync,
 		},
 		{
 			Name:        "set_data_update",
@@ -250,15 +284,25 @@ func (s *Scheduler) RunNow(ctx context.Context, name string) (uint, error) {
 // the background phase after Run has returned (and imports started outside the
 // scheduler, such as the initial import on startup).
 func (s *Scheduler) start(ctx context.Context, task ScheduledTask) (uint, error) {
-	if _, loaded := s.runningTasks.LoadOrStore(task.Name, true); loaded {
+	lockKey := task.Name
+	if task.ExclusiveGroup != "" {
+		lockKey = "group:" + task.ExclusiveGroup
+	}
+	if _, loaded := s.runningTasks.LoadOrStore(lockKey, true); loaded {
 		return 0, ErrTaskRunning
 	}
-	defer s.runningTasks.Delete(task.Name)
+	defer s.runningTasks.Delete(lockKey)
 
+	checkTypes := make([]models.JobType, 0, 1+len(task.ConflictsWith))
 	if task.JobType != "" {
-		active, err := s.jobService.HasActive(ctx, task.JobType)
+		checkTypes = append(checkTypes, task.JobType)
+	}
+	checkTypes = append(checkTypes, task.ConflictsWith...)
+
+	for _, jt := range checkTypes {
+		active, err := s.jobService.HasActive(ctx, jt)
 		if err != nil {
-			return 0, fmt.Errorf("checking for running %s job: %w", task.JobType, err)
+			return 0, fmt.Errorf("checking for running %s job: %w", jt, err)
 		}
 		if active {
 			return 0, ErrTaskRunning
@@ -421,6 +465,18 @@ func (s *Scheduler) runBulkDataUpdate(ctx context.Context) (uint, error) {
 	}
 	s.inBackground(ctx, task, job.ID, func(ctx context.Context) error {
 		return s.bulkDataService.DownloadAndImport(ctx, job.ID)
+	})
+	return job.ID, nil
+}
+
+func (s *Scheduler) runIncrementalCardSync(ctx context.Context) (uint, error) {
+	task, _ := s.task("incremental_card_sync")
+	job, err := s.incrementalSyncService.CreateSyncJob(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("creating incremental card sync job: %w", err)
+	}
+	s.inBackground(ctx, task, job.ID, func(ctx context.Context) error {
+		return s.incrementalSyncService.Sync(ctx, job.ID)
 	})
 	return job.ID, nil
 }

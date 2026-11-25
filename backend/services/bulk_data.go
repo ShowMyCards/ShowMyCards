@@ -141,6 +141,22 @@ type JobMetadata struct {
 	Phase           string   `json:"phase"`            // "downloading", "importing", "completed"
 }
 
+// BulkImportProgress reports incremental progress from streamBulkImport.
+type BulkImportProgress struct {
+	Phase           string
+	ProcessedCards  int
+	FailedCards     int
+	FailureExamples []string
+}
+
+// BulkImportResult summarizes a completed streamBulkImport run.
+type BulkImportResult struct {
+	TotalCards      int
+	ProcessedCards  int
+	FailedCards     int
+	FailureExamples []string
+}
+
 // DownloadAndImport downloads and imports bulk data from Scryfall with context support
 func (s *BulkDataService) DownloadAndImport(ctx context.Context, jobID uint) error {
 	// Update job status to in progress
@@ -186,8 +202,33 @@ func (s *BulkDataService) DownloadAndImport(ctx context.Context, jobID uint) err
 }
 
 func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID uint) error {
+	result, err := s.streamBulkImport(ctx, func(p BulkImportProgress) {
+		s.updateJobMetadata(ctx, jobID, JobMetadata{
+			Phase:           p.Phase,
+			ProcessedCards:  p.ProcessedCards,
+			FailedCards:     p.FailedCards,
+			FailureExamples: p.FailureExamples,
+		})
+	})
+
+	if result.TotalCards > 0 || err == nil {
+		s.updateJobMetadata(ctx, jobID, JobMetadata{
+			Phase:           "completed",
+			TotalCards:      result.TotalCards,
+			ProcessedCards:  result.ProcessedCards,
+			FailedCards:     result.FailedCards,
+			FailureExamples: result.FailureExamples,
+		})
+	}
+
+	return err
+}
+
+func (s *BulkDataService) streamBulkImport(ctx context.Context, onProgress func(BulkImportProgress)) (BulkImportResult, error) {
 	// Step 1: Fetch bulk data list
-	s.updateJobMetadata(ctx, jobID, JobMetadata{Phase: "fetching_list"})
+	if onProgress != nil {
+		onProgress(BulkImportProgress{Phase: "fetching_list"})
+	}
 
 	bulkDataURL, err := s.settingsService.Get(ctx, "bulk_data_url")
 	if err != nil || bulkDataURL == "" {
@@ -197,26 +238,33 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 		}
 	}
 
-	downloadURI, err := s.fetchBulkDataDownloadURI(ctx, bulkDataURL)
+	info, err := s.fetchBulkDataInfo(ctx, bulkDataURL)
 	if err != nil {
-		return fmt.Errorf("failed to fetch bulk data list: %w", err)
+		return BulkImportResult{}, fmt.Errorf("failed to fetch bulk data list: %w", err)
+	}
+
+	dataUpdatedAt := ""
+	if !info.UpdatedAt.IsZero() {
+		dataUpdatedAt = info.UpdatedAt.UTC().Format(time.RFC3339)
 	}
 
 	// Step 2: Download and import bulk data file in streaming fashion (UPSERT strategy)
-	s.updateJobMetadata(ctx, jobID, JobMetadata{Phase: "downloading_and_importing"})
+	if onProgress != nil {
+		onProgress(BulkImportProgress{Phase: "downloading_and_importing"})
+	}
 
 	totalProcessed := 0
 	totalFailed := 0
 	allFailureExamples := make([]string, 0, 10)
 
-	err = s.downloadBulkDataStream(ctx, downloadURI, BulkDataBatchSize, func(batch []scryfall.Card) error {
+	err = s.downloadBulkDataStream(ctx, info.JSONLDownloadURI, BulkDataBatchSize, func(batch []scryfall.Card) error {
 		// Check context before processing batch
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("import cancelled: %w", err)
 		}
 
 		// Import this batch with context
-		batchResult, err := s.importCardsBatch(ctx, batch)
+		batchResult, err := s.importCardsBatch(ctx, batch, dataUpdatedAt)
 		if err != nil {
 			return err
 		}
@@ -232,19 +280,21 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 		}
 
 		// Update progress
-		s.updateJobMetadata(ctx, jobID, JobMetadata{
-			Phase:           "downloading_and_importing",
-			ProcessedCards:  totalProcessed,
-			FailedCards:     totalFailed,
-			FailureExamples: allFailureExamples,
-		})
+		if onProgress != nil {
+			onProgress(BulkImportProgress{
+				Phase:           "downloading_and_importing",
+				ProcessedCards:  totalProcessed,
+				FailedCards:     totalFailed,
+				FailureExamples: allFailureExamples,
+			})
+		}
 
 		slog.Info("import progress", "processed", totalProcessed, "failed", totalFailed)
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to download and import bulk data: %w", err)
+		return BulkImportResult{}, fmt.Errorf("failed to download and import bulk data: %w", err)
 	}
 
 	// Step 3: Check failure rate and determine job outcome
@@ -254,17 +304,16 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 		failureRate = float64(totalFailed) / float64(totalCards)
 	}
 
-	s.updateJobMetadata(ctx, jobID, JobMetadata{
-		Phase:           "completed",
+	res := BulkImportResult{
 		TotalCards:      totalCards,
 		ProcessedCards:  totalProcessed,
 		FailedCards:     totalFailed,
 		FailureExamples: allFailureExamples,
-	})
+	}
 
 	// If failure rate exceeds threshold, return error to mark job as failed
 	if failureRate > BulkDataMaxFailureRate {
-		return fmt.Errorf("bulk import failed: %d/%d cards failed (%.2f%% > %.2f%% threshold)",
+		return res, fmt.Errorf("bulk import failed: %d/%d cards failed (%.2f%% > %.2f%% threshold)",
 			totalFailed, totalCards, failureRate*100, BulkDataMaxFailureRate*100)
 	}
 
@@ -279,13 +328,13 @@ func (s *BulkDataService) downloadAndImportInternal(ctx context.Context, jobID u
 		slog.Error("failed to reclassify deck extras after bulk import", "error", err)
 	}
 
-	return nil
+	return res, nil
 }
 
-func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkDataURL string) (string, error) {
+func (s *BulkDataService) fetchBulkDataInfo(ctx context.Context, bulkDataURL string) (BulkDataInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", bulkDataURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return BulkDataInfo{}, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", version.UserAgent())
 	req.Header.Set("Accept", "application/json")
@@ -294,7 +343,7 @@ func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkData
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch bulk data list: %w", err)
+		return BulkDataInfo{}, fmt.Errorf("failed to fetch bulk data list: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -305,25 +354,25 @@ func (s *BulkDataService) fetchBulkDataDownloadURI(ctx context.Context, bulkData
 			"url", bulkDataURL,
 			"response_body", string(body),
 		)
-		return "", fmt.Errorf("bulk data list returned status %d: %s", resp.StatusCode, string(body))
+		return BulkDataInfo{}, fmt.Errorf("bulk data list returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var bulkDataList BulkDataListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&bulkDataList); err != nil {
-		return "", fmt.Errorf("failed to decode bulk data list: %w", err)
+		return BulkDataInfo{}, fmt.Errorf("failed to decode bulk data list: %w", err)
 	}
 
 	// Find the "all_cards" bulk data
 	for _, bulkData := range bulkDataList.Data {
 		if bulkData.Type == BulkDataTypeAllCards {
 			if bulkData.JSONLDownloadURI == "" {
-				return "", fmt.Errorf("%s bulk data has no jsonl_download_uri", BulkDataTypeAllCards)
+				return BulkDataInfo{}, fmt.Errorf("%s bulk data has no jsonl_download_uri", BulkDataTypeAllCards)
 			}
-			return bulkData.JSONLDownloadURI, nil
+			return bulkData, nil
 		}
 	}
 
-	return "", fmt.Errorf("%s bulk data not found", BulkDataTypeAllCards)
+	return BulkDataInfo{}, fmt.Errorf("%s bulk data not found", BulkDataTypeAllCards)
 }
 
 // downloadBulkDataStream downloads and streams bulk data, calling the callback
@@ -413,10 +462,9 @@ type BatchImportResult struct {
 	FailureExamples []string // First 10 failures, max 100 chars each
 }
 
-// importCardsBatch imports a single batch of cards into the database
-// Uses UPSERT (ON CONFLICT) to skip unchanged records for better performance
-// Returns statistics about the import including failure tracking
-func (s *BulkDataService) importCardsBatch(ctx context.Context, cards []scryfall.Card) (BatchImportResult, error) {
+// importCardsBatch imports a single batch of cards into the database.
+// Uses UPSERT (ON CONFLICT) to insert new or update changed records.
+func (s *BulkDataService) importCardsBatch(ctx context.Context, cards []scryfall.Card, dataUpdatedAt string) (BatchImportResult, error) {
 	result := BatchImportResult{
 		TotalCards:      len(cards),
 		FailureExamples: make([]string, 0),
@@ -450,6 +498,9 @@ func (s *BulkDataService) importCardsBatch(ctx context.Context, cards []scryfall
 			slog.Warn("failed to convert card", "scryfall_id", scryfallCard.ID, "name", scryfallCard.Name, "error", err)
 			continue
 		}
+		if dataUpdatedAt != "" {
+			card.DataUpdatedAt = dataUpdatedAt
+		}
 		dbCards = append(dbCards, card)
 	}
 
@@ -457,25 +508,37 @@ func (s *BulkDataService) importCardsBatch(ctx context.Context, cards []scryfall
 		return result, fmt.Errorf("no valid cards to import in batch")
 	}
 
-	// Use UPSERT to insert or update cards
-	// SQLite syntax: INSERT ... ON CONFLICT(scryfall_id) DO UPDATE SET ...
-	// This skips unchanged records automatically (no UPDATE if values match)
-	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "scryfall_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"raw_json", "oracle_id"}),
-	}).Create(&dbCards).Error; err != nil {
-		firstID := ""
-		lastName := ""
-		if len(dbCards) > 0 {
-			firstID = dbCards[0].ScryfallID
-			lastName = dbCards[len(dbCards)-1].Name
-		}
-		return result, fmt.Errorf("failed to insert batch of %d cards (first: %s, last: %s): %w",
-			len(dbCards), firstID, lastName, err)
+	if err := upsertCardsBatch(ctx, s.db, dbCards); err != nil {
+		return result, err
 	}
 
 	result.SuccessCards = len(dbCards)
 	return result, nil
+}
+
+// upsertCardsBatch inserts or updates a non-empty slice of cards in SQLite,
+// keeping existing data_updated_at values when the incoming record leaves it empty.
+func upsertCardsBatch(ctx context.Context, db *gorm.DB, dbCards []*models.Card) error {
+	if len(dbCards) == 0 {
+		return nil
+	}
+
+	if err := db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "scryfall_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"raw_json":         gorm.Expr("excluded.raw_json"),
+			"oracle_id":        gorm.Expr("excluded.oracle_id"),
+			"image_updated_at": gorm.Expr("excluded.image_updated_at"),
+			"data_updated_at":  gorm.Expr("CASE WHEN excluded.data_updated_at != '' THEN excluded.data_updated_at ELSE cards.data_updated_at END"),
+		}),
+	}).Create(&dbCards).Error; err != nil {
+		firstID := dbCards[0].ScryfallID
+		lastID := dbCards[len(dbCards)-1].ScryfallID
+		return fmt.Errorf("failed to insert batch of %d cards (first: %s, last: %s): %w",
+			len(dbCards), firstID, lastID, err)
+	}
+
+	return nil
 }
 
 func (s *BulkDataService) updateJobMetadata(ctx context.Context, jobID uint, metadata JobMetadata) {

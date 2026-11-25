@@ -139,7 +139,8 @@
 				</thead>
 				<tbody>
 					{#each data.jobs as job (job.id)}
-						{@const progress = jobProgress(parseJobMetadata(job.metadata))}
+						{@const meta = parseJobMetadata(job.metadata)}
+						{@const progress = jobProgress(meta)}
 						<tr id="job-{job.id}" class="scroll-mt-20 target:bg-base-300">
 							<td>{job.id}</td>
 							<td>
@@ -169,6 +170,8 @@
 									{#if progress.phase}
 										<div class="text-xs opacity-70">{progress.phase}</div>
 									{/if}
+								{:else if typeof meta?.phase === 'string'}
+									<div class="text-xs opacity-70">{meta.phase}</div>
 								{:else}
 									<span class="opacity-50">-</span>
 								{/if}

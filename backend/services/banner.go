@@ -57,7 +57,11 @@ func (s *BannerService) GetActive(ctx context.Context) ([]models.Banner, error) 
 	// Failed syncs: one banner per type whose most recent job failed. A later
 	// successful (or in-progress) run replaces it as the latest job, so the
 	// banner clears itself.
-	for _, jobType := range []models.JobType{models.JobTypeBulkDataImport, models.JobTypeSetDataImport} {
+	for _, jobType := range []models.JobType{
+		models.JobTypeBulkDataImport,
+		models.JobTypeIncrementalCardSync,
+		models.JobTypeSetDataImport,
+	} {
 		last, err := s.jobService.GetLastJobByType(ctx, jobType)
 		if err != nil {
 			return nil, fmt.Errorf("loading last %s job: %w", jobType, err)
@@ -101,6 +105,9 @@ func inProgressBanner(jobType models.JobType) (models.Banner, bool) {
 	case models.JobTypeBulkDataImport:
 		message = "Updating card data from Scryfall — this may take a few minutes. " +
 			"Search works as normal; cards in your inventory and lists may show incomplete details until it finishes."
+	case models.JobTypeIncrementalCardSync:
+		message = "Syncing new and updated cards from Scryfall — this may take a few minutes. " +
+			"Search and your collection work as normal while it finishes."
 	case models.JobTypeSetDataImport:
 		message = "Updating set data from Scryfall — set names and icons may be incomplete until it finishes."
 	default:
@@ -122,6 +129,8 @@ func failedBanner(job *models.Job) (models.Banner, bool) {
 	switch job.Type {
 	case models.JobTypeBulkDataImport:
 		message = "The last card data sync from Scryfall failed — prices and card details may be out of date. Search still works normally."
+	case models.JobTypeIncrementalCardSync:
+		message = "The last incremental card sync from Scryfall failed — new or updated cards may be missing. Search still works normally."
 	case models.JobTypeSetDataImport:
 		message = "The last set data sync from Scryfall failed — some set names and icons may be missing or outdated."
 	default:

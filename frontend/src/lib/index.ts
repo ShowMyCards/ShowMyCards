@@ -124,6 +124,7 @@ export {
 	Box,
 	Binder,
 	JobTypeBulkDataImport,
+	JobTypeIncrementalCardSync,
 	JobStatusPending,
 	JobStatusInProgress,
 	JobStatusCompleted,

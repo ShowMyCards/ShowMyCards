@@ -71,6 +71,7 @@ func main() {
 	settingsService := services.NewSettingsService(dbClient.DB)
 	jobService := services.NewJobService(dbClient.DB)
 	bulkDataService := services.NewBulkDataService(dbClient.DB, jobService, settingsService)
+	incrementalSyncService := services.NewIncrementalSyncService(dbClient.DB, jobService, settingsService, scryfallClient, bulkDataService)
 	setDataService := services.NewSetDataService(dbClient.DB, jobService, settingsService, scryfallClient, dataDir)
 	symbolDataService := services.NewSymbolDataService(dbClient.DB, jobService, settingsService, scryfallClient)
 	// The data handler doubles as the in-process exporter for the backup job,
@@ -113,7 +114,7 @@ func main() {
 
 	// The scheduler is built before the server so its task registry can back
 	// the scheduler API.
-	scheduler := services.NewScheduler(bulkDataService, setDataService, symbolDataService, jobService, settingsService, backupService)
+	scheduler := services.NewScheduler(bulkDataService, incrementalSyncService, setDataService, symbolDataService, jobService, settingsService, backupService)
 
 	// Initialize server with database, scryfall clients, and services
 	srv := server.NewServer(ctx, dbClient, scryfallClient, settingsService, jobService, scheduler, dataDir)
