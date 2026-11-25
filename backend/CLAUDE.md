@@ -281,6 +281,7 @@ renamed on startup by `renameSettingKeys` in `database/client.go`.
 - `GET /api/search` - Search cards via Scryfall with inventory data
   - Query params: `q` (search query), `page` (default: 1)
   - Returns enhanced results with inventory info (this printing, other printings)
+- `GET /api/cards/printings/:oracle_id` - Get all printings of a card (owned printings across all languages first, plus language-filtered Scryfall printings)
 - `GET /api/search/:id` - Get single card by Scryfall ID
 
 ## Domain Model

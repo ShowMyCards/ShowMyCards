@@ -296,6 +296,9 @@
 									(sum: number, i: { quantity: number }) => sum + i.quantity,
 									0
 								)}
+								{@const showLanguage = Boolean(
+									printing.language && printing.language !== card.language
+								)}
 								<a
 									href={resolve(`cards/${printing.id}`)}
 									class="card bg-base-100 hover:bg-base-300 transition-colors cursor-pointer">
@@ -303,16 +306,25 @@
 										<figure class="px-2 pt-2">
 											<img
 												src={printing.image_uri}
-												alt={printing.name}
+												alt={getDisplayName(printing)}
 												class="rounded-lg"
 												loading="lazy" />
 										</figure>
 									{/if}
 									<div class="card-body p-3">
 										<p class="text-sm font-medium">{printing.set_name}</p>
-										{#if ownedCount > 0}
-											<div class="badge badge-primary badge-sm">
-												{ownedCount} owned
+										{#if ownedCount > 0 || showLanguage}
+											<div class="flex flex-wrap gap-1">
+												{#if ownedCount > 0}
+													<div class="badge badge-primary badge-sm">
+														{ownedCount} owned
+													</div>
+												{/if}
+												{#if showLanguage}
+													<div class="badge badge-outline badge-sm uppercase">
+														{printing.language}
+													</div>
+												{/if}
 											</div>
 										{/if}
 									</div>
