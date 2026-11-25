@@ -99,6 +99,14 @@ export interface Card {
 	set_code: string;
 }
 /**
+ * CardSyncState holds the locally-stored timestamps used to diff against
+ * Scryfall's /cards/manifest endpoint without loading RawJSON.
+ */
+export interface CardSyncState {
+	ImageUpdatedAt: string;
+	DataUpdatedAt: string;
+}
+/**
  * PrintKey identifies a printing by its set code and collector number, which a
  * card shares across all of its language variants.
  */
@@ -209,12 +217,14 @@ export interface Inventory {
  * tygo:export
  */
 export const JobTypeBulkDataImport = 'bulk_data_import';
+export const JobTypeIncrementalCardSync = 'incremental_card_sync';
 export const JobTypeSetDataImport = 'set_data_import';
 export const JobTypeSymbolDataImport = 'symbol_data_import';
 export const JobTypeDataBackup = 'data_backup';
 export const JobTypeJobCleanup = 'job_cleanup';
 export type JobType =
 	| typeof JobTypeBulkDataImport
+	| typeof JobTypeIncrementalCardSync
 	| typeof JobTypeSetDataImport
 	| typeof JobTypeSymbolDataImport
 	| typeof JobTypeDataBackup

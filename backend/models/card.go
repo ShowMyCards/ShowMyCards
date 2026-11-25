@@ -1,11 +1,13 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"gorm.io/gorm"
@@ -51,6 +53,13 @@ type Card struct {
 	ScryfallID string `gorm:"primaryKey;type:varchar(255);not null" json:"scryfall_id"`
 	OracleID   string `gorm:"index;type:varchar(255)" json:"oracle_id"` // Can be empty for tokens/emblems
 	RawJSON    string `gorm:"type:text;not null" json:"-"`              // Don't expose in API
+
+	// Sync timestamps used by IncrementalSyncService to diff against /cards/manifest.
+	// Pre-upgrade rows default to "" to avoid a slow table-wide backfill on startup;
+	// the first post-upgrade incremental sync populates them via a one-time full
+	// bulk import fallback.
+	ImageUpdatedAt string `gorm:"type:varchar(64);not null;default:''" json:"-"`
+	DataUpdatedAt  string `gorm:"type:varchar(64);not null;default:''" json:"-"`
 
 	// Generated columns (created via migration, not by GORM)
 	// These are read-only and populated by SQLite from RawJSON
@@ -104,11 +113,51 @@ func FromScryfallCard(scryfallCard scryfall.Card) (*Card, error) {
 		return nil, err
 	}
 
+	imageUpdatedAt := ""
+	if scryfallCard.ImageUpdatedAt != nil && !scryfallCard.ImageUpdatedAt.IsZero() {
+		imageUpdatedAt = scryfallCard.ImageUpdatedAt.UTC().Format(time.RFC3339)
+	}
+
 	return &Card{
-		ScryfallID: scryfallCard.ID,
-		OracleID:   scryfallCard.OracleID,
-		RawJSON:    cleanRawJSON(string(rawJSON)),
+		ScryfallID:     scryfallCard.ID,
+		OracleID:       scryfallCard.OracleID,
+		RawJSON:        cleanRawJSON(string(rawJSON)),
+		ImageUpdatedAt: imageUpdatedAt,
 	}, nil
+}
+
+// CardSyncState holds the locally-stored timestamps used to diff against
+// Scryfall's /cards/manifest endpoint without loading RawJSON.
+type CardSyncState struct {
+	ImageUpdatedAt string
+	DataUpdatedAt  string
+}
+
+// GetCardSyncState returns a map of ScryfallID -> CardSyncState for every card
+// in the local database, backed by idx_cards_sync_state.
+func GetCardSyncState(ctx context.Context, db *gorm.DB) (map[string]CardSyncState, error) {
+	rows, err := db.WithContext(ctx).Table("cards").Select("scryfall_id, image_updated_at, data_updated_at").Rows()
+	if err != nil {
+		return nil, fmt.Errorf("querying card sync state: %w", err)
+	}
+	defer rows.Close()
+
+	state := make(map[string]CardSyncState)
+	for rows.Next() {
+		var id, imgUpdated, dataUpdated string
+		if err := rows.Scan(&id, &imgUpdated, &dataUpdated); err != nil {
+			return nil, fmt.Errorf("scanning card sync state: %w", err)
+		}
+		state[id] = CardSyncState{
+			ImageUpdatedAt: imgUpdated,
+			DataUpdatedAt:  dataUpdated,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating card sync state: %w", err)
+	}
+
+	return state, nil
 }
 
 // GetCardsByIDs fetches multiple cards by their Scryfall IDs and returns them as a map

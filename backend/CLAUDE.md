@@ -311,6 +311,8 @@ Represents Magic cards from Scryfall's bulk data.
 - `ScryfallID` (string, primary key) - Unique Scryfall card identifier
 - `OracleID` (string, indexed) - Oracle ID for card versions (can be empty for tokens)
 - `RawJSON` (text) - Complete Scryfall card data as JSON (not exposed in API)
+- `ImageUpdatedAt` (string, not exposed) - Last Scryfall image update timestamp used for incremental manifest sync
+- `DataUpdatedAt` (string, not exposed) - Last Scryfall data update timestamp used for incremental manifest sync
 - `Name` (string, generated column) - Card name extracted from JSON via SQLite
 - `SetCode` (string, generated column) - Set code extracted from JSON via SQLite
 
@@ -387,9 +389,9 @@ Defines automated rules for sorting cards into storage locations.
 
 Background job tracking for long-running operations.
 
-- `Type` (string) - Job type: `bulk_data_import`, `set_data_import`,
-  `symbol_data_import`, `data_backup`, `job_cleanup`. Every scheduled task
-  writes a Job record (its `JobType` in the scheduler registry).
+- `Type` (string) - Job type: `bulk_data_import`, `incremental_card_sync`,
+  `set_data_import`, `symbol_data_import`, `data_backup`, `job_cleanup`. Every
+  scheduled task writes a Job record (its `JobType` in the scheduler registry).
 - `Status` (string) - Current status (pending, in_progress, completed, failed, cancelled)
 - `Error` (string) - Error message if failed
 - `StartedAt` (\*time.Time) - When job started

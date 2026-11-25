@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/BlueMonday/go-scryfall"
 )
@@ -51,8 +52,9 @@ func TestNewAPI_SendsShowMyCardsUserAgent(t *testing.T) {
 
 // mockAPI implements ScryfallAPI for testing
 type mockAPI struct {
-	searchFunc  func(ctx context.Context, query string, opts scryfall.SearchCardsOptions) (scryfall.CardListResponse, error)
-	getCardFunc func(ctx context.Context, id string) (scryfall.Card, error)
+	searchFunc                func(ctx context.Context, query string, opts scryfall.SearchCardsOptions) (scryfall.CardListResponse, error)
+	getCardFunc               func(ctx context.Context, id string) (scryfall.Card, error)
+	getCardsByIdentifiersFunc func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error)
 }
 
 func (m *mockAPI) SearchCards(ctx context.Context, query string, opts scryfall.SearchCardsOptions) (scryfall.CardListResponse, error) {
@@ -67,6 +69,13 @@ func (m *mockAPI) GetCard(ctx context.Context, id string) (scryfall.Card, error)
 		return m.getCardFunc(ctx, id)
 	}
 	return scryfall.Card{}, nil
+}
+
+func (m *mockAPI) GetCardsByIdentifiers(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+	if m.getCardsByIdentifiersFunc != nil {
+		return m.getCardsByIdentifiersFunc(ctx, identifiers)
+	}
+	return scryfall.GetCardsByIdentifiersResponse{}, nil
 }
 
 func (m *mockAPI) ListSets(ctx context.Context) ([]scryfall.Set, error) {
@@ -350,5 +359,155 @@ func TestGetByID_CachesResult(t *testing.T) {
 
 	if callCount != 1 {
 		t.Errorf("expected API to be called once, was called %d times", callCount)
+	}
+}
+
+func TestGetCollectionByIDs_Empty(t *testing.T) {
+	called := false
+	mock := &mockAPI{
+		getCardsByIdentifiersFunc: func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+			called = true
+			return scryfall.GetCardsByIdentifiersResponse{}, nil
+		},
+	}
+
+	client := newClientWithAPI(mock)
+	defer client.Close()
+
+	cards, notFound, err := client.GetCollectionByIDs(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if called {
+		t.Error("expected API not to be called for empty ID slice")
+	}
+	if cards != nil || notFound != nil {
+		t.Errorf("expected nil slices, got cards=%v notFound=%v", cards, notFound)
+	}
+}
+
+func TestGetCollectionByIDs_ExceedsMaxBatchSize(t *testing.T) {
+	called := false
+	mock := &mockAPI{
+		getCardsByIdentifiersFunc: func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+			called = true
+			return scryfall.GetCardsByIdentifiersResponse{}, nil
+		},
+	}
+
+	client := newClientWithAPI(mock)
+	defer client.Close()
+
+	ids := make([]string, MaxCollectionBatchSize+1)
+	for i := range ids {
+		ids[i] = "id"
+	}
+
+	_, _, err := client.GetCollectionByIDs(context.Background(), ids)
+	if err == nil {
+		t.Fatal("expected error for oversized batch")
+	}
+	if called {
+		t.Error("expected API not to be called when batch exceeds max size")
+	}
+}
+
+func TestGetCollectionByIDs_SuccessWithNotFound(t *testing.T) {
+	mock := &mockAPI{
+		getCardsByIdentifiersFunc: func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+			if len(identifiers) != 2 || identifiers[0].ID != "id-1" || identifiers[1].ID != "id-missing" {
+				t.Errorf("unexpected identifiers: %+v", identifiers)
+			}
+			return scryfall.GetCardsByIdentifiersResponse{
+				Data:     []scryfall.Card{{ID: "id-1", Name: "Card One"}},
+				NotFound: []scryfall.CardIdentifier{{ID: "id-missing"}},
+			}, nil
+		},
+	}
+
+	client := newClientWithAPI(mock)
+	defer client.Close()
+
+	cards, notFound, err := client.GetCollectionByIDs(context.Background(), []string{"id-1", "id-missing"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cards) != 1 || cards[0].ID != "id-1" {
+		t.Errorf("unexpected cards: %+v", cards)
+	}
+	if len(notFound) != 1 || notFound[0] != "id-missing" {
+		t.Errorf("unexpected notFound: %+v", notFound)
+	}
+}
+
+func TestGetCollectionByIDs_RateLimitRetry(t *testing.T) {
+	attempts := 0
+	mock := &mockAPI{
+		getCardsByIdentifiersFunc: func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+			attempts++
+			if attempts == 1 {
+				return scryfall.GetCardsByIdentifiersResponse{}, &scryfall.Error{Status: http.StatusTooManyRequests, Details: "rate limited"}
+			}
+			return scryfall.GetCardsByIdentifiersResponse{
+				Data: []scryfall.Card{{ID: "id-1", Name: "Recovered"}},
+			}, nil
+		},
+	}
+
+	client := newClientWithAPI(mock)
+	client.retryDelay = time.Millisecond
+	defer client.Close()
+
+	cards, _, err := client.GetCollectionByIDs(context.Background(), []string{"id-1"})
+	if err != nil {
+		t.Fatalf("expected retry to succeed, got: %v", err)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+	if len(cards) != 1 || cards[0].Name != "Recovered" {
+		t.Errorf("unexpected cards: %+v", cards)
+	}
+}
+
+func TestGetCollectionByIDs_RateLimitExhausted(t *testing.T) {
+	attempts := 0
+	mock := &mockAPI{
+		getCardsByIdentifiersFunc: func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+			attempts++
+			return scryfall.GetCardsByIdentifiersResponse{}, &scryfall.Error{Status: http.StatusTooManyRequests, Details: "still limited"}
+		},
+	}
+
+	client := newClientWithAPI(mock)
+	client.retryDelay = time.Millisecond
+	defer client.Close()
+
+	_, _, err := client.GetCollectionByIDs(context.Background(), []string{"id-1"})
+	if err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if attempts != maxRateLimitRetries+1 {
+		t.Errorf("expected %d attempts, got %d", maxRateLimitRetries+1, attempts)
+	}
+}
+
+func TestGetCollectionByIDs_ContextCancelledDuringBackoff(t *testing.T) {
+	mock := &mockAPI{
+		getCardsByIdentifiersFunc: func(ctx context.Context, identifiers []scryfall.CardIdentifier) (scryfall.GetCardsByIdentifiersResponse, error) {
+			return scryfall.GetCardsByIdentifiersResponse{}, &scryfall.Error{Status: http.StatusTooManyRequests}
+		},
+	}
+
+	client := newClientWithAPI(mock)
+	client.retryDelay = 5 * time.Second
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	_, _, err := client.GetCollectionByIDs(ctx, []string{"id-1"})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected context.DeadlineExceeded, got %v", err)
 	}
 }

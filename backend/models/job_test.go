@@ -26,6 +26,7 @@ func TestJobType_Valid(t *testing.T) {
 		expected bool
 	}{
 		{"BulkDataImport", JobTypeBulkDataImport, true},
+		{"IncrementalCardSync", JobTypeIncrementalCardSync, true},
 		{"SetDataImport", JobTypeSetDataImport, true},
 		{"SymbolDataImport", JobTypeSymbolDataImport, true},
 		{"DataBackup", JobTypeDataBackup, true},
@@ -83,6 +84,14 @@ func TestJob_BeforeCreate_ValidatesJobType(t *testing.T) {
 			name: "Valid BulkDataImport Type",
 			job: &Job{
 				Type:   JobTypeBulkDataImport,
+				Status: JobStatusPending,
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid IncrementalCardSync Type",
+			job: &Job{
+				Type:   JobTypeIncrementalCardSync,
 				Status: JobStatusPending,
 			},
 			expectError: false,

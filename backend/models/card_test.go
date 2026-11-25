@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -699,5 +700,94 @@ func TestCard_MalformedPreviewedAtHandling(t *testing.T) {
 
 	if scryfallCard.Name != "Test Card" {
 		t.Errorf("expected name 'Test Card', got '%s'", scryfallCard.Name)
+	}
+}
+
+func TestCard_FromScryfallCard_ImageUpdatedAt(t *testing.T) {
+	ts := time.Date(2026, 11, 24, 16, 50, 14, 0, time.FixedZone("EST", -5*3600))
+	tests := []struct {
+		name           string
+		imageUpdatedAt *scryfall.Timestamp
+		want           string
+	}{
+		{
+			name:           "non-nil timestamp normalized to UTC RFC3339",
+			imageUpdatedAt: &scryfall.Timestamp{Time: ts},
+			want:           "2026-11-24T21:50:14Z",
+		},
+		{
+			name:           "nil timestamp",
+			imageUpdatedAt: nil,
+			want:           "",
+		},
+		{
+			name:           "zero timestamp",
+			imageUpdatedAt: &scryfall.Timestamp{},
+			want:           "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card, err := FromScryfallCard(scryfall.Card{
+				ID:             "card-1",
+				OracleID:       "oracle-1",
+				Name:           "Test",
+				ImageUpdatedAt: tt.imageUpdatedAt,
+			})
+			if err != nil {
+				t.Fatalf("FromScryfallCard failed: %v", err)
+			}
+			if card.ImageUpdatedAt != tt.want {
+				t.Errorf("ImageUpdatedAt = %q, want %q", card.ImageUpdatedAt, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetCardSyncState(t *testing.T) {
+	db := setupCardTestDB(t)
+	ctx := context.Background()
+
+	state, err := GetCardSyncState(ctx, db)
+	if err != nil {
+		t.Fatalf("GetCardSyncState on empty DB failed: %v", err)
+	}
+	if len(state) != 0 {
+		t.Errorf("expected empty state map, got %d entries", len(state))
+	}
+
+	cards := []Card{
+		{
+			ScryfallID:     "c1",
+			OracleID:       "o1",
+			RawJSON:        `{"id":"c1","name":"One"}`,
+			ImageUpdatedAt: "2026-10-01T12:00:00Z",
+			DataUpdatedAt:  "2026-10-02T00:00:00Z",
+		},
+		{
+			ScryfallID: "c2",
+			OracleID:   "o2",
+			RawJSON:    `{"id":"c2","name":"Two"}`,
+		},
+	}
+	for i := range cards {
+		if err := db.Create(&cards[i]).Error; err != nil {
+			t.Fatalf("failed to create card %s: %v", cards[i].ScryfallID, err)
+		}
+	}
+
+	state, err = GetCardSyncState(ctx, db)
+	if err != nil {
+		t.Fatalf("GetCardSyncState failed: %v", err)
+	}
+	if len(state) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(state))
+	}
+	if state["c1"] != (CardSyncState{ImageUpdatedAt: "2026-10-01T12:00:00Z", DataUpdatedAt: "2026-10-02T00:00:00Z"}) {
+		t.Errorf("unexpected state for c1: %+v", state["c1"])
+	}
+	if state["c2"] != (CardSyncState{ImageUpdatedAt: "", DataUpdatedAt: ""}) {
+		t.Errorf("unexpected state for c2: %+v", state["c2"])
 	}
 }
